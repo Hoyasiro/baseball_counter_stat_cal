@@ -6,14 +6,54 @@
   --line: #dde3de;
   --primary: #1f5f3f;
   --primary-soft: #e3efe7;
+  --on-color: #ffffff;
+  --bar: #1f5f3f;
+  --board: #1d2420;
+  --board-dot: rgba(255, 255, 255, 0.5);
   --ball: #2f7d4f;
   --strike: #c9862b;
   --hit: #c0453a;
   --out: #4a5a8c;
+  --ball-light: #4fc27c;
+  --strike-light: #f2b34a;
+  --warn-bg: #fff4e0;
+  --warn-text: #7a4b00;
   --radius: 14px;
   font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
   color: var(--text);
   background: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #121714;
+    --surface: #1b221e;
+    --text: #e6ece8;
+    --muted: #9aa8a0;
+    --line: #2c3631;
+    --primary: #5fb488;
+    --primary-soft: #1f3328;
+    --board: #0a0d0b;
+    --bar: #1a4630;
+    --warn-bg: #3a2c12;
+    --warn-text: #f2cf8e;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #121714;
+  --surface: #1b221e;
+  --text: #e6ece8;
+  --muted: #9aa8a0;
+  --line: #2c3631;
+  --primary: #5fb488;
+  --primary-soft: #1f3328;
+  --board: #0a0d0b;
+  --bar: #1a4630;
+  --warn-bg: #3a2c12;
+  --warn-text: #f2cf8e;
+  color-scheme: dark;
 }
 
 * {
@@ -23,6 +63,7 @@
 body {
   margin: 0;
   background: var(--bg);
+  color: var(--text);
 }
 
 button {
@@ -91,13 +132,13 @@ button:disabled {
 /* 공통 틀 */
 .topbar {
   position: sticky;
-  top: 0;
+  top: env(safe-area-inset-top, 0px);
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  background: var(--primary);
-  color: #fff;
+  background: var(--bar);
+  color: var(--on-color);
   z-index: 1;
 }
 
@@ -108,7 +149,7 @@ button:disabled {
 
 .back {
   background: transparent;
-  color: #fff;
+  color: var(--on-color);
   padding: 4px 0;
 }
 
@@ -116,8 +157,8 @@ button:disabled {
   margin: 8px 16px 0;
   padding: 10px 12px;
   border-radius: 10px;
-  background: #fff4e0;
-  color: #7a4b00;
+  background: var(--warn-bg);
+  color: var(--warn-text);
   font-size: 14px;
 }
 
@@ -160,8 +201,8 @@ button:disabled {
 }
 
 .scoreboard {
-  background: var(--text);
-  color: #fff;
+  background: var(--board);
+  color: var(--on-color);
   border-radius: var(--radius);
   padding: 16px;
   display: grid;
@@ -194,17 +235,17 @@ button:disabled {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.5);
+  border: 2px solid var(--board-dot);
 }
 
 .ball .dot.on {
-  background: #4fc27c;
-  border-color: #4fc27c;
+  background: var(--ball-light);
+  border-color: var(--ball-light);
 }
 
 .strike .dot.on {
-  background: #f2b34a;
-  border-color: #f2b34a;
+  background: var(--strike-light);
+  border-color: var(--strike-light);
 }
 
 .count-text {
@@ -235,7 +276,7 @@ button:disabled {
   flex-direction: column;
   justify-content: center;
   gap: 4px;
-  color: #fff;
+  color: var(--on-color);
   padding: 8px 4px;
 }
 
@@ -308,7 +349,7 @@ button:disabled {
   padding: 3px 9px;
   border-radius: 999px;
   font-size: 13px;
-  color: #fff;
+  color: var(--on-color);
   background: var(--muted);
 }
 
@@ -431,5 +472,42 @@ th {
 }
 
 .note {
-  color: #7a4b00;
+  color: var(--warn-text);
+}
+
+.confirm {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.confirm p {
+  margin: 0;
+  font-size: 15px;
+}
+
+.confirm-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.confirm-buttons .secondary {
+  color: var(--text);
+}
+
+.primary {
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--bar);
+  color: var(--on-color);
+  font-weight: 600;
+}
+
+button:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
 }

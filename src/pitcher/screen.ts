@@ -19,6 +19,7 @@ interface State {
   tab: Tab;
   analysisTab: AnalysisTab;
   notice: string | null;
+  confirmingNewGame: boolean;
 }
 
 export function mountPitcher(root: HTMLElement, onBack: () => void): void {
@@ -28,6 +29,7 @@ export function mountPitcher(root: HTMLElement, onBack: () => void): void {
     tab: 'input',
     analysisTab: 'result',
     notice: loaded.ok ? null : loaded.message,
+    confirmingNewGame: false,
   };
 
   const currentGame = (): Game => state.games[state.games.length - 1];
@@ -44,12 +46,22 @@ export function mountPitcher(root: HTMLElement, onBack: () => void): void {
       state.tab === 'input'
         ? inputView(pas, state, updateGame, currentGame)
         : state.tab === 'records'
-          ? recordsView(pas, () => {
-              if (!confirm('지금 경기를 끝내고 새 경기를 시작할까요? 지금까지의 기록은 저장됩니다.')) return;
-              state.games = [...state.games, createGame()];
-              saveGames(STORAGE_KEY, state.games);
-              state.tab = 'input';
-              render();
+          ? recordsView(pas, state.confirmingNewGame, {
+              ask: () => {
+                state.confirmingNewGame = true;
+                render();
+              },
+              cancel: () => {
+                state.confirmingNewGame = false;
+                render();
+              },
+              confirm: () => {
+                state.confirmingNewGame = false;
+                state.games = [...state.games, createGame()];
+                saveGames(STORAGE_KEY, state.games);
+                state.tab = 'input';
+                render();
+              },
             })
           : analysisView(pas, state.analysisTab, (t) => {
               state.analysisTab = t;
@@ -77,6 +89,7 @@ export function mountPitcher(root: HTMLElement, onBack: () => void): void {
             text: label,
             onClick: () => {
               state.tab = tab;
+              state.confirmingNewGame = false;
               render();
             },
           }),
@@ -161,7 +174,25 @@ function inputView(
   ]);
 }
 
-function recordsView(pas: PlateAppearance[], onNewGame: () => void): HTMLElement {
+interface NewGameActions {
+  ask: () => void;
+  cancel: () => void;
+  confirm: () => void;
+}
+
+// 브라우저 확인창(confirm)은 일부 환경에서 뜨지 않으므로 화면 안에서 한 번 더 묻는다.
+function newGameControl(confirming: boolean, actions: NewGameActions): HTMLElement {
+  if (!confirming) return h('button', { className: 'secondary', text: '새 경기 시작', onClick: actions.ask });
+  return h('div', { className: 'confirm' }, [
+    h('p', { text: '지금 경기를 끝내고 새 경기를 시작할까요? 지금까지의 기록은 저장됩니다.' }),
+    h('div', { className: 'confirm-buttons' }, [
+      h('button', { className: 'secondary', text: '아니요', onClick: actions.cancel }),
+      h('button', { className: 'primary', text: '새 경기 시작', onClick: actions.confirm }),
+    ]),
+  ]);
+}
+
+function recordsView(pas: PlateAppearance[], confirmingNewGame: boolean, newGame: NewGameActions): HTMLElement {
   return h('section', { className: 'records' }, [
     pas.length === 0 ? h('p', { className: 'empty', text: '아직 기록이 없습니다.' }) : null,
     ...pas
@@ -180,7 +211,7 @@ function recordsView(pas: PlateAppearance[], onNewGame: () => void): HTMLElement
           ),
         ]),
       ),
-    h('button', { className: 'secondary', text: '새 경기 시작', onClick: onNewGame }),
+    newGameControl(confirmingNewGame, newGame),
   ]);
 }
 
