@@ -1,5 +1,8 @@
 // 경기 기록은 덮어쓰지 않는 "이벤트 목록"으로 저장한다. (CLAUDE.md 5.3)
 // 고치거나 취소할 때도 기존 이벤트를 지우지 않고 새 이벤트를 덧붙인다.
+// 기록은 경기 상황 기준이고, 우리 아이의 역할은 "등장(appearance)" 이벤트로 장면마다 정한다. (CLAUDE.md 0.5)
+
+import { Rules } from './count';
 
 export type PitchResult =
   | 'ball'
@@ -60,11 +63,46 @@ export const PLAY_KINDS: readonly PlayKind[] = [
 /** 0: 1루, 1: 2루, 2: 3루 */
 export type BaseIndex = 0 | 1 | 2;
 
+export type Bases = readonly [boolean, boolean, boolean];
+
 export type GameType = 'practice' | 'tournament' | 'league' | 'other';
 
 export const GAME_TYPES: readonly GameType[] = ['practice', 'tournament', 'league', 'other'];
 
-export type Bases = readonly [boolean, boolean, boolean];
+export type Team = 'us' | 'them';
+
+/** 초(top) / 말(bottom) */
+export type Half = 'top' | 'bottom';
+
+/** 장면에서 우리 아이의 역할 */
+export type Role = 'pitcher' | 'batter' | 'runner' | 'fielder';
+
+export const ROLES: readonly Role[] = ['pitcher', 'batter', 'runner', 'fielder'];
+
+/** 투수를 뺀 수비 포지션 (투수는 역할 'pitcher') */
+export type Position =
+  | 'catcher'
+  | 'firstBase'
+  | 'secondBase'
+  | 'thirdBase'
+  | 'shortstop'
+  | 'leftField'
+  | 'centerField'
+  | 'rightField';
+
+export const POSITIONS: readonly Position[] = [
+  'catcher',
+  'firstBase',
+  'secondBase',
+  'thirdBase',
+  'shortstop',
+  'leftField',
+  'centerField',
+  'rightField',
+];
+
+/** 주자 역할에서 우리 아이의 위치. 베이스, 득점, 아웃 */
+export type ChildPosition = BaseIndex | 'scored' | 'out';
 
 interface EventBase {
   readonly id: string;
@@ -94,9 +132,29 @@ export interface AdjustEvent extends EventBase {
   readonly bases: Bases;
   /** 고치는 동안 홈에 들어온 점수 (예: 실책으로 주자 득점) */
   readonly runs?: number;
+  /** 주자 장면에서 우리 아이가 어디로 갔는지 */
+  readonly child?: ChildPosition;
 }
 
-export type Team = 'us' | 'them';
+/** 우리 아이가 장면에 등장. 그때의 이닝·아웃·주자·카운트로 상황을 맞추고 시작한다. */
+export interface AppearanceEvent extends EventBase {
+  readonly kind: 'appearance';
+  readonly role: Role;
+  readonly inning: number;
+  readonly outs: number;
+  readonly bases: Bases;
+  readonly balls: number;
+  readonly strikes: number;
+  /** 주자 역할일 때 아이가 있는 베이스 */
+  readonly childBase?: BaseIndex;
+  /** 수비 역할일 때 포지션 */
+  readonly position?: Position;
+}
+
+/** 우리 아이가 교체되어 빠짐. 지금 장면의 기록을 끝낸다. */
+export interface ExitEvent extends EventBase {
+  readonly kind: 'exit';
+}
 
 /** 스코어보드에 직접 넣은 점수. 같은 팀·이닝은 마지막 값을 쓴다. */
 export interface ScoreEvent extends EventBase {
@@ -112,8 +170,12 @@ export interface GameInfoEvent extends EventBase {
   readonly date: string;
   readonly opponent: string;
   readonly gameType: GameType;
-  /** 아이가 던지기 시작한 이닝 */
-  readonly startInning: number;
+  /** 예전 기록용: 아이가 던지기 시작한 이닝 */
+  readonly startInning?: number;
+  /** 우리 팀이 먼저 공격(초)인지. 없으면 후공으로 본다. */
+  readonly battingFirst?: Team;
+  /** 없으면 정식 규칙 */
+  readonly rules?: Rules;
 }
 
 export interface VoidEvent extends EventBase {
@@ -121,10 +183,18 @@ export interface VoidEvent extends EventBase {
   readonly targetId: string;
 }
 
-export type LogEvent = PitchEvent | PlayEvent | AdjustEvent | ScoreEvent | GameInfoEvent | VoidEvent;
+export type LogEvent =
+  | PitchEvent
+  | PlayEvent
+  | AdjustEvent
+  | AppearanceEvent
+  | ExitEvent
+  | ScoreEvent
+  | GameInfoEvent
+  | VoidEvent;
 
 /** 경기 진행에 영향을 주는 이벤트 */
-export type PlayLogEvent = PitchEvent | PlayEvent | AdjustEvent;
+export type PlayLogEvent = PitchEvent | PlayEvent | AdjustEvent | AppearanceEvent | ExitEvent;
 
 /** 취소할 수 있는 이벤트 */
 export type UndoableEvent = PlayLogEvent | ScoreEvent;
@@ -135,8 +205,7 @@ export function activeEvents(events: readonly LogEvent[]): UndoableEvent[] {
     events.filter((e): e is VoidEvent => e.kind === 'void').map((e) => e.targetId),
   );
   return events.filter(
-    (e): e is UndoableEvent =>
-      (e.kind === 'pitch' || e.kind === 'play' || e.kind === 'adjust' || e.kind === 'score') && !voided.has(e.id),
+    (e): e is UndoableEvent => e.kind !== 'gameInfo' && e.kind !== 'void' && !voided.has(e.id),
   );
 }
 
@@ -155,11 +224,24 @@ function isCount(value: unknown, min: number, max: number): boolean {
 export const MAX_INNING = 30;
 /** 한 번에 넣을 수 있는 점수의 상한 (입력 실수 방지) */
 export const MAX_RUNS = 99;
-/** 고칠 때 3아웃을 넣으면 이닝이 끝난다. */
-export const MAX_OUTS_IN_ADJUST = 3;
+/** 규칙에 따라 아웃·볼·스트라이크 수가 달라지므로 저장 값 검사는 넉넉한 상한으로 한다. */
+const MAX_STORED_COUNT = 9;
 
 function isBases(value: unknown): boolean {
   return Array.isArray(value) && value.length === 3 && value.every((v) => typeof v === 'boolean');
+}
+
+function isChildPosition(value: unknown): boolean {
+  return value === 'scored' || value === 'out' || isCount(value, 0, 2);
+}
+
+function isRules(value: unknown): boolean {
+  return (
+    isObject(value) &&
+    isCount(value.ballsForWalk, 1, MAX_STORED_COUNT) &&
+    isCount(value.strikesForStrikeout, 1, MAX_STORED_COUNT) &&
+    isCount(value.outsPerInning, 1, MAX_STORED_COUNT)
+  );
 }
 
 /** 저장소에서 읽은 값이 올바른 이벤트인지 확인한다. (CLAUDE.md 4.2) */
@@ -181,10 +263,24 @@ export function isLogEvent(value: unknown): value is LogEvent {
     case 'adjust':
       return (
         isCount(value.inning, 1, MAX_INNING) &&
-        isCount(value.outs, 0, MAX_OUTS_IN_ADJUST) &&
+        isCount(value.outs, 0, MAX_STORED_COUNT) &&
         isBases(value.bases) &&
-        (value.runs === undefined || isCount(value.runs, 0, MAX_RUNS))
+        (value.runs === undefined || isCount(value.runs, 0, MAX_RUNS)) &&
+        (value.child === undefined || isChildPosition(value.child))
       );
+    case 'appearance':
+      return (
+        ROLES.includes(value.role as Role) &&
+        isCount(value.inning, 1, MAX_INNING) &&
+        isCount(value.outs, 0, MAX_STORED_COUNT) &&
+        isBases(value.bases) &&
+        isCount(value.balls, 0, MAX_STORED_COUNT) &&
+        isCount(value.strikes, 0, MAX_STORED_COUNT) &&
+        (value.childBase === undefined || isCount(value.childBase, 0, 2)) &&
+        (value.position === undefined || POSITIONS.includes(value.position as Position))
+      );
+    case 'exit':
+      return true;
     case 'score':
       return (
         (value.team === 'us' || value.team === 'them') &&
@@ -196,7 +292,9 @@ export function isLogEvent(value: unknown): value is LogEvent {
         typeof value.date === 'string' &&
         typeof value.opponent === 'string' &&
         GAME_TYPES.includes(value.gameType as GameType) &&
-        isCount(value.startInning, 1, MAX_INNING)
+        (value.startInning === undefined || isCount(value.startInning, 1, MAX_INNING)) &&
+        (value.battingFirst === undefined || value.battingFirst === 'us' || value.battingFirst === 'them') &&
+        (value.rules === undefined || isRules(value.rules))
       );
     case 'void':
       return typeof value.targetId === 'string';

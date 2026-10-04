@@ -1,82 +1,60 @@
-// 투수 기준 통계. 모든 값은 Calculation으로 돌려주어 결과와 계산 과정을 함께 보여준다.
+// 투수 기준 통계: 우리 아이가 투수로 등장한 장면의 상대 타자 타석만 센다. (CLAUDE.md 0.5)
+// 모든 값은 Calculation으로 돌려주어 결과와 계산 과정을 함께 보여준다.
 
-import { Calculation, SourceRef, safeDivide, tally, term } from '../common/calculation';
-import { Count, allCounts, countKey, countLabel } from '../common/count';
-import { HIT_BASES, PitchResult, PlayKind } from '../common/events';
-import { formatInningsFromOuts, formatPercent, formatRate } from '../common/format';
-import { GameReplay, PlateAppearance, PlateAppearanceOutcome } from '../common/replay';
+import { Calculation, safeDivide, tally, term } from '../common/calculation';
+import { Count, countLabel } from '../common/count';
+import { PitchResult } from '../common/events';
+import { formatInningsFromOuts, formatPercent } from '../common/format';
+import {
+  END_COUNT_BASIS,
+  GameForStats,
+  ScopedPlateAppearance,
+  averageOf,
+  completed,
+  endCountsOf,
+  inCount,
+  pitchSources,
+  platesOf,
+  playSources,
+  ref,
+  repeatedSources,
+  sluggingOf,
+  withOutcome,
+} from '../common/stat-base';
 
-/** 분석할 경기 하나 */
-export interface GameForStats {
-  /** 출처 표시에 쓰는 경기 이름 */
-  readonly label: string;
-  readonly replay: GameReplay;
-}
+export { END_COUNT_BASIS };
+export type { GameForStats };
 
 /** 스트라이크로 세는 공. 파울·번트 파울과 친 공(안타·실책 출루·아웃)도 스트라이크로 센다. 몸에 맞는 공은 볼로 센다. */
 const STRIKE_LIKE: ReadonlySet<PitchResult> = new Set(['strike', 'foul', 'buntFoul', 'hit', 'reachedOnError', 'out']);
 
-/** 상대 타수에서 빠지는 결과 (데모에는 희생타 구분이 없다) */
-const NOT_AT_BAT: ReadonlySet<PlateAppearanceOutcome> = new Set(['walk', 'hitByPitch']);
+const AT_BATS_LABEL = '상대 타수 (끝난 타석에서 볼넷·몸에 맞는 공 제외)';
 
-interface ScopedPlateAppearance {
-  readonly game: string;
-  readonly pa: PlateAppearance;
-}
-
-function flatten(games: readonly GameForStats[]): ScopedPlateAppearance[] {
-  return games.flatMap((g) => g.replay.plateAppearances.map((pa) => ({ game: g.label, pa })));
-}
-
-function ref(s: ScopedPlateAppearance): SourceRef {
-  return { game: s.game, inning: s.pa.inning, plateAppearance: s.pa.number };
-}
-
-/** 상대한 타자로 세는 타석: 끝났고, 이닝 종료로 중단되지 않은 타석 */
-function completed(pas: readonly ScopedPlateAppearance[]): ScopedPlateAppearance[] {
-  return pas.filter((s) => s.pa.outcome !== null && s.pa.outcome !== 'inningEnded');
-}
-
-function withOutcome(pas: readonly ScopedPlateAppearance[], outcome: PlateAppearanceOutcome): SourceRef[] {
-  return pas.filter((s) => s.pa.outcome === outcome).map(ref);
-}
-
-function atBats(pas: readonly ScopedPlateAppearance[]): SourceRef[] {
-  return completed(pas)
-    .filter((s) => s.pa.outcome !== null && !NOT_AT_BAT.has(s.pa.outcome))
-    .map(ref);
-}
-
-/** 조건에 맞는 공마다 출처 하나 */
-function pitchSources(pas: readonly ScopedPlateAppearance[], match: (r: PitchResult) => boolean): SourceRef[] {
-  return pas.flatMap((s) => s.pa.pitches.filter((p) => match(p.result)).map(() => ref(s)));
-}
-
-function playSources(pas: readonly ScopedPlateAppearance[], kinds: readonly PlayKind[]): SourceRef[] {
-  return pas.flatMap((s) => s.pa.plays.filter((p) => kinds.includes(p.play)).map(() => ref(s)));
+function faced(games: readonly GameForStats[]): ScopedPlateAppearance[] {
+  return platesOf(games, 'opponent');
 }
 
 export function pitchCount(games: readonly GameForStats[]): Calculation {
+  const pas = faced(games);
   const multiGame = games.length > 1;
   const parts = new Map<string, number>();
-  for (const s of flatten(games)) {
+  for (const s of pas) {
     const key = multiGame ? s.game : `${s.pa.inning}회`;
     parts.set(key, (parts.get(key) ?? 0) + s.pa.pitches.length);
   }
-  const sources = pitchSources(flatten(games), () => true);
-  const total = sources.length;
+  const sources = pitchSources(pas, () => true);
   return {
     title: '투구 수',
     formula: multiGame ? '경기별 투구 수를 모두 더한 수' : '이닝별 투구 수를 모두 더한 수 (취소한 공 제외)',
     terms: [term('던진 공', sources)],
     expression: [...parts.entries()].map(([k, n]) => `${k} ${n}`).join(' + ') || '0',
-    value: total,
-    display: `${total}`,
+    value: sources.length,
+    display: `${sources.length}`,
   };
 }
 
 export function strikeRate(games: readonly GameForStats[]): Calculation {
-  const pas = flatten(games);
+  const pas = faced(games);
   const strikes = term('스트라이크 (헛스윙·지켜본 스트라이크·파울·번트 파울·친 공)', pitchSources(pas, (r) => STRIKE_LIKE.has(r)));
   const total = term('투구 수', pitchSources(pas, () => true));
   const value = safeDivide(strikes.value, total.value);
@@ -91,121 +69,95 @@ export function strikeRate(games: readonly GameForStats[]): Calculation {
   };
 }
 
+/** 던진 이닝 = 잡은 아웃 ÷ 이닝당 아웃 수. 규칙이 다른 경기가 섞이면 경기마다 나눠 더한다. */
 export function inningsPitched(games: readonly GameForStats[]): Calculation {
-  const outs = flatten(games).flatMap((s) => Array.from({ length: s.pa.outsRecorded }, () => ref(s)));
+  const outs = repeatedSources(faced(games), (pa) => pa.outsRecorded);
+  const perInning = [...new Set(games.map((g) => g.replay.rules.outsPerInning))];
+  const sameRule = perInning.length <= 1;
+  const outsPerInning = perInning[0] ?? 3;
+  const value = sameRule
+    ? outs.length / outsPerInning
+    : games.reduce((sum, g) => sum + faced([g]).reduce((n, s) => n + s.pa.outsRecorded, 0) / g.replay.rules.outsPerInning, 0);
   return {
     title: '던진 이닝',
-    formula: '잡은 아웃 ÷ 3 (아웃 3개 = 1이닝)',
+    formula: `잡은 아웃 ÷ ${sameRule ? outsPerInning : '경기별 이닝당 아웃 수'} (아웃 ${outsPerInning}개 = 1이닝)`,
     terms: [term('잡은 아웃 (삼진·아웃·견제 아웃·도루 저지·고쳐서 더한 아웃)', outs)],
-    expression: `${outs.length} ÷ 3`,
-    value: outs.length / 3,
-    display: formatInningsFromOuts(outs.length),
+    expression: sameRule ? `${outs.length} ÷ ${outsPerInning}` : `경기별로 나눠 더함`,
+    value,
+    display: sameRule ? formatInningsFromOuts(outs.length, outsPerInning) : value.toFixed(1),
   };
 }
 
 export function battersFaced(games: readonly GameForStats[]): Calculation {
-  return tally('상대한 타자', '끝난 타석 수 (이닝 종료로 중단된 타석 제외)', completed(flatten(games)).map(ref));
+  return tally('상대한 타자', '끝난 타석 수 (중단된 타석 제외)', completed(faced(games)).map(ref));
 }
 
 export function strikeouts(games: readonly GameForStats[]): Calculation {
-  return tally('삼진', '삼진으로 끝난 타석 수 (쓰리번트 아웃 포함)', withOutcome(flatten(games), 'strikeout'));
+  return tally('삼진', '삼진으로 끝난 타석 수 (쓰리번트 아웃 포함)', withOutcome(faced(games), 'strikeout'));
 }
 
 export function walks(games: readonly GameForStats[]): Calculation {
-  return tally('볼넷', '볼넷으로 끝난 타석 수', withOutcome(flatten(games), 'walk'));
+  return tally('볼넷', '볼넷으로 끝난 타석 수', withOutcome(faced(games), 'walk'));
 }
 
 export function hitByPitches(games: readonly GameForStats[]): Calculation {
-  return tally('몸에 맞는 공', '몸에 맞는 공으로 끝난 타석 수', withOutcome(flatten(games), 'hitByPitch'));
+  return tally('몸에 맞는 공', '몸에 맞는 공으로 끝난 타석 수', withOutcome(faced(games), 'hitByPitch'));
 }
 
 export function hitsAllowed(games: readonly GameForStats[]): Calculation {
-  return tally('맞은 안타', '안타로 끝난 타석 수', withOutcome(flatten(games), 'hit'));
-}
-
-function battingAverageAgainstOf(pas: readonly ScopedPlateAppearance[], title: string): Calculation {
-  const hits = term('맞은 안타', withOutcome(pas, 'hit'));
-  const abs = term('상대 타수 (끝난 타석에서 볼넷·몸에 맞는 공 제외)', atBats(pas));
-  const value = safeDivide(hits.value, abs.value);
-  return {
-    title,
-    formula: '맞은 안타 ÷ 상대 타수',
-    terms: [hits, abs],
-    expression: `${hits.value} ÷ ${abs.value}`,
-    value,
-    display: formatRate(value),
-    note: value === null ? '상대 타수가 0이라 계산할 수 없음' : undefined,
-  };
-}
-
-/** 피안타율 = 맞은 안타 ÷ 상대 타수 */
-export function battingAverageAgainst(games: readonly GameForStats[]): Calculation {
-  return battingAverageAgainstOf(flatten(games), '피안타율');
-}
-
-export function wildPitches(games: readonly GameForStats[]): Calculation {
-  return tally('와일드피치', '와일드피치로 기록한 공 수', pitchSources(flatten(games), (r) => r === 'wildPitch'));
-}
-
-export function pickoffAttempts(games: readonly GameForStats[]): Calculation {
-  return tally('견제', '견제한 횟수 (견제 아웃 포함)', playSources(flatten(games), ['pickoff', 'pickoffOut']));
-}
-
-export function pickoffOuts(games: readonly GameForStats[]): Calculation {
-  return tally('견제 아웃', '견제로 주자를 잡은 횟수', playSources(flatten(games), ['pickoffOut']));
-}
-
-export function stolenBasesAllowed(games: readonly GameForStats[]): Calculation {
-  return tally('도루 허용', '도루를 성공한 횟수 (2루·3루·홈)', playSources(flatten(games), ['stolenBase', 'stolenSecond']));
-}
-
-export function caughtStealing(games: readonly GameForStats[]): Calculation {
-  return tally('도루 저지', '도루하던 주자를 잡은 횟수', playSources(flatten(games), ['caughtStealing', 'caughtStealingSecond']));
-}
-
-/** 이 타석들에서 나온 수만큼 출처를 반복한다. (예: 한 타석 2점이면 출처 2개) */
-function repeatedSources(pas: readonly ScopedPlateAppearance[], amount: (pa: PlateAppearance) => number): SourceRef[] {
-  return pas.flatMap((s) => Array.from({ length: amount(s.pa) }, () => ref(s)));
-}
-
-export function runsAllowed(games: readonly GameForStats[]): Calculation {
-  return tally('실점', '던지는 동안 홈에 들어온 점수', repeatedSources(flatten(games), (pa) => pa.runs));
-}
-
-export function errorsBehind(games: readonly GameForStats[]): Calculation {
-  return tally('수비 실책', '우리 팀 수비 실책 수 (실책 출루 + 실책으로 주자 진루)', repeatedSources(flatten(games), (pa) => pa.errors));
+  return tally('맞은 안타', '안타로 끝난 타석 수', withOutcome(faced(games), 'hit'));
 }
 
 export function extraBaseHitsAllowed(games: readonly GameForStats[]): Calculation {
-  const pas = flatten(games).filter((s) => s.pa.hitType !== null && s.pa.hitType !== 'single');
+  const pas = faced(games).filter((s) => s.pa.hitType !== null && s.pa.hitType !== 'single');
   return tally('맞은 장타', '2루타·3루타·홈런으로 끝난 타석 수', pas.map(ref));
 }
 
 export function homeRunsAllowed(games: readonly GameForStats[]): Calculation {
-  return tally('맞은 홈런', '홈런으로 끝난 타석 수', flatten(games).filter((s) => s.pa.hitType === 'homeRun').map(ref));
+  return tally('맞은 홈런', '홈런으로 끝난 타석 수', faced(games).filter((s) => s.pa.hitType === 'homeRun').map(ref));
 }
 
-/** 피장타율 = 루타 ÷ 상대 타수. 루타: 1루타 1, 2루타 2, 3루타 3, 홈런 4 */
+/** 피안타율 = 맞은 안타 ÷ 상대 타수 */
+export function battingAverageAgainst(games: readonly GameForStats[]): Calculation {
+  return averageOf(faced(games), { title: '피안타율', hits: '맞은 안타', atBats: AT_BATS_LABEL });
+}
+
+/** 피장타율 = 루타 ÷ 상대 타수 */
 export function sluggingAgainst(games: readonly GameForStats[]): Calculation {
-  const pas = flatten(games);
-  const totalBases = repeatedSources(pas, (pa) => (pa.hitType ? HIT_BASES[pa.hitType] : 0));
-  const bases = term('루타 (1루타 1, 2루타 2, 3루타 3, 홈런 4)', totalBases);
-  const abs = term('상대 타수 (끝난 타석에서 볼넷·몸에 맞는 공 제외)', atBats(pas));
-  const value = safeDivide(bases.value, abs.value);
-  return {
-    title: '피장타율',
-    formula: '루타 ÷ 상대 타수 (장타를 많이 맞을수록 높아요)',
-    terms: [bases, abs],
-    expression: `${bases.value} ÷ ${abs.value}`,
-    value,
-    display: formatRate(value),
-    note: value === null ? '상대 타수가 0이라 계산할 수 없음' : undefined,
-  };
+  return sluggingOf(faced(games), { title: '피장타율', atBats: AT_BATS_LABEL });
+}
+
+export function runsAllowed(games: readonly GameForStats[]): Calculation {
+  return tally('실점', '던지는 동안 홈에 들어온 점수', repeatedSources(faced(games), (pa) => pa.runs));
+}
+
+export function wildPitches(games: readonly GameForStats[]): Calculation {
+  return tally('와일드피치', '와일드피치로 기록한 공 수', pitchSources(faced(games), (r) => r === 'wildPitch'));
+}
+
+export function pickoffAttempts(games: readonly GameForStats[]): Calculation {
+  return tally('견제', '견제한 횟수 (견제 아웃 포함)', playSources(faced(games), ['pickoff', 'pickoffOut']));
+}
+
+export function pickoffOuts(games: readonly GameForStats[]): Calculation {
+  return tally('견제 아웃', '견제로 주자를 잡은 횟수', playSources(faced(games), ['pickoffOut']));
+}
+
+export function stolenBasesAllowed(games: readonly GameForStats[]): Calculation {
+  return tally('도루 허용', '도루를 성공한 횟수 (2루·3루·홈)', playSources(faced(games), ['stolenBase', 'stolenSecond']));
+}
+
+export function caughtStealing(games: readonly GameForStats[]): Calculation {
+  return tally('도루 저지', '도루하던 주자를 잡은 횟수', playSources(faced(games), ['caughtStealing', 'caughtStealingSecond']));
+}
+
+export function errorsBehind(games: readonly GameForStats[]): Calculation {
+  return tally('수비 실책', '우리 팀 수비 실책 수 (실책 출루 + 실책으로 주자 진루)', repeatedSources(faced(games), (pa) => pa.errors));
 }
 
 /** 이닝별 투구 수 */
 export function pitchesByInning(games: readonly GameForStats[]): Calculation[] {
-  const pas = flatten(games);
+  const pas = faced(games);
   const innings = [...new Set(pas.map((s) => s.pa.inning))].sort((a, b) => a - b);
   return innings.map((inning) => {
     const inInning = pas.filter((s) => s.pa.inning === inning && s.pa.pitches.length > 0);
@@ -227,22 +179,18 @@ export interface CountRow {
   readonly battingAverageAgainst: Calculation;
 }
 
-/** 카운트별 기록 (종료 카운트 기준: 그 카운트에서 다음 공으로 타석이 끝난 경우) */
+/** 카운트별 기록 (종료 카운트 기준) */
 export function byEndCount(games: readonly GameForStats[]): CountRow[] {
-  const pas = completed(flatten(games));
-  return allCounts()
-    .map((count) => {
-      const inCount = pas.filter((s) => s.pa.endCount && countKey(s.pa.endCount) === countKey(count));
-      return {
-        count,
-        plateAppearances: tally(`${countLabel(count)} 타석`, `${countLabel(count)}에서 끝난 타석 수`, inCount.map(ref)),
-        battingAverageAgainst: battingAverageAgainstOf(inCount, `${countLabel(count)} 피안타율`),
-      };
-    })
-    .filter((row) => row.plateAppearances.value !== 0);
+  const pas = faced(games);
+  return endCountsOf(pas).map((count) => {
+    const here = inCount(pas, count);
+    return {
+      count,
+      plateAppearances: tally(`${countLabel(count)} 타석`, `${countLabel(count)}에서 끝난 타석 수`, here.map(ref)),
+      battingAverageAgainst: averageOf(here, { title: `${countLabel(count)} 피안타율`, hits: '맞은 안타', atBats: AT_BATS_LABEL }),
+    };
+  });
 }
-
-export const END_COUNT_BASIS = '종료 카운트 기준: 그 카운트에서 던진 다음 공으로 타석이 끝난 경우만 셉니다.';
 
 export interface StatSection {
   readonly title: string;
@@ -291,3 +239,4 @@ export function summarize(games: readonly GameForStats[]): PitcherSummary {
     byInning: games.length === 1 ? pitchesByInning(games) : [],
   };
 }
+

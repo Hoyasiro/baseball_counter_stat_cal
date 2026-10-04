@@ -1,11 +1,11 @@
-// 투수 분석 화면: 아이가 투수로 나온 장면만 (CLAUDE.md 0.5)
+// 타자 분석 화면: 아이가 타자·주자로 나온 장면만 (CLAUDE.md 0.5)
 
 import { AnalysisActions, AnalysisScope, AnalysisTab, analysisHeader, countTable, processCard, resultCards } from '../common/analysis-ui';
 import { h } from '../common/dom';
 import { GameForStats } from '../common/stat-base';
 import { END_COUNT_BASIS, summarize } from './stats';
 
-export function pitcherAnalysisView(
+export function batterAnalysisView(
   games: readonly GameForStats[],
   totalGames: number,
   scope: AnalysisScope,
@@ -14,19 +14,17 @@ export function pitcherAnalysisView(
 ): HTMLElement {
   const summary = summarize(games);
   const header = analysisHeader(totalGames, scope, tab, actions);
-  const noData = summary.sections[0].items[0].value === 0;
-  const empty = noData ? h('p', { className: 'empty', text: '아직 아이가 투수로 나온 기록이 없습니다.' }) : null;
+  const noData = summary.sections[1].items[0].value === 0 && summary.sections[2].items.every((c) => c.value === 0);
+  const empty = noData ? h('p', { className: 'empty', text: '아직 아이가 타자·주자로 나온 기록이 없습니다.' }) : null;
 
   if (tab === 'process') {
     return h('section', { className: 'analysis' }, [
       ...header,
       empty,
       ...summary.sections.flatMap((section) => [h('h2', { text: section.title }), ...section.items.map(processCard)]),
-      summary.byInning.length > 0 ? h('h2', { text: '이닝별 투구 수' }) : null,
-      ...summary.byInning.map(processCard),
-      h('h2', { text: '카운트별 피안타율' }),
+      h('h2', { text: '카운트별 타율' }),
       h('p', { className: 'basis', text: END_COUNT_BASIS }),
-      ...summary.byCount.map((row) => processCard(row.battingAverageAgainst)),
+      ...summary.byCount.map((row) => processCard(row.battingAverage)),
     ]);
   }
 
@@ -34,12 +32,11 @@ export function pitcherAnalysisView(
     ...header,
     empty,
     ...summary.sections.flatMap(resultCards),
-    ...(summary.byInning.length > 0 ? resultCards({ title: '이닝별 투구 수', items: summary.byInning }) : []),
-    h('h2', { text: '카운트별 피안타율' }),
+    h('h2', { text: '카운트별 타율' }),
     h('p', { className: 'basis', text: END_COUNT_BASIS }),
     countTable(
-      summary.byCount.map((r) => ({ count: r.count, plateAppearances: r.plateAppearances, rate: r.battingAverageAgainst })),
-      '피안타율',
+      summary.byCount.map((r) => ({ count: r.count, plateAppearances: r.plateAppearances, rate: r.battingAverage })),
+      '타율',
     ),
   ]);
 }

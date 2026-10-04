@@ -1,8 +1,34 @@
-import { BASE_NAMES, STEAL_NAMES, basesLabel } from '../common/bases';
-import { HitType, PitchEvent, PitchResult, PlayEvent, PlayKind, UndoableEvent } from '../common/events';
-import { PlateAppearance, PlateAppearanceOutcome } from '../common/replay';
+// 화면에 보이는 쉬운 말 (CLAUDE.md 0.4). 입력은 상황 기준 하나이므로 투수·타자가 같은 말을 쓴다.
 
-/** 투수 화면용 쉬운 말 (CLAUDE.md 0.4) */
+import { BASE_NAMES, STEAL_NAMES, basesLabel } from './bases';
+import { HitType, PitchEvent, PitchResult, PlayEvent, Position, Role, UndoableEvent } from './events';
+import { halfInningLabel } from './innings';
+import { Actor, PlateAppearance, PlateAppearanceOutcome, RunnerEventKind } from './replay';
+
+export const ROLE_LABEL: Record<Role, string> = {
+  pitcher: '투수',
+  batter: '타자',
+  runner: '주자',
+  fielder: '수비',
+};
+
+export const POSITION_LABEL: Record<Position, string> = {
+  catcher: '포수',
+  firstBase: '1루수',
+  secondBase: '2루수',
+  thirdBase: '3루수',
+  shortstop: '유격수',
+  leftField: '좌익수',
+  centerField: '중견수',
+  rightField: '우익수',
+};
+
+export const ACTOR_LABEL: Record<Actor, string> = {
+  opponent: '상대 타자',
+  child: '우리 아이',
+  teammate: '우리 팀 타자',
+};
+
 export interface PitchButton {
   readonly result: PitchResult;
   readonly label: string;
@@ -57,7 +83,7 @@ export function pitchLabel(pitch: PitchEvent): string {
   return PITCH_LABEL[pitch.result];
 }
 
-/** 주자 상황 버튼. 베이스를 골라야 하는 것은 주자가 여럿일 때 고르는 화면이 나온다. */
+/** 주자 상황 버튼. 주자가 여럿이면 누구인지 고르는 화면이 나온다. */
 export type RunnerAction = 'pickoff' | 'pickoffOut' | 'stolenBase' | 'caughtStealing' | 'error';
 
 export const RUNNER_BUTTONS: readonly { action: RunnerAction; label: string; hint: string }[] = [
@@ -66,6 +92,19 @@ export const RUNNER_BUTTONS: readonly { action: RunnerAction; label: string; hin
   { action: 'error', label: '실책 진루', hint: '수비 실수로 주자 이동' },
   { action: 'stolenBase', label: '도루', hint: '다음 베이스 성공' },
   { action: 'caughtStealing', label: '도루 실패', hint: '뛰다가 잡힘' },
+];
+
+/** 주자인 우리 아이에게 바로 기록하는 버튼 */
+export type ChildRunnerAction = 'stolenBase' | 'caughtStealing' | 'pickoff' | 'pickoffOut' | 'advance' | 'scored' | 'out';
+
+export const CHILD_RUNNER_BUTTONS: readonly { action: ChildRunnerAction; label: string }[] = [
+  { action: 'stolenBase', label: '도루 성공' },
+  { action: 'caughtStealing', label: '도루 실패' },
+  { action: 'pickoff', label: '견제 받음' },
+  { action: 'pickoffOut', label: '견제 아웃' },
+  { action: 'advance', label: '한 칸 진루' },
+  { action: 'scored', label: '홈인 (득점)' },
+  { action: 'out', label: '주루 아웃' },
 ];
 
 export const CHOOSER_QUESTION: Record<Exclude<RunnerAction, 'error'>, string> = {
@@ -77,8 +116,7 @@ export const CHOOSER_QUESTION: Record<Exclude<RunnerAction, 'error'>, string> = 
 
 function playLabel(play: PlayEvent): string {
   const base = play.base ?? 0;
-  const kind: PlayKind = play.play;
-  switch (kind) {
+  switch (play.play) {
     case 'pickoff':
       return play.base === undefined ? '견제' : `견제 (${BASE_NAMES[base]})`;
     case 'pickoffOut':
@@ -96,6 +134,8 @@ function playLabel(play: PlayEvent): string {
   }
 }
 
+const CHILD_POSITION_LABEL = { scored: '아이 홈인', out: '아이 아웃' } as const;
+
 /** 기록 한 줄을 쉬운 말로. 기록 보기와 "마지막 기록 취소" 버튼에 쓴다. */
 export function eventLabel(event: UndoableEvent): string {
   switch (event.kind) {
@@ -105,21 +145,32 @@ export function eventLabel(event: UndoableEvent): string {
       return playLabel(event);
     case 'adjust': {
       const runs = event.runs ? ` · ${event.runs}점` : '';
-      return `상황 고침: ${event.inning}회 ${event.outs}아웃 ${basesLabel(event.bases)}${runs}`;
+      const child =
+        event.child === undefined
+          ? ''
+          : typeof event.child === 'number'
+            ? ` · 아이 ${BASE_NAMES[event.child]}`
+            : ` · ${CHILD_POSITION_LABEL[event.child]}`;
+      return `상황 고침: ${event.inning}회 ${event.outs}아웃 ${basesLabel(event.bases)}${runs}${child}`;
     }
+    case 'appearance':
+      return `${ROLE_LABEL[event.role]}로 등장 (${event.inning}회)`;
+    case 'exit':
+      return '교체됨';
     case 'score':
       return `점수 넣음: ${event.team === 'us' ? '우리 팀' : '상대팀'} ${event.inning}회 ${event.runs}점`;
   }
 }
 
 const OUTCOME_LABEL: Record<PlateAppearanceOutcome, string> = {
-  walk: '볼넷 (볼 4개)',
+  walk: '볼넷',
   strikeout: '삼진',
   hit: '안타',
   reachedOnError: '실책으로 출루',
   out: '아웃',
   hitByPitch: '몸에 맞는 공',
   inningEnded: '이닝 종료로 중단',
+  sceneEnded: '교체로 중단',
 };
 
 /** 타석 결과를 쉬운 말로. 안타는 종류, 쓰리번트 삼진은 따로 알려준다. */
@@ -129,4 +180,20 @@ export function outcomeLabel(pa: PlateAppearance): string {
   const lastPitch = pa.pitches[pa.pitches.length - 1];
   if (pa.outcome === 'strikeout' && lastPitch?.result === 'buntFoul') return '삼진 (쓰리번트 아웃)';
   return OUTCOME_LABEL[pa.outcome];
+}
+
+export const RUNNER_EVENT_LABEL: Record<RunnerEventKind, string> = {
+  stolenBase: '도루 성공',
+  caughtStealing: '도루 실패',
+  pickoff: '견제 받음',
+  pickedOff: '견제 아웃',
+  scored: '홈인',
+  out: '주루 아웃',
+  stranded: '잔루',
+};
+
+/** 장면 제목. 예: "4회말 · 투수로 등장" */
+export function sceneTitle(role: Role, inning: number, half: 'top' | 'bottom', position: Position | null): string {
+  const roleText = role === 'fielder' && position ? `${POSITION_LABEL[position]}(수비)` : ROLE_LABEL[role];
+  return `${halfInningLabel(inning, half)} · ${roleText}로 등장`;
 }

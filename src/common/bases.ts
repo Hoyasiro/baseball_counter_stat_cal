@@ -1,4 +1,5 @@
-// 주자 이동 규칙. 확실히 정해지는 이동(밀어내기, 안타 종류만큼 진루, 와일드피치 한 베이스)만 자동으로 처리하고,
+// 주자 이동 규칙. 주자 하나하나를 따라가서 "우리 아이"가 어디 있는지도 함께 계산한다.
+// 확실히 정해지는 이동(밀어내기, 안타 종류만큼 진루, 와일드피치 한 베이스, 도루)만 자동으로 처리하고,
 // 그 밖의 경우(주자가 더 뛴 경우, 실책 등)는 사용자가 "상황 고치기"로 맞춘다.
 
 import { BaseIndex, Bases } from './events';
@@ -7,58 +8,100 @@ export const EMPTY_BASES: Bases = [false, false, false];
 
 /** 3루 다음은 홈 */
 const HOME = 3;
+const FIRST_BASE: BaseIndex = 0;
+
+export interface Runner {
+  readonly base: BaseIndex;
+  /** 우리 아이인지 */
+  readonly child: boolean;
+}
+
+export type Runners = readonly Runner[];
 
 export interface Advance {
-  readonly bases: Bases;
+  readonly runners: Runners;
   /** 홈에 들어온 주자 수 */
   readonly runs: number;
+  readonly childScored: boolean;
+}
+
+export function toBases(runners: Runners): Bases {
+  return [0, 1, 2].map((b) => runners.some((r) => r.base === b)) as unknown as Bases;
+}
+
+/** 베이스 상태에서 주자 목록을 만든다. childBase에 있는 주자가 우리 아이다. */
+export function fromBases(bases: Bases, childBase: BaseIndex | null = null): Runners {
+  return ([0, 1, 2] as const).filter((b) => bases[b]).map((b) => ({ base: b, child: b === childBase }));
+}
+
+export function childBaseOf(runners: Runners): BaseIndex | null {
+  return runners.find((r) => r.child)?.base ?? null;
+}
+
+/** 주자를 지정한 만큼 옮긴다. 홈을 지나면 득점 */
+function move(runners: Runners, shouldMove: (r: Runner) => boolean, count: number): Advance {
+  const next: Runner[] = [];
+  let runs = 0;
+  let childScored = false;
+  for (const r of runners) {
+    if (!shouldMove(r)) {
+      next.push(r);
+      continue;
+    }
+    const target = r.base + count;
+    if (target >= HOME) {
+      runs += 1;
+      childScored ||= r.child;
+    } else {
+      next.push({ base: target as BaseIndex, child: r.child });
+    }
+  }
+  next.sort((a, b) => a.base - b.base);
+  return { runners: next, runs, childScored };
+}
+
+function addBatter(advance: Advance, base: number, batterIsChild: boolean): Advance {
+  if (base >= HOME) {
+    return { runners: advance.runners, runs: advance.runs + 1, childScored: advance.childScored || batterIsChild };
+  }
+  const runners = [...advance.runners, { base: base as BaseIndex, child: batterIsChild }].sort((a, b) => a.base - b.base);
+  return { ...advance, runners };
 }
 
 /** 타자가 1루로 나갈 때 밀려나는 주자만 한 베이스씩 이동한다. (볼넷·몸에 맞는 공) */
-export function forceAdvance(bases: Bases): Advance {
-  const [first, second, third] = bases;
-  if (!first) return { bases: [true, second, third], runs: 0 };
-  if (!second) return { bases: [true, true, third], runs: 0 };
-  if (!third) return { bases: [true, true, true], runs: 0 };
-  // 만루면 3루 주자가 홈으로 들어온다.
-  return { bases: [true, true, true], runs: 1 };
+export function forceAdvance(runners: Runners, batterIsChild = false): Advance {
+  const on = (b: number): boolean => runners.some((r) => r.base === b);
+  const forced = new Set<number>();
+  if (on(0)) {
+    forced.add(0);
+    if (on(1)) {
+      forced.add(1);
+      if (on(2)) forced.add(2);
+    }
+  }
+  return addBatter(move(runners, (r) => forced.has(r.base), 1), FIRST_BASE, batterIsChild);
 }
 
-/** 모든 주자가 count 베이스씩 이동한다. 홈을 지나면 득점이다. */
-export function advanceRunners(bases: Bases, count: number): Advance {
-  const next: [boolean, boolean, boolean] = [false, false, false];
-  let runs = 0;
-  for (const b of [0, 1, 2] as const) {
-    if (!bases[b]) continue;
-    const target = b + count;
-    if (target >= HOME) runs += 1;
-    else next[target] = true;
-  }
-  return { bases: next, runs };
+/** 모든 주자가 count 베이스씩 이동한다. (와일드피치는 1) */
+export function advanceRunners(runners: Runners, count: number): Advance {
+  return move(runners, () => true, count);
 }
 
 /** 타자가 batterBases 베이스를 가고, 주자도 같은 수만큼 간다. (안타 종류, 실책 출루) */
-export function batterAdvance(bases: Bases, batterBases: number): Advance {
-  const moved = advanceRunners(bases, batterBases);
-  if (batterBases >= HOME + 1) return { bases: moved.bases, runs: moved.runs + 1 };
-  const next: [boolean, boolean, boolean] = [moved.bases[0], moved.bases[1], moved.bases[2]];
-  next[batterBases - 1] = true;
-  return { bases: next, runs: moved.runs };
-}
-
-export function removeRunner(bases: Bases, base: BaseIndex): Bases {
-  const next: [boolean, boolean, boolean] = [bases[0], bases[1], bases[2]];
-  next[base] = false;
-  return next;
+export function batterAdvance(runners: Runners, batterBases: number, batterIsChild = false): Advance {
+  return addBatter(advanceRunners(runners, batterBases), batterBases - 1, batterIsChild);
 }
 
 /** 도루 성공: 그 주자만 한 베이스 이동. 3루 주자면 홈 도루로 득점. */
-export function stealAdvance(bases: Bases, base: BaseIndex): Advance {
-  const next: [boolean, boolean, boolean] = [bases[0], bases[1], bases[2]];
-  next[base] = false;
-  if (base === 2) return { bases: next, runs: 1 };
-  next[base + 1] = true;
-  return { bases: next, runs: 0 };
+export function stealAdvance(runners: Runners, base: BaseIndex): Advance {
+  return move(runners, (r) => r.base === base, 1);
+}
+
+export function removeRunner(runners: Runners, base: BaseIndex): { runners: Runners; removedChild: boolean } {
+  return {
+    runners: runners.filter((r) => r.base !== base),
+    removedChild: runners.some((r) => r.base === base && r.child),
+  };
 }
 
 export function hasRunner(bases: Bases): boolean {

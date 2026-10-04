@@ -1,4 +1,4 @@
-// 내야 다이아몬드: 주자 상황을 보여주고, 고칠 때는 베이스를 눌러 바꾼다.
+// 내야 다이아몬드: 주자 상황을 보여주고, 고칠 때는 베이스를 눌러 바꾼다. 우리 아이가 있는 베이스는 따로 표시한다.
 
 import { BASE_NAMES } from './bases';
 import { BaseIndex, Bases } from './events';
@@ -14,7 +14,7 @@ const BASE_POSITIONS: Record<BaseIndex, { x: number; y: number }> = {
 };
 const BASE_SIZE = 18;
 
-export function diamond(bases: Bases, onToggle?: (base: BaseIndex) => void): HTMLElement {
+export function diamond(bases: Bases, onToggle?: (base: BaseIndex) => void, childBase: BaseIndex | null = null): HTMLElement {
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('viewBox', '0 0 100 100');
   svg.setAttribute('class', 'diamond-svg');
@@ -38,8 +38,16 @@ export function diamond(bases: Bases, onToggle?: (base: BaseIndex) => void): HTM
     rect.setAttribute('width', String(BASE_SIZE));
     rect.setAttribute('height', String(BASE_SIZE));
     rect.setAttribute('transform', `rotate(45 ${x} ${y})`);
-    rect.setAttribute('class', bases[b] ? 'diamond-base on' : 'diamond-base');
+    rect.setAttribute('class', b === childBase ? 'diamond-base child' : bases[b] ? 'diamond-base on' : 'diamond-base');
     svg.append(rect);
+    if (b === childBase) {
+      const label = document.createElementNS(SVG_NS, 'text');
+      label.setAttribute('x', String(x));
+      label.setAttribute('y', String(y + BASE_SIZE + 4));
+      label.setAttribute('class', 'diamond-child-label');
+      label.textContent = '아이';
+      svg.append(label);
+    }
   }
 
   const wrapper = h('div', { className: onToggle ? 'diamond editable' : 'diamond' }, [svg]);

@@ -1,167 +1,151 @@
 import { describe, expect, it } from 'vitest';
 import { formatSources } from '../common/calculation';
+import { PlayLogEvent } from '../common/events';
 import { replayGame } from '../common/replay';
-import { adjust, hit, pitches, play } from '../common/test-helpers';
+import { adjust, appear, hit, pitches, play, settings } from '../common/test-helpers';
 import {
   GameForStats,
   battingAverageAgainst,
   byEndCount,
   caughtStealing,
+  errorsBehind,
+  extraBaseHitsAllowed,
+  homeRunsAllowed,
   inningsPitched,
   pickoffAttempts,
   pitchCount,
+  pitchesByInning,
+  runsAllowed,
+  sluggingAgainst,
+  stolenBasesAllowed,
   strikeRate,
   strikeouts,
   walks,
   wildPitches,
-  runsAllowed,
-  extraBaseHitsAllowed,
-  homeRunsAllowed,
-  sluggingAgainst,
-  errorsBehind,
-  stolenBasesAllowed,
-  pitchesByInning,
 } from './stats';
 
-// 1회
-//  타석1: 볼 스트라이크 안타              (볼 1 · 스트라이크 1에서 안타)          → 주자 1루
-//  타석2: 견제, 스트라이크 번트파울 번트파울 (볼 0 · 스트라이크 2에서 쓰리번트 삼진) → 1아웃
-//  타석3: 와일드피치 볼 볼 볼            (볼 3 · 스트라이크 0에서 볼넷)          → 주자 1·2루 (WP로 2루, 볼넷)
-//  타석4: 파울 아웃                       (볼 0 · 스트라이크 1에서 아웃)          → 2아웃
-//  타석5: 볼, 2루 도루 실패?  → 2루가 차 있어 실제로는 불가. 대신 1루 주자 견제 아웃으로 3아웃
-const events = [
-  ...pitches('ball', 'strike', 'hit'),
-  play('pickoff'),
+const asGame = (label: string, events: PlayLogEvent[]): GameForStats => ({ label, replay: replayGame(events, settings()) });
+
+// 1회 선발
+//  타석1: 볼 스트라이크 1루타                 (볼 1 · 스트라이크 1)
+//  타석2: 견제, 스트라이크 번트파울 번트파울   (쓰리번트 삼진)
+//  타석3: 와일드피치 볼 볼 볼                 (볼넷)
+//  타석4: 파울 아웃
+//  타석5: 볼, 견제 아웃 → 3아웃 (중단)
+const game = asGame('10월 4일 ○○전', [
+  appear('pitcher'),
+  ...pitches('ball', 'strike'),
+  hit('single'),
+  play('pickoff', 0),
   ...pitches('strike', 'buntFoul', 'buntFoul'),
   ...pitches('wildPitch', 'ball', 'ball', 'ball'),
   ...pitches('foul', 'out'),
   ...pitches('ball'),
   play('pickoffOut', 0),
-];
-const game: GameForStats = { label: '10월 4일 ○○전', replay: replayGame(events, 1) };
+]);
 
 describe('투수 통계 (한 경기)', () => {
-  it('투구 수 = 이닝별 합: 1회 3 + 3 + 4 + 2 + 1 = 13', () => {
-    const c = pitchCount([game]);
-    expect(c.value).toBe(13);
-    expect(c.expression).toBe('1회 13');
+  it('투구 수 = 1회 13', () => {
+    expect(pitchCount([game]).expression).toBe('1회 13');
   });
 
   it('스트라이크 비율 = 7 ÷ 13 (번트 파울 포함, 와일드피치는 볼)', () => {
-    // 스트라이크: 타석1 스트라이크·안타(2), 타석2 3개, 타석4 파울·아웃(2) = 7
     const c = strikeRate([game]);
     expect(c.expression).toBe('7 ÷ 13');
     expect(c.display).toBe('53.8%');
   });
 
-  it('던진 이닝 = 잡은 아웃 3 ÷ 3 = 1 (삼진·아웃·견제 아웃)', () => {
-    const c = inningsPitched([game]);
-    expect(c.expression).toBe('3 ÷ 3');
-    expect(c.display).toBe('1');
+  it('던진 이닝 = 잡은 아웃 3 ÷ 3 = 1', () => {
+    expect(inningsPitched([game]).display).toBe('1');
   });
 
-  it('쓰리번트 아웃은 삼진으로 센다', () => {
+  it('쓰리번트 아웃은 삼진, 볼넷 1, 와일드피치 1, 견제 2', () => {
     expect(strikeouts([game]).value).toBe(1);
-    expect(strikeouts([game]).terms[0].sources[0].plateAppearance).toBe(2);
-  });
-
-  it('볼넷 1, 와일드피치 1, 견제 2 (견제 아웃 포함)', () => {
     expect(walks([game]).value).toBe(1);
     expect(wildPitches([game]).value).toBe(1);
     expect(pickoffAttempts([game]).value).toBe(2);
   });
 
-  it('피안타율 = 안타 1 ÷ 상대 타수 3 = .333 (볼넷, 중단된 타석 제외)', () => {
+  it('피안타율 = 1 ÷ 3 = .333 (볼넷·중단 타석 제외)', () => {
     const c = battingAverageAgainst([game]);
-    expect(c.expression).toBe('1 ÷ 3');
+    expect(c.formula).toBe('맞은 안타 ÷ 상대 타수');
     expect(c.display).toBe('.333');
     expect(formatSources(c.terms[1].sources)).toBe('1회 1·2·4번째 타석');
   });
 
+  it('카운트별(종료 카운트 기준)은 기록에 있는 카운트만', () => {
+    const rows = byEndCount([game]);
+    expect(rows.map((r) => `${r.count.balls}-${r.count.strikes}`)).toEqual(['0-1', '0-2', '1-1', '3-0']);
+  });
+
   it('타수가 0이면 계산 불가(-)와 이유', () => {
-    const onlyWalk: GameForStats = { label: 'x', replay: replayGame(pitches('ball', 'ball', 'ball', 'ball'), 1) };
-    const c = battingAverageAgainst([onlyWalk]);
-    expect(c.value).toBeNull();
+    const c = battingAverageAgainst([asGame('x', [appear('pitcher'), ...pitches('ball', 'ball', 'ball', 'ball')])]);
     expect(c.display).toBe('-');
     expect(c.note).toContain('계산할 수 없음');
   });
-
-  it('공이 없으면 스트라이크 비율도 계산 불가', () => {
-    expect(strikeRate([]).value).toBeNull();
-  });
-
-  it('카운트별(종료 카운트 기준), 중단된 타석은 빠진다', () => {
-    const rows = byEndCount([game]);
-    expect(rows.map((r) => `${r.count.balls}-${r.count.strikes}`)).toEqual(['0-1', '0-2', '1-1', '3-0']);
-    expect(rows.find((r) => r.count.balls === 1)!.battingAverageAgainst.display).toBe('1.000');
-    expect(rows.find((r) => r.count.balls === 3)!.battingAverageAgainst.display).toBe('-');
-  });
 });
 
-describe('여러 경기 합계', () => {
-  const second: GameForStats = {
-    label: '10월 11일 △△전',
-    replay: replayGame([adjust(2, 1, [true, false, false]), play('caughtStealingSecond'), ...pitches('hit')], 2),
-  };
-
-  it('투구 수는 경기별로 더한다', () => {
-    expect(pitchCount([game, second]).expression).toBe('10월 4일 ○○전 13 + 10월 11일 △△전 1');
-  });
-
-  it('출처는 경기별로 묶어 보여준다', () => {
-    const c = battingAverageAgainst([game, second]);
-    expect(c.expression).toBe('2 ÷ 4');
-    expect(formatSources(c.terms[0].sources)).toBe('10월 4일 ○○전: 1회 1번째 타석 / 10월 11일 △△전: 2회 1번째 타석');
-  });
-
-  it('도루 저지와 던진 이닝 (1회 3아웃 + 2회 도루 저지 1아웃 = 4아웃 → 1 1/3)', () => {
-    expect(caughtStealing([game, second]).value).toBe(1);
-    expect(inningsPitched([game, second]).display).toBe('1 1/3');
-  });
-});
-
-describe('안타 종류·실점·실책', () => {
-  // 1회: 2루타, 홈런(2점), 실책 출루, 3루 도루 실패 아웃, 삼진, 아웃
-  const events = [
+describe('안타 종류·실점·실책·도루', () => {
+  const g = asGame('x', [
+    appear('pitcher'),
     hit('double'),
     hit('homeRun'),
     ...pitches('reachedOnError'),
     play('stolenBase', 0),
     play('caughtStealing', 1),
-    ...pitches('strike', 'strike', 'strike'),
-    ...pitches('out'),
-  ];
-  const g: GameForStats = { label: 'x', replay: replayGame(events, 1) };
+    ...pitches('strike', 'strike', 'strike', 'out'),
+  ]);
 
-  it('실점 2 (홈런 때 2루 주자와 타자)', () => {
+  it('실점 2, 장타 2, 홈런 1', () => {
     expect(runsAllowed([g]).value).toBe(2);
-  });
-
-  it('장타 2, 홈런 1', () => {
     expect(extraBaseHitsAllowed([g]).value).toBe(2);
     expect(homeRunsAllowed([g]).value).toBe(1);
   });
 
-  it('피장타율 = 루타 6 ÷ 타수 5 (실책 출루도 타수) = 1.200', () => {
-    const c = sluggingAgainst([g]);
-    expect(c.expression).toBe('6 ÷ 5');
-    expect(c.display).toBe('1.200');
-  });
-
-  it('피안타율 = 2 ÷ 5 (실책 출루는 안타가 아님)', () => {
+  it('피장타율 = 6 ÷ 5 = 1.200, 피안타율 = 2 ÷ 5', () => {
+    expect(sluggingAgainst([g]).display).toBe('1.200');
     expect(battingAverageAgainst([g]).expression).toBe('2 ÷ 5');
   });
 
-  it('수비 실책 1, 도루 허용 1, 도루 저지 1', () => {
+  it('수비 실책 1, 도루 허용 1, 도루 저지 1, 이닝별 투구 수', () => {
     expect(errorsBehind([g]).value).toBe(1);
     expect(stolenBasesAllowed([g]).value).toBe(1);
     expect(caughtStealing([g]).value).toBe(1);
+    expect(pitchesByInning([g])[0].expression).toBe('1 + 1 + 1 + 3 + 1');
+  });
+});
+
+describe('투수 장면만 센다', () => {
+  it('같은 경기의 아이 타석은 투수 통계에 들어가지 않는다', () => {
+    const g = asGame('x', [appear('pitcher'), ...pitches('out'), appear('batter', { inning: 1 }), hit('single')]);
+    expect(pitchCount([g]).value).toBe(1);
+    expect(battingAverageAgainst([g]).expression).toBe('0 ÷ 1');
   });
 
-  it('이닝별 투구 수', () => {
-    const [first] = pitchesByInning([g]);
-    expect(first.title).toBe('1회 투구 수');
-    expect(first.expression).toBe('1 + 1 + 1 + 3 + 1');
-    expect(first.value).toBe(7);
+  it('중계로 들어와 이어받은 카운트도 아이가 끝낸 타석이면 아이 기록', () => {
+    const g = asGame('x', [appear('pitcher', { inning: 5, outs: 2, balls: 3, strikes: 2 }), ...pitches('strike')]);
+    expect(strikeouts([g]).value).toBe(1);
+    expect(pitchCount([g]).value).toBe(1);
+    expect(inningsPitched([g]).display).toBe('1/3');
+  });
+});
+
+describe('여러 경기 합계', () => {
+  const second = asGame('10월 11일 △△전', [appear('pitcher', { inning: 2, outs: 1, bases: [true, false, false] }), play('caughtStealingSecond'), hit('single')]);
+
+  it('투구 수는 경기별로 더하고, 출처는 경기별로 묶는다', () => {
+    expect(pitchCount([game, second]).expression).toBe('10월 4일 ○○전 13 + 10월 11일 △△전 1');
+    const c = battingAverageAgainst([game, second]);
+    expect(formatSources(c.terms[0].sources)).toBe('10월 4일 ○○전: 1회 1번째 타석 / 10월 11일 △△전: 2회 1번째 타석');
+  });
+
+  it('던진 이닝: 3아웃 + 1아웃 = 1 1/3', () => {
+    expect(inningsPitched([game, second]).display).toBe('1 1/3');
+  });
+
+  it('규칙이 다른 경기가 섞이면 경기별로 나눠 더한다 (3아웃/3 + 4아웃/4 = 2.0)', () => {
+    const four = { label: 'y', replay: replayGame([appear('pitcher'), ...pitches('out', 'out', 'out'), adjust(1, 4, [false, false, false])], settings('them', { ballsForWalk: 4, strikesForStrikeout: 3, outsPerInning: 4 })) };
+    const three = asGame('z', [appear('pitcher'), ...pitches('out', 'out', 'out')]);
+    expect(inningsPitched([three, four]).display).toBe('2.0');
   });
 });

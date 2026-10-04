@@ -18,6 +18,8 @@
   --out-light: #e2554a;
   --ball-light: #4fc27c;
   --strike-light: #f2b34a;
+  --child: #4fb6f2;
+  --danger: #b3261e;
   --warn-bg: #fff4e0;
   --warn-text: #7a4b00;
   --radius: 14px;
@@ -90,47 +92,9 @@ button:disabled {
   flex-direction: column;
 }
 
-/* 처음 화면 */
-.home {
-  padding: 48px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.home h1 {
-  margin: 0;
-  font-size: 26px;
-}
-
 .sub {
   margin: 0;
   color: var(--muted);
-}
-
-.menu {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 24px 20px;
-  border-radius: var(--radius);
-  background: var(--surface);
-  border: 2px solid var(--line);
-  text-align: left;
-}
-
-.menu strong {
-  font-size: 22px;
-}
-
-.menu small {
-  color: var(--muted);
-}
-
-.menu.pitcher {
-  border-color: var(--primary);
-  background: var(--primary-soft);
 }
 
 /* 공통 틀 */
@@ -149,12 +113,6 @@ button:disabled {
 .topbar h1 {
   margin: 0;
   font-size: 18px;
-}
-
-.back {
-  background: transparent;
-  color: var(--on-color);
-  padding: 4px 0;
 }
 
 .notice {
@@ -179,7 +137,7 @@ button:disabled {
   width: 100%;
   max-width: 480px;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   background: var(--surface);
   border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom);
@@ -187,7 +145,7 @@ button:disabled {
 
 .tabbar button {
   padding: 14px 0;
-  font-size: 14px;
+  font-size: 13px;
   background: transparent;
   color: var(--muted);
   font-weight: 600;
@@ -1144,10 +1102,6 @@ button {
   border-color: var(--bar);
 }
 
-.inning-cards {
-  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-}
-
 /* ── 가로 화면: 왼쪽 상황판, 오른쪽 버튼 ── */
 @media (orientation: landscape) and (max-height: 560px) {
   :root {
@@ -1215,4 +1169,276 @@ button {
   .tabbar button {
     padding: 8px 0;
   }
+}
+
+/* ── 상황 기준 입력: 장면·역할 ── */
+.topbar h1 {
+  font-size: 17px;
+}
+
+.board-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.board-scene {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--board-pill);
+  color: var(--on-color);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.role-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--board-pill);
+  opacity: 1;
+}
+
+.role-badge.pitcher {
+  background: var(--ball);
+}
+
+.role-badge.batter {
+  background: var(--hit);
+}
+
+.role-badge.runner {
+  background: #2d6f99;
+}
+
+.diamond-base.child {
+  fill: var(--child);
+  stroke: var(--child);
+}
+
+.diamond-child-label {
+  fill: var(--child);
+  font-size: 11px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.situation-editor .diamond-child-label,
+.scene-setup .diamond-child-label {
+  fill: var(--child);
+}
+
+.pad-title {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.runner-section.child {
+  border: 2px solid var(--child);
+}
+
+.child-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.child-grid .play {
+  padding: 10px 2px;
+  font-size: 13px;
+}
+
+/* 등장 설정 */
+.scene-setup {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 2px solid var(--primary);
+}
+
+.role-picker {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.role-picker button {
+  display: grid;
+  gap: 2px;
+  padding: 10px 2px;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  border: 1px solid var(--line);
+}
+
+.role-picker button strong {
+  font-size: 16px;
+}
+
+.role-picker button small {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.role-picker button.active {
+  background: var(--bar);
+  border-color: var(--bar);
+  color: var(--on-color);
+}
+
+.role-picker button.active small {
+  color: var(--on-color);
+  opacity: 0.85;
+}
+
+.position-picker,
+.child-base-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.position-picker button,
+.child-base-picker button {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-weight: 600;
+}
+
+.position-picker button.active,
+.child-base-picker button.active {
+  background: var(--bar);
+  border-color: var(--bar);
+  color: var(--on-color);
+}
+
+.diamond-field {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+
+.diamond-field small {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.scene-setup .diamond,
+.situation-editor .diamond {
+  width: 132px;
+  background: var(--board);
+  border-radius: var(--radius);
+}
+
+.secondary.danger {
+  color: var(--danger);
+}
+
+/* 기록 보기: 장면 */
+.scene-block {
+  display: grid;
+  gap: 8px;
+}
+
+.scene-block > .sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pa.child {
+  border-left: 4px solid var(--hit);
+}
+
+.pa.opponent {
+  border-left: 4px solid var(--ball);
+}
+
+.chip.runner {
+  background: #2d6f99;
+}
+
+.chip.appearance,
+.chip.exit {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--muted);
+}
+
+.line-score td.manual {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* 경기 규칙 */
+.rules {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.rules summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rules .stepper span {
+  flex: 1;
+  font-weight: 400;
+}
+
+/* 등장 설정은 한 화면에 들어가도록 다이아몬드를 옆에 두고 버튼을 줄인다. */
+.scene-setup .editor-grid {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.scene-setup .editor-fields {
+  flex: 1;
+  gap: 6px;
+}
+
+.scene-setup .stepper,
+.scene-setup .outs-picker {
+  gap: 6px;
+}
+
+.scene-setup .stepper span,
+.scene-setup .outs-picker span {
+  min-width: 64px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.scene-setup .stepper button,
+.scene-setup .outs-picker button {
+  min-width: 38px;
+  min-height: 38px;
+  font-size: 16px;
+}
+
+.scene-setup .stepper strong {
+  min-width: 44px;
+  font-size: 16px;
+}
+
+.scene-setup .diamond {
+  width: 104px;
+}
+
+.scene-setup .role-picker button {
+  padding: 8px 2px;
 }

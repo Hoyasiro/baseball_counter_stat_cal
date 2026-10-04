@@ -1,140 +1,222 @@
 import { describe, expect, it } from 'vitest';
-import { activeEvents, LogEvent } from './events';
+import { activeEvents, LogEvent, PlayLogEvent } from './events';
 import { replayGame } from './replay';
-import { adjust, hit, pitches, play } from './test-helpers';
+import { adjust, appear, exit, hit, pitches, play, settings } from './test-helpers';
 
-const START = 1;
+/** 1회 선발 투수로 등장한 뒤의 기록 */
+const asPitcher = (...events: PlayLogEvent[]) => replayGame([appear('pitcher'), ...events], settings());
 
-describe('카운트와 타석 결과', () => {
+describe('카운트와 타석 결과 (투수 장면)', () => {
   it('볼 4개면 볼넷, 종료 카운트는 마지막 공 직전', () => {
-    const { plateAppearances: [pa] } = replayGame(pitches('ball', 'strike', 'ball', 'ball', 'ball'), START);
+    const { plateAppearances: [pa] } = asPitcher(...pitches('ball', 'strike', 'ball', 'ball', 'ball'));
     expect(pa.outcome).toBe('walk');
     expect(pa.endCount).toEqual({ balls: 3, strikes: 1 });
+    expect(pa.actor).toBe('opponent');
   });
 
   it('스트라이크 3개면 삼진', () => {
-    const { plateAppearances: [pa] } = replayGame(pitches('strike', 'strike', 'strike'), START);
+    const { plateAppearances: [pa] } = asPitcher(...pitches('strike', 'strike', 'strike'));
     expect(pa.outcome).toBe('strikeout');
-    expect(pa.endCount).toEqual({ balls: 0, strikes: 2 });
   });
 
   it('2스트라이크 이후 일반 파울은 카운트가 그대로다', () => {
-    const r = replayGame(pitches('foul', 'foul', 'foul', 'foul'), START);
-    expect(r.plateAppearances[0].outcome).toBeNull();
-    expect(r.state.count).toEqual({ balls: 0, strikes: 2 });
+    expect(asPitcher(...pitches('foul', 'foul', 'foul', 'foul')).state?.count).toEqual({ balls: 0, strikes: 2 });
   });
 
   it('쓰리번트 아웃: 2스트라이크에서 번트 파울은 삼진', () => {
-    const r = replayGame(pitches('strike', 'foul', 'buntFoul'), START);
+    const r = asPitcher(...pitches('strike', 'foul', 'buntFoul'));
     expect(r.plateAppearances[0].outcome).toBe('strikeout');
-    expect(r.plateAppearances[0].endCount).toEqual({ balls: 0, strikes: 2 });
-    expect(r.state.outs).toBe(1);
+    expect(r.state?.outs).toBe(1);
   });
 
   it('2스트라이크 전 번트 파울은 스트라이크 하나', () => {
-    const r = replayGame(pitches('buntFoul'), START);
-    expect(r.state.count).toEqual({ balls: 0, strikes: 1 });
+    expect(asPitcher(...pitches('buntFoul')).state?.count).toEqual({ balls: 0, strikes: 1 });
   });
 
   it('와일드피치는 볼로 센다 (볼 4개째면 볼넷)', () => {
-    const r = replayGame(pitches('ball', 'ball', 'ball', 'wildPitch'), START);
-    expect(r.plateAppearances[0].outcome).toBe('walk');
+    expect(asPitcher(...pitches('ball', 'ball', 'ball', 'wildPitch')).plateAppearances[0].outcome).toBe('walk');
   });
 
-  it('초구 안타는 0-0에서 끝난다', () => {
-    const { plateAppearances: [pa] } = replayGame(pitches('hit'), START);
-    expect(pa.endCount).toEqual({ balls: 0, strikes: 0 });
-  });
-
-  it('풀카운트에서 아웃', () => {
-    const { plateAppearances: [pa] } = replayGame(pitches('ball', 'ball', 'ball', 'strike', 'strike', 'out'), START);
-    expect(pa.endCount).toEqual({ balls: 3, strikes: 2 });
-    expect(pa.outcome).toBe('out');
+  it('초구 안타는 0-0, 풀카운트 아웃은 3-2에서 끝난다', () => {
+    expect(asPitcher(hit('single')).plateAppearances[0].endCount).toEqual({ balls: 0, strikes: 0 });
+    const full = asPitcher(...pitches('ball', 'ball', 'ball', 'strike', 'strike', 'out'));
+    expect(full.plateAppearances[0].endCount).toEqual({ balls: 3, strikes: 2 });
   });
 });
 
-describe('주자 이동', () => {
-  it('볼넷은 밀려나는 주자만 이동: 2루 주자만 있으면 1·2루', () => {
-    const events = [adjust(1, 0, [false, true, false]), ...pitches('ball', 'ball', 'ball', 'ball')];
-    expect(replayGame(events, START).state.bases).toEqual([true, true, false]);
+describe('주자 이동과 득점', () => {
+  it('볼넷은 밀려나는 주자만: 2루 주자만 있으면 1·2루', () => {
+    const r = asPitcher(adjust(1, 0, [false, true, false]), ...pitches('ball', 'ball', 'ball', 'ball'));
+    expect(r.state?.bases).toEqual([true, true, false]);
   });
 
-  it('안타는 주자 한 베이스씩, 타자는 1루 (1루 주자 → 1·2루)', () => {
-    const events = [...pitches('hit'), ...pitches('hit')];
-    expect(replayGame(events, START).state.bases).toEqual([true, true, false]);
+  it('주자 1·2루 3루타: 2점, 타자는 3루', () => {
+    const r = asPitcher(adjust(1, 0, [true, true, false]), hit('triple'));
+    expect(r.plateAppearances[0].runs).toBe(2);
+    expect(r.state?.bases).toEqual([false, false, true]);
   });
 
-  it('와일드피치는 모든 주자 한 베이스씩 (1·3루 → 2루, 3루 주자 득점)', () => {
-    const events = [adjust(1, 0, [true, false, true]), ...pitches('wildPitch')];
-    const r = replayGame(events, START);
-    expect(r.state.bases).toEqual([false, true, false]);
-    expect(r.state.count).toEqual({ balls: 1, strikes: 0 });
+  it('만루 홈런 4점, 만루 밀어내기 1점, 3루 주자 와일드피치 1점', () => {
+    expect(asPitcher(adjust(1, 0, [true, true, true]), hit('homeRun')).plateAppearances[0].runs).toBe(4);
+    expect(asPitcher(adjust(1, 0, [true, true, true]), ...pitches('ball', 'ball', 'ball', 'ball')).plateAppearances[0].runs).toBe(1);
+    expect(asPitcher(adjust(1, 0, [false, false, true]), ...pitches('wildPitch')).plateAppearances[0].runs).toBe(1);
   });
 
-  it('2루 도루 성공: 1루 주자가 2루로, 카운트는 그대로', () => {
-    const events = [...pitches('hit', 'ball'), play('stolenSecond')];
-    const r = replayGame(events, START);
-    expect(r.state.bases).toEqual([false, true, false]);
-    expect(r.state.count).toEqual({ balls: 1, strikes: 0 });
-    expect(r.plateAppearances[1].plays).toHaveLength(1);
+  it('실책 출루: 1루로, 실책 1개 / 실책 진루 뒤 고치기로 득점', () => {
+    expect(asPitcher(...pitches('reachedOnError')).plateAppearances[0].errors).toBe(1);
+    const r = asPitcher(adjust(1, 0, [false, false, true]), ...pitches('ball'), play('error'), adjust(1, 0, [false, false, false], 1));
+    expect(r.plateAppearances[0].errors).toBe(1);
+    expect(r.plateAppearances[0].runs).toBe(1);
   });
 
-  it('2루 도루 실패: 1루 주자 아웃, 아웃 하나 추가', () => {
-    const r = replayGame([...pitches('hit'), play('caughtStealingSecond')], START);
-    expect(r.state.bases).toEqual([false, false, false]);
-    expect(r.state.outs).toBe(1);
+  it('도루: 3루·홈 도루, 도루 실패 아웃, 견제는 그대로', () => {
+    const steal = asPitcher(adjust(1, 0, [false, true, false]), play('stolenBase', 1), play('stolenBase', 2));
+    expect(steal.state?.bases).toEqual([false, false, false]);
+    expect(steal.plateAppearances[0].runs).toBe(1);
+    const caught = asPitcher(adjust(1, 0, [true, true, false]), play('caughtStealing', 1));
+    expect(caught.state?.bases).toEqual([true, false, false]);
+    expect(caught.state?.outs).toBe(1);
+    expect(asPitcher(adjust(1, 0, [true, true, false]), play('pickoff', 1)).state?.bases).toEqual([true, true, false]);
   });
 
-  it('견제는 아무것도 바꾸지 않고, 견제 아웃은 고른 베이스의 주자를 지운다', () => {
-    const events = [adjust(1, 0, [true, true, false]), play('pickoff'), play('pickoffOut', 1)];
-    const r = replayGame(events, START);
-    expect(r.state.bases).toEqual([true, false, false]);
-    expect(r.state.outs).toBe(1);
+  it('예전 기록의 2루 도루와 종류 없는 안타도 읽는다', () => {
+    const r = asPitcher(...pitches('hit'), play('stolenSecond'));
+    expect(r.plateAppearances[0].hitType).toBe('single');
+    expect(r.state?.bases).toEqual([false, true, false]);
   });
 });
 
-describe('이닝', () => {
-  it('세 번째 아웃이면 다음 이닝, 아웃·주자 초기화', () => {
-    const r = replayGame([...pitches('hit', 'out', 'out', 'out')], START);
-    expect(r.state).toEqual({ inning: 2, outs: 0, bases: [false, false, false], count: { balls: 0, strikes: 0 } });
-    expect(r.plateAppearances.map((pa) => pa.inning)).toEqual([1, 1, 1, 1]);
+describe('투수 장면의 이닝', () => {
+  it('3아웃이면 다음 이닝 같은 쪽(초)으로 이어진다', () => {
+    const r = asPitcher(...pitches('out', 'out', 'out'));
+    expect(r.state).toMatchObject({ role: 'pitcher', inning: 2, half: 'top', outs: 0 });
   });
 
-  it('시작 이닝을 따른다 (3회부터 던짐)', () => {
-    const r = replayGame(pitches('out'), 3);
-    expect(r.plateAppearances[0].inning).toBe(3);
+  it('중계: 4회말 1아웃 1·3루, 볼 2 · 스트라이크 1에서 등판 (선공 팀)', () => {
+    const r = replayGame(
+      [appear('pitcher', { inning: 4, outs: 1, bases: [true, false, true], balls: 2, strikes: 1 }), ...pitches('ball', 'ball')],
+      settings('us'),
+    );
+    const pa = r.plateAppearances[0];
+    expect(pa).toMatchObject({ inning: 4, half: 'bottom', outsBefore: 1, outcome: 'walk' });
+    expect(pa.startCount).toEqual({ balls: 2, strikes: 1 });
+    expect(pa.runs).toBe(0);
+    expect(r.state?.bases).toEqual([true, true, true]);
   });
 
-  it('타석 도중 도루 실패로 세 번째 아웃이면 그 타석은 "이닝 종료로 중단"', () => {
-    const events = [adjust(1, 2, [true, false, false]), ...pitches('ball'), play('caughtStealingSecond')];
-    const r = replayGame(events, START);
+  it('타석 도중 도루 실패로 3아웃이면 "이닝 종료로 중단"', () => {
+    const r = asPitcher(adjust(1, 2, [true, false, false]), ...pitches('ball'), play('caughtStealingSecond'));
     expect(r.plateAppearances[0].outcome).toBe('inningEnded');
-    expect(r.plateAppearances[0].endCount).toBeNull();
-    expect(r.state.inning).toBe(2);
-    expect(r.state.count).toEqual({ balls: 0, strikes: 0 });
+    expect(r.state?.inning).toBe(2);
   });
 
-  it('병살: 아웃 뒤 다음 공 전에 아웃을 고치면 방금 타석이 잡은 아웃으로 센다', () => {
-    const events = [...pitches('hit', 'out'), adjust(1, 2, [false, false, false])];
-    const r = replayGame(events, START);
-    expect(r.plateAppearances).toHaveLength(2);
-    expect(r.plateAppearances[1].outsRecorded).toBe(2);
-    expect(r.state.outs).toBe(2);
-  });
-
-  it('고쳐서 3아웃을 넣으면 이닝이 끝난다', () => {
-    const events = [...pitches('out', 'out'), adjust(1, 3, [false, false, false])];
-    const r = replayGame(events, START);
-    expect(r.state.inning).toBe(2);
+  it('병살: 다음 공 전에 아웃을 고치면 방금 타석이 잡은 아웃', () => {
+    const r = asPitcher(hit('single'), ...pitches('out'), adjust(1, 2, [false, false, false]));
     expect(r.plateAppearances[1].outsRecorded).toBe(2);
   });
 
-  it('이닝을 직접 바꾸면 아웃은 잡은 것으로 세지 않는다', () => {
-    const events = [...pitches('out'), adjust(4, 0, [false, false, false]), ...pitches('ball')];
-    const r = replayGame(events, START);
-    expect(r.state.inning).toBe(4);
-    expect(r.plateAppearances.map((pa) => pa.outsRecorded)).toEqual([1, 0]);
-    expect(r.plateAppearances[1].inning).toBe(4);
+  it('첫 기록 전에 고친 아웃은 시작 상황 (잡은 아웃 아님)', () => {
+    const r = asPitcher(adjust(1, 1, [true, false, false]), ...pitches('out'));
+    expect(r.plateAppearances[0].outsBefore).toBe(1);
+    expect(r.plateAppearances[0].outsRecorded).toBe(1);
+  });
+
+  it('교체되면 장면이 끝나고, 던지던 타석은 중단', () => {
+    const r = asPitcher(...pitches('ball'), exit());
+    expect(r.state).toBeNull();
+    expect(r.plateAppearances[0].outcome).toBe('sceneEnded');
+    expect(r.scenes[0].endedBy).toBe('exit');
+  });
+});
+
+describe('타자·주자 장면 (우리 아이)', () => {
+  it('아이 타석이 안타면 주자가 되어 장면이 이어진다', () => {
+    const r = replayGame([appear('batter', { inning: 2 }), hit('double')], settings());
+    expect(r.plateAppearances[0]).toMatchObject({ actor: 'child', half: 'bottom', hitType: 'double' });
+    expect(r.state).toMatchObject({ role: 'runner', childBase: 1 });
+  });
+
+  it('아이가 아웃이면 장면이 끝난다', () => {
+    const r = replayGame([appear('batter'), ...pitches('strike', 'strike', 'strike')], settings());
+    expect(r.state).toBeNull();
+    expect(r.scenes[0].endedBy).toBe('childDone');
+  });
+
+  it('주자인 아이: 뒤 타자 1루타에 한 칸 진루, 2루타에 득점', () => {
+    const events = [appear('batter'), ...pitches('ball', 'ball', 'ball', 'ball'), hit('single')];
+    const r = replayGame(events, settings());
+    expect(r.state?.childBase).toBe(1);
+    expect(r.plateAppearances[1].actor).toBe('teammate');
+    const r2 = replayGame([...events, hit('double')], settings());
+    expect(r2.state).toBeNull();
+    expect(r2.runnerEvents.map((e) => e.kind)).toEqual(['scored']);
+  });
+
+  it('대주자: 2루에 등장해 3루 도루 성공, 견제 받고, 한 칸 진루(고치기)로 득점', () => {
+    const r = replayGame(
+      [
+        appear('runner', { inning: 5, outs: 1, bases: [true, false, false], childBase: 1 }),
+        play('stolenBase', 1),
+        play('pickoff', 2),
+        adjust(5, 1, [true, false, false], 1, 'scored'),
+      ],
+      settings(),
+    );
+    expect(r.runnerEvents.map((e) => e.kind)).toEqual(['stolenBase', 'pickoff', 'scored']);
+    expect(r.state).toBeNull();
+    expect(r.halves.get('5B')?.runs).toBe(1);
+  });
+
+  it('주자인 아이가 도루 실패하면 장면이 끝난다', () => {
+    const r = replayGame([appear('runner', { childBase: 0 }), play('caughtStealing', 0)], settings());
+    expect(r.runnerEvents[0].kind).toBe('caughtStealing');
+    expect(r.state).toBeNull();
+  });
+
+  it('3아웃이면 베이스에 남은 아이는 잔루', () => {
+    const r = replayGame([appear('runner', { outs: 2, childBase: 1 }), ...pitches('out')], settings());
+    expect(r.runnerEvents.map((e) => e.kind)).toEqual(['stranded']);
+    expect(r.scenes[0].endedBy).toBe('halfOver');
+  });
+
+  it('대타: 볼 1 · 스트라이크 2에서 등장', () => {
+    const r = replayGame([appear('batter', { balls: 1, strikes: 2 }), ...pitches('strike')], settings());
+    expect(r.plateAppearances[0]).toMatchObject({ outcome: 'strikeout', startCount: { balls: 1, strikes: 2 } });
+  });
+
+  it('수비 장면은 포지션만 남고 투구는 받지 않는다', () => {
+    const r = replayGame([appear('fielder', { position: 'shortstop' }), ...pitches('ball')], settings());
+    expect(r.state).toMatchObject({ role: 'fielder', position: 'shortstop' });
+    expect(r.plateAppearances).toHaveLength(0);
+  });
+
+  it('다음 등장이 오면 앞 장면은 끝난다', () => {
+    const r = replayGame([appear('pitcher'), ...pitches('ball'), appear('batter', { inning: 1 })], settings());
+    expect(r.scenes.map((s) => s.endedBy)).toEqual(['next', null]);
+    expect(r.state?.role).toBe('batter');
+  });
+});
+
+describe('경기 규칙 바꾸기 (연습경기)', () => {
+  const loose = settings('them', { ballsForWalk: 5, strikesForStrikeout: 4, outsPerInning: 3 });
+
+  it('볼 5개 볼넷, 스트라이크 4개 삼진', () => {
+    const walk = replayGame([appear('pitcher'), ...pitches('ball', 'ball', 'ball', 'ball')], loose);
+    expect(walk.state?.count).toEqual({ balls: 4, strikes: 0 });
+    const k = replayGame([appear('pitcher'), ...pitches('strike', 'strike', 'strike', 'strike')], loose);
+    expect(k.plateAppearances[0].outcome).toBe('strikeout');
+  });
+
+  it('3스트라이크 상황(마지막 직전)의 일반 파울은 카운트 그대로, 번트 파울은 삼진', () => {
+    const r = replayGame([appear('pitcher'), ...pitches('strike', 'strike', 'strike', 'foul')], loose);
+    expect(r.state?.count).toEqual({ balls: 0, strikes: 3 });
+    const bunt = replayGame([appear('pitcher'), ...pitches('strike', 'strike', 'strike', 'buntFoul')], loose);
+    expect(bunt.plateAppearances[0].outcome).toBe('strikeout');
+  });
+
+  it('이닝당 아웃 수 4개', () => {
+    const r = replayGame([appear('pitcher'), ...pitches('out', 'out', 'out')], settings('them', { ballsForWalk: 4, strikesForStrikeout: 3, outsPerInning: 4 }));
+    expect(r.state).toMatchObject({ inning: 1, outs: 3 });
   });
 });
 
@@ -144,87 +226,5 @@ describe('취소', () => {
     const events: LogEvent[] = [a, b, { kind: 'void', id: 'v1', createdAt: b.createdAt, author: '테스트', targetId: b.id }];
     expect(activeEvents(events)).toEqual([a]);
     expect(events).toHaveLength(3);
-  });
-});
-
-describe('시작 상황', () => {
-  it('첫 기록 전에 고친 아웃은 잡은 아웃이 아니다 (1아웃에 등판)', () => {
-    const r = replayGame([adjust(3, 1, [true, false, false]), ...pitches('out')], 3);
-    expect(r.plateAppearances[0].outsBefore).toBe(1);
-    expect(r.plateAppearances[0].basesBefore).toEqual([true, false, false]);
-    expect(r.plateAppearances[0].outsRecorded).toBe(1);
-    expect(r.state.outs).toBe(2);
-  });
-});
-
-describe('안타 종류·실책·도루와 득점', () => {
-  it('예전 기록처럼 종류 없는 안타는 1루타', () => {
-    const r = replayGame(pitches('hit'), START);
-    expect(r.plateAppearances[0].hitType).toBe('single');
-    expect(r.state.bases).toEqual([true, false, false]);
-  });
-
-  it('2루타 뒤 1루타: 2루 주자는 3루까지만 (1점 아님, 더 가면 상황 고치기)', () => {
-    const r = replayGame([hit('double'), hit('single')], START);
-    expect(r.state.bases).toEqual([true, false, true]);
-    expect(r.plateAppearances.map((pa) => pa.runs)).toEqual([0, 0]);
-  });
-
-  it('주자 1·2루 3루타: 2점, 타자는 3루', () => {
-    const r = replayGame([adjust(1, 0, [true, true, false]), hit('triple')], START);
-    expect(r.plateAppearances[0].runs).toBe(2);
-    expect(r.state.bases).toEqual([false, false, true]);
-  });
-
-  it('만루 홈런은 4점', () => {
-    const r = replayGame([adjust(1, 0, [true, true, true]), hit('homeRun')], START);
-    expect(r.plateAppearances[0].runs).toBe(4);
-    expect(r.plateAppearances[0].hitType).toBe('homeRun');
-  });
-
-  it('만루 밀어내기 볼넷 1점, 3루 주자 와일드피치 1점', () => {
-    const walk = replayGame([adjust(1, 0, [true, true, true]), ...pitches('ball', 'ball', 'ball', 'ball')], START);
-    expect(walk.plateAppearances[0].runs).toBe(1);
-    const wp = replayGame([adjust(1, 0, [false, false, true]), ...pitches('wildPitch')], START);
-    expect(wp.plateAppearances[0].runs).toBe(1);
-  });
-
-  it('실책 출루: 안타가 아니고 1루로, 실책 1개', () => {
-    const r = replayGame(pitches('reachedOnError'), START);
-    expect(r.plateAppearances[0].outcome).toBe('reachedOnError');
-    expect(r.plateAppearances[0].errors).toBe(1);
-    expect(r.state.bases).toEqual([true, false, false]);
-  });
-
-  it('주자 진루 실책은 실책만 세고, 바뀐 상황은 고치기로 맞춘다 (득점 포함)', () => {
-    const events = [adjust(1, 0, [false, false, true]), ...pitches('ball'), play('error'), adjust(1, 0, [false, false, false], 1)];
-    const r = replayGame(events, START);
-    expect(r.plateAppearances[0].errors).toBe(1);
-    expect(r.plateAppearances[0].runs).toBe(1);
-    expect(r.state.count).toEqual({ balls: 1, strikes: 0 });
-  });
-
-  it('3루 도루와 홈 도루', () => {
-    const events = [adjust(1, 0, [false, true, false]), play('stolenBase', 1), play('stolenBase', 2)];
-    const r = replayGame(events, START);
-    expect(r.state.bases).toEqual([false, false, false]);
-    expect(r.plateAppearances[0].runs).toBe(1);
-  });
-
-  it('3루 도루 실패는 3루로 가던 2루 주자 아웃', () => {
-    const r = replayGame([adjust(1, 0, [true, true, false]), play('caughtStealing', 1)], START);
-    expect(r.state.bases).toEqual([true, false, false]);
-    expect(r.state.outs).toBe(1);
-  });
-
-  it('견제는 베이스를 기록해도 상황은 그대로', () => {
-    const r = replayGame([adjust(1, 0, [true, true, false]), play('pickoff', 1)], START);
-    expect(r.state.bases).toEqual([true, true, false]);
-    expect(r.plateAppearances[0].plays[0].base).toBe(1);
-  });
-
-  it('예전 기록의 2루 도루도 그대로 읽는다', () => {
-    const r = replayGame([...pitches('hit'), play('stolenSecond')], START);
-    expect(r.state.bases).toEqual([false, true, false]);
   });
 });

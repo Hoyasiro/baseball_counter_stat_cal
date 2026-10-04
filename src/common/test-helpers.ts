@@ -1,4 +1,22 @@
-import { AdjustEvent, BaseIndex, Bases, HitType, PitchEvent, PitchResult, PlayEvent, PlayKind, ScoreEvent, Team } from './events';
+import { DEFAULT_RULES, Rules } from './count';
+import {
+  AdjustEvent,
+  AppearanceEvent,
+  BaseIndex,
+  Bases,
+  ChildPosition,
+  ExitEvent,
+  HitType,
+  PitchEvent,
+  PitchResult,
+  PlayEvent,
+  PlayKind,
+  Position,
+  Role,
+  ScoreEvent,
+  Team,
+} from './events';
+import { ReplaySettings } from './replay';
 
 let seq = 0;
 
@@ -7,21 +25,63 @@ function base(): { id: string; createdAt: string; author: string } {
   return { id: `e${seq}`, createdAt: '2026-10-04T00:00:00.000Z', author: '테스트' };
 }
 
+/** 기본: 후공(우리 팀 수비가 초), 정식 규칙 */
+export function settings(battingFirst: Team = 'them', rules: Rules = DEFAULT_RULES): ReplaySettings {
+  return { battingFirst, rules };
+}
+
 /** 테스트용 투구 이벤트 목록 */
 export function pitches(...results: PitchResult[]): PitchEvent[] {
   return results.map((result) => ({ kind: 'pitch', ...base(), result }));
-}
-
-export function play(kind: PlayKind, baseIndex?: BaseIndex): PlayEvent {
-  return { kind: 'play', ...base(), play: kind, ...(baseIndex === undefined ? {} : { base: baseIndex }) };
 }
 
 export function hit(hitType: HitType): PitchEvent {
   return { kind: 'pitch', ...base(), result: 'hit', hitType };
 }
 
-export function adjust(inning: number, outs: number, bases: Bases, runs?: number): AdjustEvent {
-  return { kind: 'adjust', ...base(), inning, outs, bases, ...(runs === undefined ? {} : { runs }) };
+export function play(kind: PlayKind, baseIndex?: BaseIndex): PlayEvent {
+  return { kind: 'play', ...base(), play: kind, ...(baseIndex === undefined ? {} : { base: baseIndex }) };
+}
+
+export function adjust(inning: number, outs: number, bases: Bases, runs?: number, child?: ChildPosition): AdjustEvent {
+  return {
+    kind: 'adjust',
+    ...base(),
+    inning,
+    outs,
+    bases,
+    ...(runs === undefined ? {} : { runs }),
+    ...(child === undefined ? {} : { child }),
+  };
+}
+
+interface AppearanceOptions {
+  inning?: number;
+  outs?: number;
+  bases?: Bases;
+  balls?: number;
+  strikes?: number;
+  childBase?: BaseIndex;
+  position?: Position;
+}
+
+export function appear(role: Role, options: AppearanceOptions = {}): AppearanceEvent {
+  return {
+    kind: 'appearance',
+    ...base(),
+    role,
+    inning: options.inning ?? 1,
+    outs: options.outs ?? 0,
+    bases: options.bases ?? [false, false, false],
+    balls: options.balls ?? 0,
+    strikes: options.strikes ?? 0,
+    ...(options.childBase === undefined ? {} : { childBase: options.childBase }),
+    ...(options.position === undefined ? {} : { position: options.position }),
+  };
+}
+
+export function exit(): ExitEvent {
+  return { kind: 'exit', ...base() };
 }
 
 export function score(team: Team, inning: number, runs: number): ScoreEvent {

@@ -1,3 +1,4 @@
+import { DEFAULT_RULES, Rules } from './count';
 import {
   BaseIndex,
   Bases,
@@ -7,6 +8,9 @@ import {
   LogEvent,
   PitchResult,
   PlayKind,
+  Position,
+  Role,
+  ChildPosition,
   Team,
   isLogEvent,
 } from './events';
@@ -25,7 +29,9 @@ export interface GameInfo {
   readonly date: string;
   readonly opponent: string;
   readonly gameType: GameType;
-  readonly startInning: number;
+  /** 우리 팀이 먼저 공격(초)인지 */
+  readonly battingFirst: Team;
+  readonly rules: Rules;
 }
 
 export const GAME_TYPE_LABEL: Record<GameType, string> = {
@@ -76,8 +82,51 @@ export function addPlay(game: Game, play: PlayKind, baseIndex?: BaseIndex): Game
   return append(game, { kind: 'play', ...base(), play, ...(baseIndex === undefined ? {} : { base: baseIndex }) });
 }
 
-export function addAdjust(game: Game, inning: number, outs: number, bases: Bases, runs = 0): Game {
-  return append(game, { kind: 'adjust', ...base(), inning, outs, bases, ...(runs > 0 ? { runs } : {}) });
+export interface AdjustInput {
+  readonly inning: number;
+  readonly outs: number;
+  readonly bases: Bases;
+  readonly runs: number;
+  readonly child?: ChildPosition;
+}
+
+export function addAdjust(game: Game, input: AdjustInput): Game {
+  const { inning, outs, bases, runs, child } = input;
+  return append(game, {
+    kind: 'adjust',
+    ...base(),
+    inning,
+    outs,
+    bases,
+    ...(runs > 0 ? { runs } : {}),
+    ...(child === undefined ? {} : { child }),
+  });
+}
+
+export interface AppearanceInput {
+  readonly role: Role;
+  readonly inning: number;
+  readonly outs: number;
+  readonly bases: Bases;
+  readonly balls: number;
+  readonly strikes: number;
+  readonly childBase?: BaseIndex;
+  readonly position?: Position;
+}
+
+export function addAppearance(game: Game, input: AppearanceInput): Game {
+  const { childBase, position, ...rest } = input;
+  return append(game, {
+    kind: 'appearance',
+    ...base(),
+    ...rest,
+    ...(childBase === undefined ? {} : { childBase }),
+    ...(position === undefined ? {} : { position }),
+  });
+}
+
+export function addExit(game: Game): Game {
+  return append(game, { kind: 'exit', ...base() });
 }
 
 export function addScore(game: Game, team: Team, inning: number, runs: number): Game {
@@ -88,9 +137,15 @@ export function addVoid(game: Game, targetId: string): Game {
   return append(game, { kind: 'void', ...base(), targetId });
 }
 
-const UNKNOWN_INFO: GameInfo = { date: '', opponent: '', gameType: 'other', startInning: 1 };
+const UNKNOWN_INFO: GameInfo = {
+  date: '',
+  opponent: '',
+  gameType: 'other',
+  battingFirst: 'them',
+  rules: DEFAULT_RULES,
+};
 
-/** 가장 최근에 입력한 경기 정보 */
+/** 가장 최근에 입력한 경기 정보. 예전 기록에 없는 값은 기본값(후공, 정식 규칙)으로 채운다. */
 export function gameInfo(game: Game): GameInfo {
   const infos = game.events.filter((e): e is GameInfoEvent => e.kind === 'gameInfo');
   const latest = infos[infos.length - 1];
@@ -99,13 +154,14 @@ export function gameInfo(game: Game): GameInfo {
     date: latest.date,
     opponent: latest.opponent,
     gameType: latest.gameType,
-    startInning: latest.startInning,
+    battingFirst: latest.battingFirst ?? UNKNOWN_INFO.battingFirst,
+    rules: latest.rules ?? DEFAULT_RULES,
   };
 }
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
-/** 화면용 날짜. 예: "10월 4일 (토)" */
+/** 화면용 날짜. 예: "10월 4일 (일)" */
 export function dateLabel(date: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   if (!match) return '날짜 없음';
@@ -137,19 +193,47 @@ export function isGame(value: unknown): value is Game {
   );
 }
 
-/** 이전 버전(경기 정보 없음) 기록을 읽어 경기 정보를 붙인다. 날짜는 처음 만든 날로 둔다. */
+/**
+ * 예전 버전 기록을 지금 구조로 읽는다. 원래 이벤트는 그대로 두고 앞에 덧붙이기만 한다.
+ * - 경기 정보가 없으면: 처음 만든 날짜로 경기 정보를 붙인다.
+ * - 투구 기록은 있는데 등장 기록이 없으면(투수 화면만 있던 때): 시작 이닝에 "투수로 등장"을 붙인다.
+ */
 export function upgradeLegacyGame(game: Game): Game {
-  if (game.events.some((e) => e.kind === 'gameInfo')) return game;
-  const date = game.createdAt.slice(0, 10);
-  const info: LogEvent = {
-    kind: 'gameInfo',
-    id: createId(),
-    createdAt: game.createdAt,
-    author: game.author,
-    date,
-    opponent: '',
-    gameType: 'other',
-    startInning: 1,
-  };
-  return { ...game, events: [info, ...game.events] };
+  const extra: LogEvent[] = [];
+  const firstInfo = game.events.find((e): e is GameInfoEvent => e.kind === 'gameInfo');
+  if (!firstInfo) {
+    extra.push({
+      kind: 'gameInfo',
+      id: createId(),
+      createdAt: game.createdAt,
+      author: game.author,
+      date: game.createdAt.slice(0, 10),
+      opponent: '',
+      gameType: 'other',
+    });
+  }
+  const hasPlay = game.events.some((e) => e.kind === 'pitch' || e.kind === 'play' || e.kind === 'adjust');
+  if (hasPlay && !game.events.some((e) => e.kind === 'appearance')) {
+    const infos = game.events.filter((e): e is GameInfoEvent => e.kind === 'gameInfo');
+    const startInning = infos[infos.length - 1]?.startInning ?? 1;
+    extra.push({
+      kind: 'appearance',
+      id: createId(),
+      createdAt: game.createdAt,
+      author: game.author,
+      role: 'pitcher',
+      inning: startInning,
+      outs: 0,
+      bases: [false, false, false],
+      balls: 0,
+      strikes: 0,
+    });
+  }
+  if (extra.length === 0) return game;
+  // 경기 정보는 맨 앞, 등장은 경기 정보 뒤·첫 경기 진행 이벤트 앞에 넣는다.
+  const infoEvents = game.events.filter((e) => e.kind === 'gameInfo');
+  const rest = game.events.filter((e) => e.kind !== 'gameInfo');
+  const addedInfo = extra.filter((e) => e.kind === 'gameInfo');
+  const addedAppearance = extra.filter((e) => e.kind === 'appearance');
+  return { ...game, events: [...addedInfo, ...infoEvents, ...addedAppearance, ...rest] };
 }
