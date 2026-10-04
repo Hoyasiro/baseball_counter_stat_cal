@@ -1,0 +1,10 @@
+{
+  "name": "우리 아이 야구 기록",
+  "short_name": "야구 기록",
+  "lang": "ko",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f6f3",
+  "theme_color": "#1f5f3f"
+}
