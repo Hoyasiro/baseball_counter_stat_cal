@@ -1,0 +1,58 @@
+// 카운트는 항상 "볼 먼저, 스트라이크 나중" 순서로 다룬다. (CLAUDE.md 5.1)
+
+/** 볼넷이 되는 볼 수 */
+export const BALLS_FOR_WALK = 4;
+/** 삼진이 되는 스트라이크 수 */
+export const STRIKES_FOR_STRIKEOUT = 3;
+
+export const MAX_BALLS_IN_COUNT = BALLS_FOR_WALK - 1;
+export const MAX_STRIKES_IN_COUNT = STRIKES_FOR_STRIKEOUT - 1;
+
+export interface Count {
+  readonly balls: number;
+  readonly strikes: number;
+}
+
+export const FIRST_PITCH_COUNT: Count = { balls: 0, strikes: 0 };
+
+export function isValidCount(balls: number, strikes: number): boolean {
+  return (
+    Number.isInteger(balls) &&
+    Number.isInteger(strikes) &&
+    balls >= 0 &&
+    balls <= MAX_BALLS_IN_COUNT &&
+    strikes >= 0 &&
+    strikes <= MAX_STRIKES_IN_COUNT
+  );
+}
+
+export function createCount(balls: number, strikes: number): Count {
+  if (!isValidCount(balls, strikes)) {
+    throw new Error(
+      `존재할 수 없는 카운트입니다: 볼 ${balls}, 스트라이크 ${strikes} ` +
+        `(볼 0~${MAX_BALLS_IN_COUNT}, 스트라이크 0~${MAX_STRIKES_IN_COUNT})`,
+    );
+  }
+  return { balls, strikes };
+}
+
+/** 가능한 12개 카운트를 0-0, 0-1, 0-2, 1-0 ... 3-2 순서로 돌려준다. */
+export function allCounts(): Count[] {
+  const counts: Count[] = [];
+  for (let balls = 0; balls <= MAX_BALLS_IN_COUNT; balls++) {
+    for (let strikes = 0; strikes <= MAX_STRIKES_IN_COUNT; strikes++) {
+      counts.push({ balls, strikes });
+    }
+  }
+  return counts;
+}
+
+/** 코드·데이터용 표기. 예: "2-1" */
+export function countKey(count: Count): string {
+  return `${count.balls}-${count.strikes}`;
+}
+
+/** 화면용 표기. 숫자만 쓰면 헷갈리므로 글자를 함께 쓴다. (CLAUDE.md 5.1) */
+export function countLabel(count: Count): string {
+  return `볼 ${count.balls} · 스트라이크 ${count.strikes}`;
+}
