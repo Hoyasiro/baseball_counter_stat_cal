@@ -14,6 +14,8 @@
   --strike: #c9862b;
   --hit: #c0453a;
   --out: #4a5a8c;
+  --extra: #6b5a86;
+  --out-light: #e2554a;
   --ball-light: #4fc27c;
   --strike-light: #f2b34a;
   --warn-bg: #fff4e0;
@@ -175,14 +177,15 @@ button:disabled {
   width: 100%;
   max-width: 480px;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   background: var(--surface);
   border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom);
 }
 
 .tabbar button {
-  padding: 16px 0;
+  padding: 14px 0;
+  font-size: 14px;
   background: transparent;
   color: var(--muted);
   font-weight: 600;
@@ -510,4 +513,466 @@ th {
 button:focus-visible {
   outline: 3px solid var(--primary);
   outline-offset: 2px;
+}
+
+/* 경기 표시줄 */
+.game-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  color: var(--text);
+  font-size: 14px;
+  text-align: left;
+}
+
+.game-strip small {
+  color: var(--primary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.game-title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* 점수판: 왼쪽 이닝·카운트, 오른쪽 다이아몬드 */
+.scoreboard {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.board-left {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.board-right {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+
+.inning {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.inning strong {
+  font-size: 26px;
+}
+
+.inning span {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.scoreboard .count-text {
+  grid-column: 1 / -1;
+}
+
+.count-row {
+  gap: 12px;
+  font-size: 16px;
+}
+
+.dot {
+  width: 20px;
+  height: 20px;
+}
+
+.out .dot.on {
+  background: var(--out-light);
+  border-color: var(--out-light);
+}
+
+.bases-text {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+/* 다이아몬드 */
+.diamond {
+  position: relative;
+  width: 104px;
+  aspect-ratio: 1;
+  max-width: 100%;
+}
+
+.diamond-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.diamond-line {
+  fill: none;
+  stroke: var(--board-dot);
+  stroke-width: 2;
+}
+
+.diamond-home {
+  fill: var(--board-dot);
+}
+
+.diamond-base {
+  fill: transparent;
+  stroke: var(--board-dot);
+  stroke-width: 2.5;
+}
+
+.diamond-base.on {
+  fill: var(--strike-light);
+  stroke: var(--strike-light);
+}
+
+.situation-editor .diamond {
+  width: 140px;
+  background: var(--board);
+  border-radius: var(--radius);
+}
+
+.diamond-hit {
+  position: absolute;
+  width: 34%;
+  height: 34%;
+  transform: translate(-50%, -50%);
+  background: transparent;
+  border-radius: 50%;
+}
+
+/* 보조 투구 버튼 */
+.extra-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.pitch.extra {
+  min-height: 56px;
+  background: var(--extra);
+}
+
+.pitch.extra strong {
+  font-size: 16px;
+}
+
+.input-controls {
+  display: grid;
+  gap: 12px;
+}
+
+/* 주자 상황 */
+.runner-section {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.section-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.section-title small {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.play-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.choice-row button {
+  flex: 1 1 30%;
+}
+
+.play {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 6px;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  color: var(--text);
+  border: 1px solid var(--line);
+  font-weight: 600;
+}
+
+.play small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.tool-row {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 8px;
+}
+
+.tool-row .undo {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 상황 고치기 */
+.situation-editor {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 2px solid var(--primary);
+}
+
+.help {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.editor-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.editor-fields {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.stepper,
+.outs-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stepper button,
+.outs-picker button {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  border: 1px solid var(--line);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.outs-picker button.active {
+  background: var(--bar);
+  color: var(--on-color);
+}
+
+.stepper strong {
+  min-width: 44px;
+  text-align: center;
+  font-size: 18px;
+}
+
+/* 기록 보기 */
+.inning-title {
+  margin: 8px 0 0;
+  font-size: 17px;
+}
+
+.pa.current {
+  border-color: var(--primary);
+}
+
+.pa .sub {
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+
+.chip.buntFoul,
+.chip.wildPitch {
+  background: var(--extra);
+}
+
+.chip.play {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--primary);
+}
+
+.chip.adjust {
+  background: transparent;
+  color: var(--muted);
+  border: 1px dashed var(--muted);
+}
+
+/* 경기 분석 */
+.scope-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.scope-tabs button {
+  padding: 10px 0;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.scope-tabs button.active {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.card strong {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 경기 목록 · 경기 정보 */
+.games {
+  display: grid;
+  gap: 10px;
+}
+
+.game-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.game-card.current {
+  border: 2px solid var(--primary);
+}
+
+.game-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.game-card h3,
+.game-card p {
+  margin: 0;
+}
+
+.opponent {
+  font-weight: 600;
+}
+
+.type-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+.game-form {
+  display: grid;
+  gap: 14px;
+}
+
+.game-form h2 {
+  margin: 0;
+}
+
+.game-form label,
+.field {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.game-form input {
+  font: inherit;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  min-width: 0;
+  width: 100%;
+}
+
+.type-picker {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.type-picker button {
+  padding: 12px 0;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-weight: 600;
+}
+
+.type-picker button.active {
+  background: var(--bar);
+  color: var(--on-color);
+  border-color: var(--bar);
+}
+
+.error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+input:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 1px;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chips {
+  align-items: flex-start;
+}
+
+.chip {
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+/* 버튼이 하나뿐이면 한 줄을 다 쓴다. */
+.confirm-buttons > :only-child {
+  grid-column: 1 / -1;
 }

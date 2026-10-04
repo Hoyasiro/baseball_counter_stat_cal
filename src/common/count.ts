@@ -5,6 +5,9 @@ export const BALLS_FOR_WALK = 4;
 /** 삼진이 되는 스트라이크 수 */
 export const STRIKES_FOR_STRIKEOUT = 3;
 
+/** 한 이닝의 아웃 수 */
+export const OUTS_PER_INNING = 3;
+
 export const MAX_BALLS_IN_COUNT = BALLS_FOR_WALK - 1;
 export const MAX_STRIKES_IN_COUNT = STRIKES_FOR_STRIKEOUT - 1;
 

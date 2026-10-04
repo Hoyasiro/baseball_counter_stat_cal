@@ -1,72 +1,179 @@
-// 투수용 화면: 기록 입력 / 기록 보기 / 경기 분석 (CLAUDE.md 0.5)
+// 투수용 화면: 기록 입력 / 기록 보기 / 경기 분석 / 경기 목록 (CLAUDE.md 0.5)
+// 상태를 들고 화면을 다시 그리는 역할만 한다. 각 화면은 *-view.ts에 있다.
 
-import { Calculation } from '../common/calculation';
-import { MAX_BALLS_IN_COUNT, MAX_STRIKES_IN_COUNT, countLabel } from '../common/count';
 import { h } from '../common/dom';
-import { Game, addPitch, addVoid, createGame } from '../common/game';
-import { PitchResult, PlateAppearance, activePitches, buildPlateAppearances } from '../common/pitch-log';
+import { BaseIndex, Bases, PitchResult, PlayKind, activeEvents } from '../common/events';
+import {
+  Game,
+  GameInfo,
+  addAdjust,
+  addPitch,
+  addPlay,
+  addVoid,
+  createGame,
+  gameInfo,
+  gameShortLabel,
+  setGameInfo,
+  today,
+} from '../common/game';
+import { GameReplay, replayGame } from '../common/replay';
 import { loadGames, saveGames } from '../common/storage';
-import { OUTCOME_LABEL, PITCH_BUTTONS, PITCH_LABEL } from './labels';
-import { END_COUNT_BASIS, summarize } from './stats';
+import { AnalysisScope, AnalysisTab, analysisView } from './analysis-view';
+import { GameForm, gamesView } from './games-view';
+import { SituationDraft, inputView } from './input-view';
+import { recordsView } from './records-view';
+import { GameForStats } from './stats';
 
-const STORAGE_KEY = 'baseball-counter.pitcher.games.v1';
+const STORAGE_KEY = 'baseball-counter.pitcher.games.v2';
+const LEGACY_STORAGE_KEYS = ['baseball-counter.pitcher.games.v1'];
 
-type Tab = 'input' | 'records' | 'analysis';
-type AnalysisTab = 'result' | 'process';
+type Tab = 'input' | 'records' | 'analysis' | 'games';
+
+const TABS: readonly [Tab, string][] = [
+  ['input', '기록 입력'],
+  ['records', '기록 보기'],
+  ['analysis', '경기 분석'],
+  ['games', '경기 목록'],
+];
 
 interface State {
   games: Game[];
+  currentGameId: string | null;
   tab: Tab;
   analysisTab: AnalysisTab;
+  analysisScope: AnalysisScope;
   notice: string | null;
-  confirmingNewGame: boolean;
+  /** "상황 고치기" 중인 값 */
+  situationDraft: SituationDraft | null;
+  /** 견제 아웃에서 어느 베이스 주자인지 고르는 중 */
+  choosingPickoffBase: boolean;
+  form: GameForm | null;
+}
+
+export function replayOf(game: Game): GameReplay {
+  return replayGame(activeEvents(game.events), gameInfo(game).startInning);
+}
+
+function newGameForm(): GameForm {
+  return { gameId: null, info: { date: today(), opponent: '', gameType: 'practice', startInning: 1 }, error: null };
 }
 
 export function mountPitcher(root: HTMLElement, onBack: () => void): void {
-  const loaded = loadGames(STORAGE_KEY);
+  const loaded = loadGames(STORAGE_KEY, LEGACY_STORAGE_KEYS);
+  const latest = loaded.games[loaded.games.length - 1];
   const state: State = {
-    games: loaded.games.length > 0 ? loaded.games : [createGame()],
-    tab: 'input',
+    games: loaded.games,
+    currentGameId: latest?.id ?? null,
+    tab: latest ? 'input' : 'games',
     analysisTab: 'result',
+    analysisScope: 'game',
     notice: loaded.ok ? null : loaded.message,
-    confirmingNewGame: false,
+    situationDraft: null,
+    choosingPickoffBase: false,
+    form: latest ? null : newGameForm(),
   };
 
-  const currentGame = (): Game => state.games[state.games.length - 1];
+  const currentGame = (): Game | undefined => state.games.find((g) => g.id === state.currentGameId);
 
-  const updateGame = (game: Game): void => {
-    state.games = [...state.games.slice(0, -1), game];
+  const persist = (): void => {
     if (!saveGames(STORAGE_KEY, state.games)) state.notice = '기록을 저장하지 못했습니다. 저장 공간을 확인하세요.';
+  };
+
+  const replaceGame = (game: Game): void => {
+    state.games = state.games.map((g) => (g.id === game.id ? game : g));
+    persist();
     render();
   };
 
+  const updateCurrent = (change: (g: Game) => Game): void => {
+    const game = currentGame();
+    if (game) replaceGame(change(game));
+  };
+
+  const go = (tab: Tab): void => {
+    state.tab = tab;
+    state.situationDraft = null;
+    state.choosingPickoffBase = false;
+    render();
+  };
+
+  const inputActions = {
+    pitch: (result: PitchResult) => {
+      state.notice = null;
+      updateCurrent((g) => addPitch(g, result));
+    },
+    play: (play: PlayKind, base?: BaseIndex) => {
+      state.choosingPickoffBase = false;
+      updateCurrent((g) => addPlay(g, play, base));
+    },
+    choosePickoffBase: (choosing: boolean) => {
+      state.choosingPickoffBase = choosing;
+      render();
+    },
+    undo: (targetId: string) => updateCurrent((g) => addVoid(g, targetId)),
+    startSituationEdit: (draft: SituationDraft) => {
+      state.situationDraft = draft;
+      render();
+    },
+    changeSituationDraft: (draft: SituationDraft) => {
+      state.situationDraft = draft;
+      render();
+    },
+    cancelSituationEdit: () => {
+      state.situationDraft = null;
+      render();
+    },
+    saveSituation: (inning: number, outs: number, bases: Bases) => {
+      state.situationDraft = null;
+      updateCurrent((g) => addAdjust(g, inning, outs, bases));
+    },
+    openGames: () => go('games'),
+  };
+
+  const gamesActions = {
+    select: (id: string) => {
+      state.currentGameId = id;
+      go('input');
+    },
+    openNew: () => {
+      state.form = newGameForm();
+      render();
+    },
+    openEdit: (game: Game) => {
+      state.form = { gameId: game.id, info: gameInfo(game), error: null };
+      render();
+    },
+    changeForm: (form: GameForm) => {
+      state.form = form;
+    },
+    cancelForm: () => {
+      state.form = null;
+      render();
+    },
+    saveForm: (form: GameForm) => {
+      const error = validateInfo(form.info);
+      if (error) {
+        state.form = { ...form, error };
+        render();
+        return;
+      }
+      state.form = null;
+      if (form.gameId === null) {
+        const game = createGame(form.info);
+        state.games = [...state.games, game];
+        state.currentGameId = game.id;
+        persist();
+        go('input');
+        return;
+      }
+      const game = state.games.find((g) => g.id === form.gameId);
+      if (game) replaceGame(setGameInfo(game, form.info));
+    },
+  };
+
   const render = (): void => {
-    const pas = buildPlateAppearances(activePitches(currentGame().events));
-    const body =
-      state.tab === 'input'
-        ? inputView(pas, state, updateGame, currentGame)
-        : state.tab === 'records'
-          ? recordsView(pas, state.confirmingNewGame, {
-              ask: () => {
-                state.confirmingNewGame = true;
-                render();
-              },
-              cancel: () => {
-                state.confirmingNewGame = false;
-                render();
-              },
-              confirm: () => {
-                state.confirmingNewGame = false;
-                state.games = [...state.games, createGame()];
-                saveGames(STORAGE_KEY, state.games);
-                state.tab = 'input';
-                render();
-              },
-            })
-          : analysisView(pas, state.analysisTab, (t) => {
-              state.analysisTab = t;
-              render();
-            });
+    const game = currentGame();
+    const body = renderBody(game);
 
     const children: Node[] = [
       h('header', { className: 'topbar' }, [
@@ -77,21 +184,12 @@ export function mountPitcher(root: HTMLElement, onBack: () => void): void {
       h(
         'nav',
         { className: 'tabbar' },
-        (
-          [
-            ['input', '기록 입력'],
-            ['records', '기록 보기'],
-            ['analysis', '경기 분석'],
-          ] as const
-        ).map(([tab, label]) =>
+        TABS.map(([tab, label]) =>
           h('button', {
             className: state.tab === tab ? 'active' : '',
             text: label,
-            onClick: () => {
-              state.tab = tab;
-              state.confirmingNewGame = false;
-              render();
-            },
+            disabled: tab !== 'games' && !game,
+            onClick: () => go(tab),
           }),
         ),
       ),
@@ -106,186 +204,42 @@ export function mountPitcher(root: HTMLElement, onBack: () => void): void {
     root.replaceChildren(...children);
   };
 
+  const renderBody = (game: Game | undefined): HTMLElement => {
+    if (state.tab === 'games' || !game) {
+      return gamesView(state.games, state.currentGameId, state.form, gamesActions, replayOf);
+    }
+    const replay = replayOf(game);
+    switch (state.tab) {
+      case 'input':
+        return inputView(game, replay, state.situationDraft, state.choosingPickoffBase, inputActions);
+      case 'records':
+        return recordsView(game, replay);
+      case 'analysis': {
+        const scoped: GameForStats[] =
+          state.analysisScope === 'game'
+            ? [{ label: gameShortLabel(game), replay }]
+            : state.games.map((g) => ({ label: gameShortLabel(g), replay: replayOf(g) }));
+        return analysisView(scoped, state.games.length, state.analysisScope, state.analysisTab, {
+          scope: (s) => {
+            state.analysisScope = s;
+            render();
+          },
+          tab: (t) => {
+            state.analysisTab = t;
+            render();
+          },
+        });
+      }
+    }
+  };
+
   render();
 }
 
-function dots(filled: number, total: number, kind: string): HTMLElement {
-  return h(
-    'span',
-    { className: `dots ${kind}` },
-    Array.from({ length: total }, (_, i) => h('span', { className: i < filled ? 'dot on' : 'dot' })),
-  );
-}
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-function inputView(
-  pas: PlateAppearance[],
-  state: State,
-  updateGame: (g: Game) => void,
-  currentGame: () => Game,
-): HTMLElement {
-  const last = pas[pas.length - 1];
-  const inProgress = last && last.outcome === null ? last : null;
-  const count = inProgress ? inProgress.currentCount : { balls: 0, strikes: 0 };
-  const batterNumber = inProgress ? inProgress.number : pas.length + 1;
-  const justEnded = last && last.outcome !== null ? last : null;
-  const lastPitch = last?.pitches[last.pitches.length - 1];
-
-  const record = (result: PitchResult): void => {
-    state.notice = null;
-    updateGame(addPitch(currentGame(), result));
-  };
-
-  return h('section', { className: 'input' }, [
-    h('div', { className: 'scoreboard' }, [
-      h('p', { className: 'batter', text: `${batterNumber}번째 타자` }),
-      h('div', { className: 'count-row' }, [h('span', { text: '볼' }), dots(count.balls, MAX_BALLS_IN_COUNT, 'ball')]),
-      h('div', { className: 'count-row' }, [
-        h('span', { text: '스트라이크' }),
-        dots(count.strikes, MAX_STRIKES_IN_COUNT, 'strike'),
-      ]),
-      h('p', { className: 'count-text', text: countLabel(count) }),
-    ]),
-    h('p', {
-      className: 'message',
-      text: justEnded?.outcome
-        ? `${justEnded.number}번째 타자: ${OUTCOME_LABEL[justEnded.outcome]}. 다음 타자 공을 기록하세요.`
-        : lastPitch
-          ? `방금 공: ${PITCH_LABEL[lastPitch.result]}`
-          : '공을 던질 때마다 결과 버튼을 누르세요.',
-    }),
-    h(
-      'div',
-      { className: 'pitch-buttons' },
-      PITCH_BUTTONS.map((b) =>
-        h('button', { className: `pitch ${b.result}`, onClick: () => record(b.result) }, [
-          h('strong', { text: b.label }),
-          h('small', { text: b.hint }),
-        ]),
-      ),
-    ),
-    h('button', {
-      className: 'undo',
-      text: '↶ 마지막 공 취소',
-      disabled: !lastPitch,
-      onClick: () => {
-        if (lastPitch) updateGame(addVoid(currentGame(), lastPitch.id));
-      },
-    }),
-  ]);
-}
-
-interface NewGameActions {
-  ask: () => void;
-  cancel: () => void;
-  confirm: () => void;
-}
-
-// 브라우저 확인창(confirm)은 일부 환경에서 뜨지 않으므로 화면 안에서 한 번 더 묻는다.
-function newGameControl(confirming: boolean, actions: NewGameActions): HTMLElement {
-  if (!confirming) return h('button', { className: 'secondary', text: '새 경기 시작', onClick: actions.ask });
-  return h('div', { className: 'confirm' }, [
-    h('p', { text: '지금 경기를 끝내고 새 경기를 시작할까요? 지금까지의 기록은 저장됩니다.' }),
-    h('div', { className: 'confirm-buttons' }, [
-      h('button', { className: 'secondary', text: '아니요', onClick: actions.cancel }),
-      h('button', { className: 'primary', text: '새 경기 시작', onClick: actions.confirm }),
-    ]),
-  ]);
-}
-
-function recordsView(pas: PlateAppearance[], confirmingNewGame: boolean, newGame: NewGameActions): HTMLElement {
-  return h('section', { className: 'records' }, [
-    pas.length === 0 ? h('p', { className: 'empty', text: '아직 기록이 없습니다.' }) : null,
-    ...pas
-      .slice()
-      .reverse()
-      .map((pa) =>
-        h('article', { className: 'pa' }, [
-          h('h3', {
-            text: `${pa.number}번째 타자 · ${pa.outcome ? OUTCOME_LABEL[pa.outcome] : '진행 중'}`,
-          }),
-          pa.endCount ? h('p', { className: 'sub', text: `${countLabel(pa.endCount)}에서 끝남` }) : null,
-          h(
-            'p',
-            { className: 'chips' },
-            pa.pitches.map((p) => h('span', { className: `chip ${p.result}`, text: PITCH_LABEL[p.result] })),
-          ),
-        ]),
-      ),
-    newGameControl(confirmingNewGame, newGame),
-  ]);
-}
-
-function analysisView(
-  pas: PlateAppearance[],
-  tab: AnalysisTab,
-  onTab: (t: AnalysisTab) => void,
-): HTMLElement {
-  const summary = summarize(pas);
-  const tabs = h('div', { className: 'subtabs' }, [
-    h('button', { className: tab === 'result' ? 'active' : '', text: '결과', onClick: () => onTab('result') }),
-    h('button', { className: tab === 'process' ? 'active' : '', text: '계산 과정', onClick: () => onTab('process') }),
-  ]);
-
-  if (tab === 'result') {
-    return h('section', { className: 'analysis' }, [
-      tabs,
-      h(
-        'div',
-        { className: 'cards' },
-        summary.totals.map((c) =>
-          h('div', { className: 'card' }, [h('small', { text: c.title }), h('strong', { text: c.display })]),
-        ),
-      ),
-      h('h2', { text: '카운트별 피안타율' }),
-      h('p', { className: 'basis', text: END_COUNT_BASIS }),
-      summary.byCount.length === 0
-        ? h('p', { className: 'empty', text: '끝난 타석이 없습니다.' })
-        : h('table', {}, [
-            h('thead', {}, [
-              h('tr', {}, [h('th', { text: '카운트' }), h('th', { text: '타석' }), h('th', { text: '피안타율' })]),
-            ]),
-            h(
-              'tbody',
-              {},
-              summary.byCount.map((row) =>
-                h('tr', {}, [
-                  h('td', { text: countLabel(row.count) }),
-                  h('td', { text: row.plateAppearances.display }),
-                  h('td', { text: row.battingAverageAgainst.display }),
-                ]),
-              ),
-            ),
-          ]),
-    ]);
-  }
-
-  return h('section', { className: 'analysis' }, [
-    tabs,
-    ...summary.totals.map(processCard),
-    h('h2', { text: '카운트별 피안타율' }),
-    h('p', { className: 'basis', text: END_COUNT_BASIS }),
-    ...summary.byCount.map((row) => processCard(row.battingAverageAgainst)),
-  ]);
-}
-
-function processCard(c: Calculation): HTMLElement {
-  return h('article', { className: 'process' }, [
-    h('h3', { text: c.title }),
-    h('p', {}, [h('b', { text: '① 공식 ' }), c.formula]),
-    h('p', {}, [h('b', { text: '② 들어간 숫자 ' }), c.expression]),
-    h(
-      'ul',
-      {},
-      c.terms.map((t) =>
-        h('li', {}, [
-          `${t.label}: ${t.value}`,
-          h('small', {
-            text: t.plateAppearances.length ? ` (타석 ${t.plateAppearances.join(', ')})` : ' (해당 타석 없음)',
-          }),
-        ]),
-      ),
-    ),
-    h('p', {}, [h('b', { text: '③ 결과 ' }), c.display]),
-    c.note ? h('p', { className: 'note', text: c.note }) : null,
-  ]);
+export function validateInfo(info: GameInfo): string | null {
+  if (!DATE_PATTERN.test(info.date)) return '경기 날짜를 골라 주세요.';
+  if (!Number.isInteger(info.startInning) || info.startInning < 1) return '시작 이닝은 1회 이상이어야 합니다.';
+  return null;
 }
