@@ -2,7 +2,7 @@
 // 고치거나 취소할 때도 기존 이벤트를 지우지 않고 새 이벤트를 덧붙인다.
 // 기록은 경기 상황 기준이고, 우리 아이의 역할은 "등장(appearance)" 이벤트로 장면마다 정한다. (CLAUDE.md 0.5)
 
-import { Rules } from './count';
+import { MAX_BALLS_IN_COUNT, MAX_STRIKES_IN_COUNT, OUTS_PER_INNING } from './count';
 
 export type PitchResult =
   | 'ball'
@@ -174,8 +174,6 @@ export interface GameInfoEvent extends EventBase {
   readonly startInning?: number;
   /** 우리 팀이 먼저 공격(초)인지. 없으면 후공으로 본다. */
   readonly battingFirst?: Team;
-  /** 없으면 정식 규칙 */
-  readonly rules?: Rules;
 }
 
 export interface VoidEvent extends EventBase {
@@ -224,8 +222,6 @@ function isCount(value: unknown, min: number, max: number): boolean {
 export const MAX_INNING = 30;
 /** 한 번에 넣을 수 있는 점수의 상한 (입력 실수 방지) */
 export const MAX_RUNS = 99;
-/** 규칙에 따라 아웃·볼·스트라이크 수가 달라지므로 저장 값 검사는 넉넉한 상한으로 한다. */
-const MAX_STORED_COUNT = 9;
 
 function isBases(value: unknown): boolean {
   return Array.isArray(value) && value.length === 3 && value.every((v) => typeof v === 'boolean');
@@ -235,14 +231,6 @@ function isChildPosition(value: unknown): boolean {
   return value === 'scored' || value === 'out' || isCount(value, 0, 2);
 }
 
-function isRules(value: unknown): boolean {
-  return (
-    isObject(value) &&
-    isCount(value.ballsForWalk, 1, MAX_STORED_COUNT) &&
-    isCount(value.strikesForStrikeout, 1, MAX_STORED_COUNT) &&
-    isCount(value.outsPerInning, 1, MAX_STORED_COUNT)
-  );
-}
 
 /** 저장소에서 읽은 값이 올바른 이벤트인지 확인한다. (CLAUDE.md 4.2) */
 export function isLogEvent(value: unknown): value is LogEvent {
@@ -263,7 +251,7 @@ export function isLogEvent(value: unknown): value is LogEvent {
     case 'adjust':
       return (
         isCount(value.inning, 1, MAX_INNING) &&
-        isCount(value.outs, 0, MAX_STORED_COUNT) &&
+        isCount(value.outs, 0, OUTS_PER_INNING) &&
         isBases(value.bases) &&
         (value.runs === undefined || isCount(value.runs, 0, MAX_RUNS)) &&
         (value.child === undefined || isChildPosition(value.child))
@@ -272,10 +260,10 @@ export function isLogEvent(value: unknown): value is LogEvent {
       return (
         ROLES.includes(value.role as Role) &&
         isCount(value.inning, 1, MAX_INNING) &&
-        isCount(value.outs, 0, MAX_STORED_COUNT) &&
+        isCount(value.outs, 0, OUTS_PER_INNING - 1) &&
         isBases(value.bases) &&
-        isCount(value.balls, 0, MAX_STORED_COUNT) &&
-        isCount(value.strikes, 0, MAX_STORED_COUNT) &&
+        isCount(value.balls, 0, MAX_BALLS_IN_COUNT) &&
+        isCount(value.strikes, 0, MAX_STRIKES_IN_COUNT) &&
         (value.childBase === undefined || isCount(value.childBase, 0, 2)) &&
         (value.position === undefined || POSITIONS.includes(value.position as Position))
       );
@@ -293,8 +281,7 @@ export function isLogEvent(value: unknown): value is LogEvent {
         typeof value.opponent === 'string' &&
         GAME_TYPES.includes(value.gameType as GameType) &&
         (value.startInning === undefined || isCount(value.startInning, 1, MAX_INNING)) &&
-        (value.battingFirst === undefined || value.battingFirst === 'us' || value.battingFirst === 'them') &&
-        (value.rules === undefined || isRules(value.rules))
+        (value.battingFirst === undefined || value.battingFirst === 'us' || value.battingFirst === 'them')
       );
     case 'void':
       return typeof value.targetId === 'string';

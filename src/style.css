@@ -1379,26 +1379,6 @@ button {
   text-underline-offset: 3px;
 }
 
-/* 경기 규칙 */
-.rules {
-  display: grid;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: var(--radius);
-  background: var(--surface);
-  border: 1px solid var(--line);
-}
-
-.rules summary {
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.rules .stepper span {
-  flex: 1;
-  font-weight: 400;
-}
-
 /* 등장 설정은 한 화면에 들어가도록 다이아몬드를 옆에 두고 버튼을 줄인다. */
 .scene-setup .editor-grid {
   flex-wrap: nowrap;

@@ -2,7 +2,7 @@
 // 선발이면 기본값 그대로 "시작", 중계·대타·대주자면 그 장면을 맞춘다. (CLAUDE.md 0.5)
 
 import { BASE_NAMES } from './bases';
-import { Rules, maxBalls, maxStrikes } from './count';
+import { MAX_BALLS_IN_COUNT, MAX_STRIKES_IN_COUNT, OUTS_PER_INNING } from './count';
 import { diamond } from './diamond';
 import { h } from './dom';
 import { BaseIndex, Bases, MAX_INNING, POSITIONS, Position, ROLES, Role, Team } from './events';
@@ -85,7 +85,6 @@ function stepper(label: string, value: string, onMinus: (() => void) | null, onP
 
 export function sceneSetupView(
   draft: SceneDraft,
-  rules: Rules,
   battingFirst: Team,
   actions: SceneSetupActions,
   current: string | null,
@@ -142,7 +141,7 @@ export function sceneSetupView(
         ),
         h('div', { className: 'outs-picker' }, [
           h('span', { text: '아웃' }),
-          ...Array.from({ length: rules.outsPerInning }, (_, n) =>
+          ...Array.from({ length: OUTS_PER_INNING }, (_, n) =>
             h('button', { className: draft.outs === n ? 'active' : '', text: `${n}`, onClick: () => set({ outs: n }) }),
           ),
         ]),
@@ -151,7 +150,7 @@ export function sceneSetupView(
               '볼',
               `${draft.balls}`,
               draft.balls > 0 ? () => set({ balls: draft.balls - 1 }) : null,
-              draft.balls < maxBalls(rules) ? () => set({ balls: draft.balls + 1 }) : null,
+              draft.balls < MAX_BALLS_IN_COUNT ? () => set({ balls: draft.balls + 1 }) : null,
             )
           : null,
         needsCount
@@ -159,7 +158,7 @@ export function sceneSetupView(
               '스트라이크',
               `${draft.strikes}`,
               draft.strikes > 0 ? () => set({ strikes: draft.strikes - 1 }) : null,
-              draft.strikes < maxStrikes(rules) ? () => set({ strikes: draft.strikes + 1 }) : null,
+              draft.strikes < MAX_STRIKES_IN_COUNT ? () => set({ strikes: draft.strikes + 1 }) : null,
             )
           : null,
       ]),

@@ -4,7 +4,6 @@
 
 import { batterAnalysisView } from './batter/analysis-view';
 import { AnalysisScope, AnalysisTab } from './common/analysis-ui';
-import { isValidRules } from './common/count';
 import { h } from './common/dom';
 import { BaseIndex, HitType, PitchResult, Role, activeEvents, playEvents } from './common/events';
 import {
@@ -23,7 +22,6 @@ import {
   setGameInfo,
   today,
 } from './common/game';
-import { DEFAULT_RULES } from './common/count';
 import { GameForm, gamesView } from './common/games-view';
 import { Chooser, SituationDraft, inputView } from './common/input-view';
 import { AppTab, ChildRunnerAction, RunnerAction, TAB_LABEL } from './common/labels';
@@ -63,7 +61,7 @@ interface State {
 
 export function replayOf(game: Game): GameReplay {
   const info = gameInfo(game);
-  return replayGame(playEvents(activeEvents(game.events)), { battingFirst: info.battingFirst, rules: info.rules });
+  return replayGame(playEvents(activeEvents(game.events)), { battingFirst: info.battingFirst });
 }
 
 const ERROR_REASON = '실책으로 바뀐 주자·아웃·점수를 맞춰 주세요. 바뀐 게 없으면 취소를 누르세요.';
@@ -72,7 +70,7 @@ const BLOCKED_ADVANCE_REASON = '다음 베이스에 주자가 있어요. 주자�
 function newGameForm(): GameForm {
   return {
     gameId: null,
-    info: { date: today(), opponent: '', gameType: 'practice', battingFirst: 'them', rules: DEFAULT_RULES },
+    info: { date: today(), opponent: '', gameType: 'practice', battingFirst: 'them' },
     error: null,
   };
 }
@@ -81,7 +79,6 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export function validateInfo(info: GameInfo): string | null {
   if (!DATE_PATTERN.test(info.date)) return '경기 날짜를 골라 주세요.';
-  if (!isValidRules(info.rules)) return '경기 규칙 값이 범위를 벗어났습니다.';
   return null;
 }
 

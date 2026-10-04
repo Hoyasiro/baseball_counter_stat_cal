@@ -1,4 +1,3 @@
-import { DEFAULT_RULES, Rules } from './count';
 import {
   AdjustEvent,
   AppearanceEvent,
@@ -25,9 +24,9 @@ function base(): { id: string; createdAt: string; author: string } {
   return { id: `e${seq}`, createdAt: '2026-10-04T00:00:00.000Z', author: '테스트' };
 }
 
-/** 기본: 후공(우리 팀 수비가 초), 정식 규칙 */
-export function settings(battingFirst: Team = 'them', rules: Rules = DEFAULT_RULES): ReplaySettings {
-  return { battingFirst, rules };
+/** 기본: 후공(우리 팀 수비가 초) */
+export function settings(battingFirst: Team = 'them'): ReplaySettings {
+  return { battingFirst };
 }
 
 /** 테스트용 투구 이벤트 목록 */

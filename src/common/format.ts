@@ -1,6 +1,6 @@
 // 반올림은 표시 단계에서만 한다. (CLAUDE.md 5.2)
 
-import { DEFAULT_RULES } from './count';
+import { OUTS_PER_INNING } from './count';
 
 export const NO_VALUE_DISPLAY = '-';
 
@@ -21,9 +21,9 @@ export function formatPercent(value: number | null): string {
 }
 
 /** 던진 이닝 표시. 잡은 아웃 수로 받는다. 예: 7 → "2 1/3", 6 → "2", 1 → "1/3" */
-export function formatInningsFromOuts(outs: number, outsPerInning: number = DEFAULT_RULES.outsPerInning): string {
-  const whole = Math.floor(outs / outsPerInning);
-  const rest = outs % outsPerInning;
+export function formatInningsFromOuts(outs: number): string {
+  const whole = Math.floor(outs / OUTS_PER_INNING);
+  const rest = outs % OUTS_PER_INNING;
   if (rest === 0) return `${whole}`;
-  return whole === 0 ? `${rest}/${outsPerInning}` : `${whole} ${rest}/${outsPerInning}`;
+  return whole === 0 ? `${rest}/${OUTS_PER_INNING}` : `${whole} ${rest}/${OUTS_PER_INNING}`;
 }

@@ -197,28 +197,6 @@ describe('타자·주자 장면 (우리 아이)', () => {
   });
 });
 
-describe('경기 규칙 바꾸기 (연습경기)', () => {
-  const loose = settings('them', { ballsForWalk: 5, strikesForStrikeout: 4, outsPerInning: 3 });
-
-  it('볼 5개 볼넷, 스트라이크 4개 삼진', () => {
-    const walk = replayGame([appear('pitcher'), ...pitches('ball', 'ball', 'ball', 'ball')], loose);
-    expect(walk.state?.count).toEqual({ balls: 4, strikes: 0 });
-    const k = replayGame([appear('pitcher'), ...pitches('strike', 'strike', 'strike', 'strike')], loose);
-    expect(k.plateAppearances[0].outcome).toBe('strikeout');
-  });
-
-  it('3스트라이크 상황(마지막 직전)의 일반 파울은 카운트 그대로, 번트 파울은 삼진', () => {
-    const r = replayGame([appear('pitcher'), ...pitches('strike', 'strike', 'strike', 'foul')], loose);
-    expect(r.state?.count).toEqual({ balls: 0, strikes: 3 });
-    const bunt = replayGame([appear('pitcher'), ...pitches('strike', 'strike', 'strike', 'buntFoul')], loose);
-    expect(bunt.plateAppearances[0].outcome).toBe('strikeout');
-  });
-
-  it('이닝당 아웃 수 4개', () => {
-    const r = replayGame([appear('pitcher'), ...pitches('out', 'out', 'out')], settings('them', { ballsForWalk: 4, strikesForStrikeout: 3, outsPerInning: 4 }));
-    expect(r.state).toMatchObject({ inning: 1, outs: 3 });
-  });
-});
 
 describe('취소', () => {
   it('취소한 기록은 빠지지만 기록 자체는 지워지지 않는다', () => {

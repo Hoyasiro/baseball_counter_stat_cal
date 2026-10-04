@@ -105,7 +105,7 @@ export function sluggingOf(pas: readonly ScopedPlateAppearance[], labels: Omit<R
   };
 }
 
-/** 끝난 타석의 종료 카운트를 정렬해서 (규칙이 경기마다 다를 수 있어 기록에서 뽑는다) */
+/** 기록에 나온 종료 카운트만 볼·스트라이크 순으로 (타석이 없는 카운트는 표에서 뺀다) */
 export function endCountsOf(pas: readonly ScopedPlateAppearance[]): Count[] {
   const seen = new Map<string, Count>();
   for (const s of completed(pas)) {

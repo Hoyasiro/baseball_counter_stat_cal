@@ -8,7 +8,15 @@
 // - 수비: 포지션만 남긴다. (수비 기록은 다음 단계)
 // 공격 장면(타자·주자)은 아이가 아웃되거나 득점하거나 3아웃이 되면 끝난다.
 
-import { Count, FIRST_PITCH_COUNT, Rules, maxBalls, maxStrikes } from './count';
+import {
+  BALLS_FOR_WALK,
+  Count,
+  FIRST_PITCH_COUNT,
+  MAX_BALLS_IN_COUNT,
+  MAX_STRIKES_IN_COUNT,
+  OUTS_PER_INNING,
+  STRIKES_FOR_STRIKEOUT,
+} from './count';
 import {
   Advance,
   Runners,
@@ -150,12 +158,10 @@ export interface GameReplay {
   /** 기록한 초·말별 점수·안타·실책. 키는 halfKey */
   readonly halves: ReadonlyMap<string, HalfTotals>;
   readonly battingFirst: Team;
-  readonly rules: Rules;
 }
 
 export interface ReplaySettings {
   readonly battingFirst: Team;
-  readonly rules: Rules;
 }
 
 export function halfKey(inning: number, half: Half): string {
@@ -168,26 +174,26 @@ interface PitchApplied {
 }
 
 /** 공 하나가 카운트에 주는 영향. 주자 이동은 replayGame에서 처리한다. */
-export function applyPitch(count: Count, result: PitchResult, rules: Rules): PitchApplied {
+export function applyPitch(count: Count, result: PitchResult): PitchApplied {
   switch (result) {
     case 'ball':
     case 'wildPitch': {
       const balls = count.balls + 1;
-      return balls >= rules.ballsForWalk
+      return balls >= BALLS_FOR_WALK
         ? { next: count, outcome: 'walk' }
         : { next: { ...count, balls }, outcome: null };
     }
     case 'strike':
-    // 번트 파울은 마지막 스트라이크 직전에도 스트라이크다. 그래서 삼진이 된다 (쓰리번트 아웃).
+    // 번트 파울은 2스트라이크에서도 스트라이크다. 그래서 2스트라이크 번트 파울은 삼진 (쓰리번트 아웃).
     case 'buntFoul': {
       const strikes = count.strikes + 1;
-      return strikes >= rules.strikesForStrikeout
+      return strikes >= STRIKES_FOR_STRIKEOUT
         ? { next: count, outcome: 'strikeout' }
         : { next: { ...count, strikes }, outcome: null };
     }
     case 'foul':
-      // 마지막 스트라이크 직전의 일반 파울은 카운트가 그대로다.
-      return count.strikes < maxStrikes(rules)
+      // 2스트라이크 이후 일반 파울은 카운트가 그대로다.
+      return count.strikes < MAX_STRIKES_IN_COUNT
         ? { next: { ...count, strikes: count.strikes + 1 }, outcome: null }
         : { next: count, outcome: null };
     case 'hit':
@@ -237,12 +243,12 @@ interface OpenScene {
 
 type Totals = { runs: number; hits: number; errors: number };
 
-function clampCount(balls: number, strikes: number, rules: Rules): Count {
-  return { balls: Math.min(balls, maxBalls(rules)), strikes: Math.min(strikes, maxStrikes(rules)) };
+function clampCount(balls: number, strikes: number): Count {
+  return { balls: Math.min(balls, MAX_BALLS_IN_COUNT), strikes: Math.min(strikes, MAX_STRIKES_IN_COUNT) };
 }
 
 export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySettings): GameReplay {
-  const { rules, battingFirst } = settings;
+  const { battingFirst } = settings;
   const pas: MutablePlateAppearance[] = [];
   const scenes: MutableScene[] = [];
   const runnerEvents: RunnerEvent[] = [];
@@ -348,7 +354,7 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
 
   /** 3아웃 처리. 수비 장면은 다음 이닝으로 이어지고, 공격 장면은 끝난다. */
   const endHalfIfOver = (s: OpenScene): void => {
-    if (scene !== s || s.outs < rules.outsPerInning) return;
+    if (scene !== s || s.outs < OUTS_PER_INNING) return;
     if (started(s.current)) closePa(s, 'inningEnded', null);
     if (isOffenseRole(s.role)) {
       const childBase = childBaseOf(s.runners);
@@ -368,7 +374,7 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
     const childBase = event.role === 'runner' ? (event.childBase ?? 0) : null;
     const bases: [boolean, boolean, boolean] = [event.bases[0], event.bases[1], event.bases[2]];
     if (childBase !== null) bases[childBase] = true;
-    const count = clampCount(event.balls, event.strikes, rules);
+    const count = clampCount(event.balls, event.strikes);
     const record: MutableScene = {
       id: event.id,
       role: event.role,
@@ -387,7 +393,7 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
       role: event.role,
       inning: event.inning,
       half: sceneHalf,
-      outs: Math.min(event.outs, rules.outsPerInning - 1),
+      outs: Math.min(event.outs, OUTS_PER_INNING - 1),
       runners: fromBases(bases, childBase),
       current: null,
       childBatting: event.role === 'batter',
@@ -403,7 +409,7 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
     pa.timeline.push(event);
     pa.pitches.push(event);
     if (event.result === 'wildPitch') applyAdvance(s, advanceRunners(s.runners, 1), pa);
-    const applied = applyPitch(pa.count, event.result, rules);
+    const applied = applyPitch(pa.count, event.result);
     if (!applied.outcome) {
       pa.count = applied.next;
       endIfChildDone(s);
@@ -541,7 +547,6 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
     state: active ? activeState(active) : null,
     halves,
     battingFirst,
-    rules,
   };
 }
 

@@ -2,7 +2,7 @@
 // 상황판(이닝·아웃·카운트·주자·점수·투구 수)은 위에 고정하고, 버튼은 스크롤 없이 한 화면에 들어가게 한다. (0.4)
 
 import { BASE_NAMES, STEAL_NAMES, basesLabel, hasRunner, occupiedBases, stealableBases } from './bases';
-import { Rules, maxBalls, maxStrikes } from './count';
+import { MAX_BALLS_IN_COUNT, MAX_STRIKES_IN_COUNT, OUTS_PER_INNING } from './count';
 import { diamond } from './diamond';
 import { h } from './dom';
 import { BaseIndex, Bases, ChildPosition, HitType, MAX_INNING, MAX_RUNS, PitchResult, UndoableEvent } from './events';
@@ -128,7 +128,6 @@ function message(replay: GameReplay): string {
 function board(model: InputModel, actions: InputActions): HTMLElement {
   const { replay, info, score } = model;
   const state = replay.state;
-  const rules = replay.rules;
 
   const head = h('div', { className: 'board-head' }, [
     h('button', { className: 'board-game', onClick: actions.openGames }, [`${dateLabel(info.date)} · ${opponentLabel(info.opponent)}`]),
@@ -157,12 +156,12 @@ function board(model: InputModel, actions: InputActions): HTMLElement {
           h('strong', { text: halfInningLabel(inning, half) }),
           h('span', { className: `role-badge ${state.role}`, text: roleText(state) }),
         ]),
-        h('div', { className: 'count-row' }, [h('span', { text: '볼' }), dots(count.balls, maxBalls(rules), 'ball', '볼')]),
+        h('div', { className: 'count-row' }, [h('span', { text: '볼' }), dots(count.balls, MAX_BALLS_IN_COUNT, 'ball', '볼')]),
         h('div', { className: 'count-row' }, [
           h('span', { text: '스트라이크' }),
-          dots(count.strikes, maxStrikes(rules), 'strike', '스트라이크'),
+          dots(count.strikes, MAX_STRIKES_IN_COUNT, 'strike', '스트라이크'),
         ]),
-        h('div', { className: 'count-row' }, [h('span', { text: '아웃' }), dots(outs, rules.outsPerInning - 1, 'out', '아웃')]),
+        h('div', { className: 'count-row' }, [h('span', { text: '아웃' }), dots(outs, OUTS_PER_INNING - 1, 'out', '아웃')]),
       ]),
       h('div', { className: 'board-right' }, [
         diamond(bases, undefined, state.childBase),
@@ -293,7 +292,7 @@ function stepper(label: string, value: string, onMinus: (() => void) | null, onP
   ]);
 }
 
-function situationEditor(draft: SituationDraft, rules: Rules, actions: InputActions): HTMLElement {
+function situationEditor(draft: SituationDraft, actions: InputActions): HTMLElement {
   const set = (change: Partial<SituationDraft>): void => actions.editSituation({ ...draft, ...change });
   const childOnBase = typeof draft.child === 'number' ? draft.child : null;
   const toggleBase = (b: BaseIndex): void => {
@@ -329,7 +328,7 @@ function situationEditor(draft: SituationDraft, rules: Rules, actions: InputActi
         ),
         h('div', { className: 'outs-picker' }, [
           h('span', { text: '아웃' }),
-          ...Array.from({ length: rules.outsPerInning + 1 }, (_, n) =>
+          ...Array.from({ length: OUTS_PER_INNING + 1 }, (_, n) =>
             h('button', { className: draft.outs === n ? 'active' : '', text: `${n}`, onClick: () => set({ outs: n }) }),
           ),
         ]),
@@ -350,8 +349,8 @@ function situationEditor(draft: SituationDraft, rules: Rules, actions: InputActi
           ),
         ])
       : null,
-    draft.outs === rules.outsPerInning
-      ? h('p', { className: 'help', text: `${rules.outsPerInning}아웃으로 저장하면 이 이닝 쪽(초/말)이 끝납니다.` })
+    draft.outs === OUTS_PER_INNING
+      ? h('p', { className: 'help', text: '3아웃으로 저장하면 이 이닝 쪽(초/말)이 끝납니다.' })
       : null,
     h('div', { className: 'confirm-buttons' }, [
       h('button', { className: 'secondary', text: '취소', onClick: () => actions.editSituation(null) }),
@@ -385,12 +384,12 @@ function controls(model: InputModel, actions: InputActions): HTMLElement {
       exit: state ? actions.scene.exit : null,
     };
     return h('div', { className: 'controls' }, [
-      sceneSetupView(draftToShow, replay.rules, info.battingFirst, sceneActions, current),
+      sceneSetupView(draftToShow, info.battingFirst, sceneActions, current),
       undoButton(events, actions),
     ]);
   }
 
-  if (draft) return h('div', { className: 'controls' }, [situationEditor(draft, replay.rules, actions)]);
+  if (draft) return h('div', { className: 'controls' }, [situationEditor(draft, actions)]);
 
   const openEditor = (): void =>
     actions.editSituation({

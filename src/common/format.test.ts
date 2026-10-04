@@ -25,9 +25,3 @@ describe('표시 형식', () => {
     expect(formatInningsFromOuts(7)).toBe('2 1/3');
   });
 });
-
-describe('규칙이 다른 경기의 이닝', () => {
-  it('이닝당 아웃 4개면 5아웃 = 1 1/4', () => {
-    expect(formatInningsFromOuts(5, 4)).toBe('1 1/4');
-  });
-});

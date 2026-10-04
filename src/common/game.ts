@@ -1,4 +1,3 @@
-import { DEFAULT_RULES, Rules } from './count';
 import {
   BaseIndex,
   Bases,
@@ -31,7 +30,6 @@ export interface GameInfo {
   readonly gameType: GameType;
   /** 우리 팀이 먼저 공격(초)인지 */
   readonly battingFirst: Team;
-  readonly rules: Rules;
 }
 
 export const GAME_TYPE_LABEL: Record<GameType, string> = {
@@ -142,10 +140,9 @@ const UNKNOWN_INFO: GameInfo = {
   opponent: '',
   gameType: 'other',
   battingFirst: 'them',
-  rules: DEFAULT_RULES,
 };
 
-/** 가장 최근에 입력한 경기 정보. 예전 기록에 없는 값은 기본값(후공, 정식 규칙)으로 채운다. */
+/** 가장 최근에 입력한 경기 정보. 예전 기록에 없는 값은 기본값(후공)으로 채운다. */
 export function gameInfo(game: Game): GameInfo {
   const infos = game.events.filter((e): e is GameInfoEvent => e.kind === 'gameInfo');
   const latest = infos[infos.length - 1];
@@ -155,7 +152,6 @@ export function gameInfo(game: Game): GameInfo {
     opponent: latest.opponent,
     gameType: latest.gameType,
     battingFirst: latest.battingFirst ?? UNKNOWN_INFO.battingFirst,
-    rules: latest.rules ?? DEFAULT_RULES,
   };
 }
 

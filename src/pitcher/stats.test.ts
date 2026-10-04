@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { formatSources } from '../common/calculation';
 import { PlayLogEvent } from '../common/events';
 import { replayGame } from '../common/replay';
-import { adjust, appear, hit, pitches, play, settings } from '../common/test-helpers';
+import { appear, hit, pitches, play, settings } from '../common/test-helpers';
 import {
   GameForStats,
   battingAverageAgainst,
@@ -141,11 +141,5 @@ describe('여러 경기 합계', () => {
 
   it('던진 이닝: 3아웃 + 1아웃 = 1 1/3', () => {
     expect(inningsPitched([game, second]).display).toBe('1 1/3');
-  });
-
-  it('규칙이 다른 경기가 섞이면 경기별로 나눠 더한다 (3아웃/3 + 4아웃/4 = 2.0)', () => {
-    const four = { label: 'y', replay: replayGame([appear('pitcher'), ...pitches('out', 'out', 'out'), adjust(1, 4, [false, false, false])], settings('them', { ballsForWalk: 4, strikesForStrikeout: 3, outsPerInning: 4 })) };
-    const three = asGame('z', [appear('pitcher'), ...pitches('out', 'out', 'out')]);
-    expect(inningsPitched([three, four]).display).toBe('2.0');
   });
 });

@@ -2,7 +2,7 @@
 // 모든 값은 Calculation으로 돌려주어 결과와 계산 과정을 함께 보여준다.
 
 import { Calculation, safeDivide, tally, term } from '../common/calculation';
-import { Count, countLabel } from '../common/count';
+import { Count, OUTS_PER_INNING, countLabel } from '../common/count';
 import { PitchResult } from '../common/events';
 import { formatInningsFromOuts, formatPercent } from '../common/format';
 import {
@@ -69,22 +69,16 @@ export function strikeRate(games: readonly GameForStats[]): Calculation {
   };
 }
 
-/** 던진 이닝 = 잡은 아웃 ÷ 이닝당 아웃 수. 규칙이 다른 경기가 섞이면 경기마다 나눠 더한다. */
+/** 던진 이닝 = 잡은 아웃 ÷ 3 */
 export function inningsPitched(games: readonly GameForStats[]): Calculation {
   const outs = repeatedSources(faced(games), (pa) => pa.outsRecorded);
-  const perInning = [...new Set(games.map((g) => g.replay.rules.outsPerInning))];
-  const sameRule = perInning.length <= 1;
-  const outsPerInning = perInning[0] ?? 3;
-  const value = sameRule
-    ? outs.length / outsPerInning
-    : games.reduce((sum, g) => sum + faced([g]).reduce((n, s) => n + s.pa.outsRecorded, 0) / g.replay.rules.outsPerInning, 0);
   return {
     title: '던진 이닝',
-    formula: `잡은 아웃 ÷ ${sameRule ? outsPerInning : '경기별 이닝당 아웃 수'} (아웃 ${outsPerInning}개 = 1이닝)`,
+    formula: `잡은 아웃 ÷ ${OUTS_PER_INNING} (아웃 ${OUTS_PER_INNING}개 = 1이닝)`,
     terms: [term('잡은 아웃 (삼진·아웃·견제 아웃·도루 저지·고쳐서 더한 아웃)', outs)],
-    expression: sameRule ? `${outs.length} ÷ ${outsPerInning}` : `경기별로 나눠 더함`,
-    value,
-    display: sameRule ? formatInningsFromOuts(outs.length, outsPerInning) : value.toFixed(1),
+    expression: `${outs.length} ÷ ${OUTS_PER_INNING}`,
+    value: outs.length / OUTS_PER_INNING,
+    display: formatInningsFromOuts(outs.length),
   };
 }
 

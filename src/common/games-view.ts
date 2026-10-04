@@ -1,6 +1,5 @@
 // 경기 목록과 경기 정보 입력 화면 (공통)
 
-import { RULE_LIMITS, Rules, isDefaultRules } from './count';
 import { h } from './dom';
 import { GAME_TYPES, GameType, Team } from './events';
 import { GAME_TYPE_LABEL, Game, GameInfo, dateLabel, gameInfo, opponentLabel } from './game';
@@ -22,11 +21,6 @@ export interface GamesActions {
   saveForm: (form: GameForm) => void;
 }
 
-const RULE_LABEL: Record<keyof Rules, string> = {
-  ballsForWalk: '볼넷이 되는 볼 수',
-  strikesForStrikeout: '삼진이 되는 스트라이크 수',
-  outsPerInning: '한 이닝 아웃 수',
-};
 
 /** 버튼 여러 개 중 하나를 고르는 줄. 다시 그리지 않고 선택 표시만 바꾼다. */
 function picker<T extends string>(options: readonly [T, string][], selected: T, onSelect: (v: T) => void, className: string): HTMLElement {
@@ -58,30 +52,6 @@ function formView(form: GameForm, hasGames: boolean, actions: GamesActions): HTM
   });
   opponentInput.addEventListener('input', () => update({ opponent: opponentInput.value }));
 
-  const ruleRow = (key: keyof Rules): HTMLElement => {
-    const value = h('strong', { text: String(form.info.rules[key]) });
-    const step = (delta: number): void => {
-      const limits = RULE_LIMITS[key];
-      const next = Math.min(limits.max, Math.max(limits.min, current.info.rules[key] + delta));
-      update({ rules: { ...current.info.rules, [key]: next } });
-      value.textContent = String(next);
-    };
-    return h('div', { className: 'stepper' }, [
-      h('span', { text: RULE_LABEL[key] }),
-      h('button', { text: '−', onClick: () => step(-1), attrs: { type: 'button', 'aria-label': `${RULE_LABEL[key]} 줄이기` } }),
-      value,
-      h('button', { text: '+', onClick: () => step(1), attrs: { type: 'button', 'aria-label': `${RULE_LABEL[key]} 늘리기` } }),
-    ]);
-  };
-
-  const rules = h('details', { className: 'rules', attrs: isDefaultRules(form.info.rules) ? {} : { open: '' } }, [
-    h('summary', { text: '경기 규칙 바꾸기 (연습경기 등)' }),
-    h('p', { className: 'help', text: '정식 규칙은 볼 4개 볼넷, 스트라이크 3개 삼진, 3아웃입니다. 연습경기에서 다르게 하면 맞춰 주세요.' }),
-    ruleRow('ballsForWalk'),
-    ruleRow('strikesForStrikeout'),
-    ruleRow('outsPerInning'),
-  ]);
-
   return h('section', { className: 'game-form' }, [
     h('h2', { text: form.gameId ? '경기 정보 고치기' : '새 경기' }),
     hasGames ? null : h('p', { className: 'help', text: '먼저 오늘 경기 정보를 입력하세요. 나중에 고칠 수 있어요.' }),
@@ -103,7 +73,6 @@ function formView(form: GameForm, hasGames: boolean, actions: GamesActions): HTM
         'type-picker',
       ),
     ]),
-    rules,
     form.error ? h('p', { className: 'error', text: form.error, attrs: { role: 'alert' } }) : null,
     h('div', { className: 'confirm-buttons' }, [
       hasGames ? h('button', { className: 'secondary', text: '취소', onClick: actions.cancelForm }) : null,
@@ -123,7 +92,7 @@ function gameCard(game: Game, isCurrent: boolean, replay: GameReplay, actions: G
       h('span', { className: `type-chip ${info.gameType}`, text: GAME_TYPE_LABEL[info.gameType] }),
     ]),
     h('p', { className: 'opponent', text: `상대: ${opponentLabel(info.opponent)} · ${info.battingFirst === 'us' ? '선공' : '후공'}` }),
-    h('p', { className: 'sub', text: `장면 ${replay.scenes.length} · 투구 ${pitches}개 · 타석 ${batted}${isDefaultRules(info.rules) ? '' : ' · 규칙 바꿈'}` }),
+    h('p', { className: 'sub', text: `장면 ${replay.scenes.length} · 투구 ${pitches}개 · 타석 ${batted}` }),
     h('div', { className: 'confirm-buttons' }, [
       h('button', { className: 'secondary', text: '정보 고치기', onClick: () => actions.openEdit(game) }),
       h('button', { className: 'primary', text: isCurrent ? '기록 중 · 이어서' : '이 경기 기록하기', onClick: () => actions.select(game.id) }),
