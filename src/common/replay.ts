@@ -9,13 +9,14 @@ import {
   OUTS_PER_INNING,
   STRIKES_FOR_STRIKEOUT,
 } from './count';
-import { advanceAll, EMPTY_BASES, forceAdvance, hitAdvance, removeRunner } from './bases';
-import { AdjustEvent, Bases, PitchEvent, PitchResult, PlayEvent, PlayLogEvent } from './events';
+import { Advance, advanceRunners, batterAdvance, EMPTY_BASES, forceAdvance, removeRunner, stealAdvance } from './bases';
+import { AdjustEvent, Bases, HIT_BASES, HitType, PitchEvent, PitchResult, PlayEvent, PlayLogEvent } from './events';
 
 export type PlateAppearanceOutcome =
   | 'walk'
   | 'strikeout'
   | 'hit'
+  | 'reachedOnError'
   | 'out'
   | 'hitByPitch'
   /** 타석 도중 이닝이 끝남 (예: 도루 실패로 세 번째 아웃). 같은 타자가 다음 이닝에 다시 친다. */
@@ -40,6 +41,12 @@ export interface PlateAppearance {
   readonly outsRecorded: number;
   /** 이 타석 동안 일어난 주자 상황 (견제, 도루 등) */
   readonly plays: readonly PlayEvent[];
+  /** 안타로 끝났을 때 안타 종류 */
+  readonly hitType: HitType | null;
+  /** 이 타석 동안 홈에 들어온 점수 (상대 팀 득점 = 투수 실점) */
+  readonly runs: number;
+  /** 이 타석 동안 나온 우리 팀 수비 실책 수 (실책 출루 + 실책으로 주자 진루) */
+  readonly errors: number;
 }
 
 export interface GameState {
@@ -83,38 +90,53 @@ export function applyPitch(count: Count, result: PitchResult): PitchApplied {
         ? { next: { ...count, strikes: count.strikes + 1 }, outcome: null }
         : { next: count, outcome: null };
     case 'hit':
+    case 'reachedOnError':
     case 'out':
     case 'hitByPitch':
       return { next: count, outcome: result };
   }
 }
 
-/** 타석 결과에 따른 아웃과 주자 이동 */
-function applyOutcome(bases: Bases, outcome: PlateAppearanceOutcome): { bases: Bases; outs: number } {
+interface Effect extends Advance {
+  readonly outs: number;
+}
+
+const NO_MOVE = (bases: Bases): Effect => ({ bases, runs: 0, outs: 0 });
+
+/** 타석 결과에 따른 아웃, 주자 이동, 득점 */
+function applyOutcome(bases: Bases, outcome: PlateAppearanceOutcome, hitType: HitType): Effect {
   switch (outcome) {
     case 'walk':
     case 'hitByPitch':
-      return { bases: forceAdvance(bases), outs: 0 };
+      return { ...forceAdvance(bases), outs: 0 };
     case 'hit':
-      return { bases: hitAdvance(bases), outs: 0 };
+      return { ...batterAdvance(bases, HIT_BASES[hitType]), outs: 0 };
+    case 'reachedOnError':
+      // 실책 출루는 1루타처럼 한 베이스씩 옮긴다. 더 간 경우는 사용자가 고친다.
+      return { ...batterAdvance(bases, HIT_BASES.single), outs: 0 };
     case 'strikeout':
     case 'out':
-      return { bases, outs: 1 };
+      return { bases, runs: 0, outs: 1 };
     case 'inningEnded':
-      return { bases, outs: 0 };
+      return NO_MOVE(bases);
   }
 }
 
-function applyPlay(bases: Bases, play: PlayEvent): { bases: Bases; outs: number } {
+function applyPlay(bases: Bases, play: PlayEvent): Effect {
   switch (play.play) {
     case 'pickoff':
-      return { bases, outs: 0 };
+    case 'error':
+      return NO_MOVE(bases);
     case 'pickoffOut':
-      return { bases: removeRunner(bases, play.base ?? 0), outs: 1 };
+      return { bases: removeRunner(bases, play.base ?? 0), runs: 0, outs: 1 };
+    case 'stolenBase':
+      return { ...stealAdvance(bases, play.base ?? 0), outs: 0 };
     case 'stolenSecond':
-      return { bases: [false, true, bases[2]], outs: 0 };
+      return { ...stealAdvance(bases, 0), outs: 0 };
+    case 'caughtStealing':
+      return { bases: removeRunner(bases, play.base ?? 0), runs: 0, outs: 1 };
     case 'caughtStealingSecond':
-      return { bases: removeRunner(bases, 0), outs: 1 };
+      return { bases: removeRunner(bases, 0), runs: 0, outs: 1 };
   }
 }
 
@@ -127,6 +149,8 @@ interface OpenPlateAppearance {
   plays: PlayEvent[];
   count: Count;
   outsRecorded: number;
+  runs: number;
+  errors: number;
 }
 
 type MutablePlateAppearance = { -readonly [K in keyof PlateAppearance]: PlateAppearance[K] } & {
@@ -148,6 +172,8 @@ export function replayGame(events: readonly PlayLogEvent[], startInning: number)
     plays: [],
     count: FIRST_PITCH_COUNT,
     outsRecorded: 0,
+    runs: 0,
+    errors: 0,
   });
   let current = open();
 
@@ -170,6 +196,9 @@ export function replayGame(events: readonly PlayLogEvent[], startInning: number)
     currentCount: pa.count,
     outsRecorded: pa.outsRecorded,
     plays: pa.plays,
+    hitType: outcome === 'hit' ? (pa.pitches[pa.pitches.length - 1]?.hitType ?? 'single') : null,
+    runs: pa.runs,
+    errors: pa.errors,
   });
 
   const close = (outcome: PlateAppearanceOutcome, endCount: Count | null): void => {
@@ -206,6 +235,7 @@ export function replayGame(events: readonly PlayLogEvent[], startInning: number)
     // 첫 기록 전에 고친 것은 시작 상황(예: 1아웃에 등판)이므로 잡은 아웃으로 세지 않는다.
     const isStartingSituation = !last && !started(current);
     if (event.outs > outs && !isStartingSituation) owner.outsRecorded += event.outs - outs;
+    owner.runs += event.runs ?? 0;
     outs = event.outs;
     bases = event.bases;
     if (!started(current)) {
@@ -229,21 +259,29 @@ export function replayGame(events: readonly PlayLogEvent[], startInning: number)
       bases = applied.bases;
       outs += applied.outs;
       current.outsRecorded += applied.outs;
+      current.runs += applied.runs;
+      if (event.play === 'error') current.errors += 1;
       endInningIfThreeOuts();
       continue;
     }
 
     current.pitches.push(event);
-    if (event.result === 'wildPitch') bases = advanceAll(bases);
+    if (event.result === 'wildPitch') {
+      const moved = advanceRunners(bases, 1);
+      bases = moved.bases;
+      current.runs += moved.runs;
+    }
     const applied = applyPitch(current.count, event.result);
     if (!applied.outcome) {
       current.count = applied.next;
       continue;
     }
-    const after = applyOutcome(bases, applied.outcome);
+    const after = applyOutcome(bases, applied.outcome, event.hitType ?? 'single');
     bases = after.bases;
     outs += after.outs;
     current.outsRecorded += after.outs;
+    current.runs += after.runs;
+    if (applied.outcome === 'reachedOnError') current.errors += 1;
     close(applied.outcome, current.count);
     current = open();
     endInningIfThreeOuts();

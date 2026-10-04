@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { formatSources } from '../common/calculation';
 import { replayGame } from '../common/replay';
-import { adjust, pitches, play } from '../common/test-helpers';
+import { adjust, hit, pitches, play } from '../common/test-helpers';
 import {
   GameForStats,
   battingAverageAgainst,
   byEndCount,
-  caughtStealingSecond,
+  caughtStealing,
   inningsPitched,
   pickoffAttempts,
   pitchCount,
@@ -14,6 +14,13 @@ import {
   strikeouts,
   walks,
   wildPitches,
+  runsAllowed,
+  extraBaseHitsAllowed,
+  homeRunsAllowed,
+  sluggingAgainst,
+  errorsBehind,
+  stolenBasesAllowed,
+  pitchesByInning,
 } from './stats';
 
 // 1회
@@ -108,7 +115,53 @@ describe('여러 경기 합계', () => {
   });
 
   it('도루 저지와 던진 이닝 (1회 3아웃 + 2회 도루 저지 1아웃 = 4아웃 → 1 1/3)', () => {
-    expect(caughtStealingSecond([game, second]).value).toBe(1);
+    expect(caughtStealing([game, second]).value).toBe(1);
     expect(inningsPitched([game, second]).display).toBe('1 1/3');
+  });
+});
+
+describe('안타 종류·실점·실책', () => {
+  // 1회: 2루타, 홈런(2점), 실책 출루, 3루 도루 실패 아웃, 삼진, 아웃
+  const events = [
+    hit('double'),
+    hit('homeRun'),
+    ...pitches('reachedOnError'),
+    play('stolenBase', 0),
+    play('caughtStealing', 1),
+    ...pitches('strike', 'strike', 'strike'),
+    ...pitches('out'),
+  ];
+  const g: GameForStats = { label: 'x', replay: replayGame(events, 1) };
+
+  it('실점 2 (홈런 때 2루 주자와 타자)', () => {
+    expect(runsAllowed([g]).value).toBe(2);
+  });
+
+  it('장타 2, 홈런 1', () => {
+    expect(extraBaseHitsAllowed([g]).value).toBe(2);
+    expect(homeRunsAllowed([g]).value).toBe(1);
+  });
+
+  it('피장타율 = 루타 6 ÷ 타수 5 (실책 출루도 타수) = 1.200', () => {
+    const c = sluggingAgainst([g]);
+    expect(c.expression).toBe('6 ÷ 5');
+    expect(c.display).toBe('1.200');
+  });
+
+  it('피안타율 = 2 ÷ 5 (실책 출루는 안타가 아님)', () => {
+    expect(battingAverageAgainst([g]).expression).toBe('2 ÷ 5');
+  });
+
+  it('수비 실책 1, 도루 허용 1, 도루 저지 1', () => {
+    expect(errorsBehind([g]).value).toBe(1);
+    expect(stolenBasesAllowed([g]).value).toBe(1);
+    expect(caughtStealing([g]).value).toBe(1);
+  });
+
+  it('이닝별 투구 수', () => {
+    const [first] = pitchesByInning([g]);
+    expect(first.title).toBe('1회 투구 수');
+    expect(first.expression).toBe('1 + 1 + 1 + 3 + 1');
+    expect(first.value).toBe(7);
   });
 });

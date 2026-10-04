@@ -1,4 +1,15 @@
-import { Bases, BaseIndex, GameInfoEvent, GameType, LogEvent, PitchResult, PlayKind, isLogEvent } from './events';
+import {
+  BaseIndex,
+  Bases,
+  GameInfoEvent,
+  GameType,
+  HitType,
+  LogEvent,
+  PitchResult,
+  PlayKind,
+  Team,
+  isLogEvent,
+} from './events';
 
 /** 데모에는 로그인이 없으므로 작성자를 고정한다. 공증 기능 단계에서 실제 사용자로 바꾼다. */
 export const DEMO_AUTHOR = '나';
@@ -57,16 +68,20 @@ export function setGameInfo(game: Game, info: GameInfo): Game {
   return append(game, { kind: 'gameInfo', ...base(), ...info });
 }
 
-export function addPitch(game: Game, result: PitchResult): Game {
-  return append(game, { kind: 'pitch', ...base(), result });
+export function addPitch(game: Game, result: PitchResult, hitType?: HitType): Game {
+  return append(game, { kind: 'pitch', ...base(), result, ...(hitType ? { hitType } : {}) });
 }
 
 export function addPlay(game: Game, play: PlayKind, baseIndex?: BaseIndex): Game {
   return append(game, { kind: 'play', ...base(), play, ...(baseIndex === undefined ? {} : { base: baseIndex }) });
 }
 
-export function addAdjust(game: Game, inning: number, outs: number, bases: Bases): Game {
-  return append(game, { kind: 'adjust', ...base(), inning, outs, bases });
+export function addAdjust(game: Game, inning: number, outs: number, bases: Bases, runs = 0): Game {
+  return append(game, { kind: 'adjust', ...base(), inning, outs, bases, ...(runs > 0 ? { runs } : {}) });
+}
+
+export function addScore(game: Game, team: Team, inning: number, runs: number): Game {
+  return append(game, { kind: 'score', ...base(), team, inning, runs });
 }
 
 export function addVoid(game: Game, targetId: string): Game {

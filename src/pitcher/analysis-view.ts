@@ -78,6 +78,8 @@ export function analysisView(
     return h('section', { className: 'analysis' }, [
       ...header,
       ...summary.sections.flatMap((section) => [h('h2', { text: section.title }), ...section.items.map(processCard)]),
+      summary.byInning.length > 0 ? h('h2', { text: '이닝별 투구 수' }) : null,
+      ...summary.byInning.map(processCard),
       h('h2', { text: '카운트별 피안타율' }),
       h('p', { className: 'basis', text: END_COUNT_BASIS }),
       ...summary.byCount.map((row) => processCard(row.battingAverageAgainst)),
@@ -96,6 +98,16 @@ export function analysisView(
         ),
       ),
     ]),
+    summary.byInning.length > 0 ? h('h2', { text: '이닝별 투구 수' }) : null,
+    summary.byInning.length > 0
+      ? h(
+          'div',
+          { className: 'cards inning-cards' },
+          summary.byInning.map((c) =>
+            h('div', { className: 'card' }, [h('small', { text: c.title.replace(' 투구 수', '') }), h('strong', { text: c.display })]),
+          ),
+        )
+      : null,
     h('h2', { text: '카운트별 피안타율' }),
     h('p', { className: 'basis', text: END_COUNT_BASIS }),
     summary.byCount.length === 0

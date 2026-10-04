@@ -1,4 +1,4 @@
-import { AdjustEvent, BaseIndex, Bases, PitchEvent, PitchResult, PlayEvent, PlayKind } from './events';
+import { AdjustEvent, BaseIndex, Bases, HitType, PitchEvent, PitchResult, PlayEvent, PlayKind, ScoreEvent, Team } from './events';
 
 let seq = 0;
 
@@ -16,6 +16,14 @@ export function play(kind: PlayKind, baseIndex?: BaseIndex): PlayEvent {
   return { kind: 'play', ...base(), play: kind, ...(baseIndex === undefined ? {} : { base: baseIndex }) };
 }
 
-export function adjust(inning: number, outs: number, bases: Bases): AdjustEvent {
-  return { kind: 'adjust', ...base(), inning, outs, bases };
+export function hit(hitType: HitType): PitchEvent {
+  return { kind: 'pitch', ...base(), result: 'hit', hitType };
+}
+
+export function adjust(inning: number, outs: number, bases: Bases, runs?: number): AdjustEvent {
+  return { kind: 'adjust', ...base(), inning, outs, bases, ...(runs === undefined ? {} : { runs }) };
+}
+
+export function score(team: Team, inning: number, runs: number): ScoreEvent {
+  return { kind: 'score', ...base(), team, inning, runs };
 }

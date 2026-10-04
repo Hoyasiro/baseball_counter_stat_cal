@@ -2,13 +2,14 @@
 // 상태를 들고 화면을 다시 그리는 역할만 한다. 각 화면은 *-view.ts에 있다.
 
 import { h } from '../common/dom';
-import { BaseIndex, Bases, PitchResult, PlayKind, activeEvents } from '../common/events';
+import { BaseIndex, HitType, PitchResult, activeEvents, playEvents } from '../common/events';
 import {
   Game,
   GameInfo,
   addAdjust,
   addPitch,
   addPlay,
+  addScore,
   addVoid,
   createGame,
   gameInfo,
@@ -16,12 +17,14 @@ import {
   setGameInfo,
   today,
 } from '../common/game';
+import { lineScore } from '../common/line-score';
 import { GameReplay, replayGame } from '../common/replay';
 import { loadGames, saveGames } from '../common/storage';
 import { AnalysisScope, AnalysisTab, analysisView } from './analysis-view';
 import { GameForm, gamesView } from './games-view';
-import { SituationDraft, inputView } from './input-view';
-import { recordsView } from './records-view';
+import { Chooser, SituationDraft, inputView } from './input-view';
+import { RunnerAction } from './labels';
+import { ScoreDraft, recordsView } from './records-view';
 import { GameForStats } from './stats';
 
 const STORAGE_KEY = 'baseball-counter.pitcher.games.v2';
@@ -45,14 +48,17 @@ interface State {
   notice: string | null;
   /** "상황 고치기" 중인 값 */
   situationDraft: SituationDraft | null;
-  /** 견제 아웃에서 어느 베이스 주자인지 고르는 중 */
-  choosingPickoffBase: boolean;
+  /** 안타 종류나 주자를 고르는 중 */
+  chooser: Chooser;
+  scoreDraft: ScoreDraft | null;
   form: GameForm | null;
 }
 
 export function replayOf(game: Game): GameReplay {
-  return replayGame(activeEvents(game.events), gameInfo(game).startInning);
+  return replayGame(playEvents(activeEvents(game.events)), gameInfo(game).startInning);
 }
+
+const ERROR_REASON = '실책으로 바뀐 주자·아웃·점수를 맞춰 주세요. 바뀐 게 없으면 취소를 누르세요.';
 
 function newGameForm(): GameForm {
   return { gameId: null, info: { date: today(), opponent: '', gameType: 'practice', startInning: 1 }, error: null };
@@ -69,7 +75,8 @@ export function mountPitcher(root: HTMLElement, onBack: () => void): void {
     analysisScope: 'game',
     notice: loaded.ok ? null : loaded.message,
     situationDraft: null,
-    choosingPickoffBase: false,
+    chooser: null,
+    scoreDraft: null,
     form: latest ? null : newGameForm(),
   };
 
@@ -93,41 +100,56 @@ export function mountPitcher(root: HTMLElement, onBack: () => void): void {
   const go = (tab: Tab): void => {
     state.tab = tab;
     state.situationDraft = null;
-    state.choosingPickoffBase = false;
+    state.chooser = null;
+    state.scoreDraft = null;
     render();
+    window.scrollTo(0, 0);
   };
 
   const inputActions = {
-    pitch: (result: PitchResult) => {
+    pitch: (result: PitchResult, hitType?: HitType) => {
       state.notice = null;
-      updateCurrent((g) => addPitch(g, result));
+      state.chooser = null;
+      updateCurrent((g) => addPitch(g, result, hitType));
     },
-    play: (play: PlayKind, base?: BaseIndex) => {
-      state.choosingPickoffBase = false;
-      updateCurrent((g) => addPlay(g, play, base));
+    runner: (action: RunnerAction, base?: BaseIndex) => {
+      state.chooser = null;
+      updateCurrent((g) => addPlay(g, action, base));
+      if (action === 'error') {
+        // 실책 뒤에는 바로 상황 고치기를 열어 바뀐 주자·점수를 맞추게 한다.
+        const game = currentGame();
+        if (!game) return;
+        const { inning, outs, bases } = replayOf(game).state;
+        state.situationDraft = { inning, outs, bases, runs: 0, reason: ERROR_REASON };
+        render();
+      }
     },
-    choosePickoffBase: (choosing: boolean) => {
-      state.choosingPickoffBase = choosing;
+    choose: (chooser: Chooser) => {
+      state.chooser = chooser;
       render();
     },
     undo: (targetId: string) => updateCurrent((g) => addVoid(g, targetId)),
-    startSituationEdit: (draft: SituationDraft) => {
+    editSituation: (draft: SituationDraft | null) => {
       state.situationDraft = draft;
       render();
     },
-    changeSituationDraft: (draft: SituationDraft) => {
-      state.situationDraft = draft;
-      render();
-    },
-    cancelSituationEdit: () => {
+    saveSituation: (draft: SituationDraft) => {
       state.situationDraft = null;
-      render();
-    },
-    saveSituation: (inning: number, outs: number, bases: Bases) => {
-      state.situationDraft = null;
-      updateCurrent((g) => addAdjust(g, inning, outs, bases));
+      updateCurrent((g) => addAdjust(g, draft.inning, draft.outs, draft.bases, draft.runs));
     },
     openGames: () => go('games'),
+    openScoreboard: () => go('records'),
+  };
+
+  const scoreActions = {
+    edit: (draft: ScoreDraft | null) => {
+      state.scoreDraft = draft;
+      render();
+    },
+    save: (draft: ScoreDraft) => {
+      state.scoreDraft = null;
+      updateCurrent((g) => addScore(g, draft.team, draft.inning, draft.runs));
+    },
   };
 
   const gamesActions = {
@@ -209,11 +231,16 @@ export function mountPitcher(root: HTMLElement, onBack: () => void): void {
       return gamesView(state.games, state.currentGameId, state.form, gamesActions, replayOf);
     }
     const replay = replayOf(game);
+    const events = activeEvents(game.events);
+    const score = lineScore(replay, events);
     switch (state.tab) {
       case 'input':
-        return inputView(game, replay, state.situationDraft, state.choosingPickoffBase, inputActions);
+        return inputView(
+          { game, replay, events, score, draft: state.situationDraft, chooser: state.chooser },
+          inputActions,
+        );
       case 'records':
-        return recordsView(game, replay);
+        return recordsView(game, replay, score, state.scoreDraft, scoreActions);
       case 'analysis': {
         const scoped: GameForStats[] =
           state.analysisScope === 'game'
