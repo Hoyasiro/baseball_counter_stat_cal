@@ -5,6 +5,17 @@ import { HitType, PitchEvent, PitchResult, PlayEvent, Position, Role, UndoableEv
 import { halfInningLabel } from './innings';
 import { Actor, PlateAppearance, PlateAppearanceOutcome, RunnerEventKind } from './replay';
 
+/** 아래 탭 이름 */
+export type AppTab = 'input' | 'records' | 'pitcher' | 'batter' | 'games';
+
+export const TAB_LABEL: Record<AppTab, string> = {
+  input: '기록 입력',
+  records: '기록 보기',
+  pitcher: '투수 분석',
+  batter: '타자 분석',
+  games: '경기',
+};
+
 export const ROLE_LABEL: Record<Role, string> = {
   pitcher: '투수',
   batter: '타자',

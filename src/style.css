@@ -1442,3 +1442,173 @@ button {
 .scene-setup .role-picker button {
   padding: 8px 2px;
 }
+
+/* ── 도움말 · 처음 사용 안내 ── */
+.topbar {
+  justify-content: space-between;
+}
+
+.help-button {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--board-pill);
+  color: var(--on-color);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.tutorial-card {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+  padding: 20px 18px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.tutorial-card h2 {
+  margin: 0;
+  font-size: 21px;
+  text-wrap: balance;
+}
+
+.tutorial-card p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.tutorial-step {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.tutorial-sample {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sample-chip {
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.sample-chip.ball {
+  background: var(--ball);
+  color: var(--on-color);
+}
+
+.sample-chip.strike,
+.sample-chip.foul {
+  background: var(--strike);
+  color: var(--on-color);
+}
+
+.sample-chip.hit,
+.sample-chip.hitByPitch {
+  background: var(--hit);
+  color: var(--on-color);
+}
+
+.sample-chip.out {
+  background: var(--out);
+  color: var(--on-color);
+}
+
+.tutorial-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.tutorial-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.tutorial-dots span.on {
+  background: var(--primary);
+}
+
+.manual {
+  display: grid;
+  gap: 12px;
+}
+
+.manual-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.manual-head h2 {
+  margin: 0;
+}
+
+.manual-head .secondary {
+  padding: 8px 16px;
+}
+
+.manual-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.manual-index a {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.manual-section {
+  display: grid;
+  gap: 6px;
+  scroll-margin-top: calc(var(--topbar-h) + 8px);
+}
+
+.manual-section h3 {
+  margin: 8px 0 0;
+  font-size: 17px;
+}
+
+.manual-item {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.manual-item summary {
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.manual-item p {
+  margin: 8px 0 0;
+  line-height: 1.6;
+  font-size: 15px;
+}

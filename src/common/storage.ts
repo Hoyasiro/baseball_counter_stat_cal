@@ -46,3 +46,22 @@ export function saveGames(key: string, games: readonly Game[]): boolean {
     return false;
   }
 }
+
+const TUTORIAL_SEEN_KEY = 'baseball-counter.tutorial-seen';
+
+/** 처음 사용 안내를 이미 봤는지. 저장소를 못 쓰면 봤다고 보고 다시 띄우지 않는다. */
+export function hasSeenTutorial(): boolean {
+  try {
+    return localStorage.getItem(TUTORIAL_SEEN_KEY) === '1';
+  } catch {
+    return true;
+  }
+}
+
+export function markTutorialSeen(): void {
+  try {
+    localStorage.setItem(TUTORIAL_SEEN_KEY, '1');
+  } catch {
+    // 저장하지 못해도 안내는 닫힌다. 다음에 다시 보일 뿐이다.
+  }
+}

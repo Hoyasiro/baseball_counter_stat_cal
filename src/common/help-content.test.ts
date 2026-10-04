@@ -1,0 +1,53 @@
+// 기능을 바꾸고 도움말을 깜빡하지 않도록, 화면의 버튼 이름이 매뉴얼에 모두 나오는지 검사한다. (CLAUDE.md 10)
+
+import { describe, expect, it } from 'vitest';
+import { GAME_TYPE_LABEL } from './game';
+import { MANUAL_SECTIONS, TUTORIAL_STEPS } from './help-content';
+import {
+  CHILD_RUNNER_BUTTONS,
+  EXTRA_PITCH_BUTTONS,
+  HIT_BUTTONS,
+  MAIN_PITCH_BUTTONS,
+  POSITION_LABEL,
+  ROLE_LABEL,
+  RUNNER_BUTTONS,
+  TAB_LABEL,
+} from './labels';
+
+const manualText = MANUAL_SECTIONS.flatMap((s) => [s.title, ...s.items.flatMap((i) => [i.title, ...i.text])]).join('\n');
+
+function missing(labels: readonly string[]): string[] {
+  return labels.filter((label) => !manualText.includes(label));
+}
+
+describe('도움말이 화면과 맞는지', () => {
+  it('공 버튼과 안타 종류가 매뉴얼에 있다', () => {
+    expect(missing([...MAIN_PITCH_BUTTONS, ...EXTRA_PITCH_BUTTONS].map((b) => b.label))).toEqual([]);
+    expect(missing(HIT_BUTTONS.map((b) => b.label))).toEqual([]);
+  });
+
+  it('주자 상황·아이 주루 버튼이 매뉴얼에 있다', () => {
+    expect(missing(RUNNER_BUTTONS.map((b) => b.label))).toEqual([]);
+    expect(missing(CHILD_RUNNER_BUTTONS.map((b) => b.label))).toEqual([]);
+  });
+
+  it('역할·포지션·경기 구분·탭 이름이 매뉴얼에 있다', () => {
+    expect(missing(Object.values(ROLE_LABEL))).toEqual([]);
+    expect(missing(Object.values(POSITION_LABEL))).toEqual([]);
+    expect(missing(Object.values(GAME_TYPE_LABEL))).toEqual([]);
+    expect(missing(Object.values(TAB_LABEL))).toEqual([]);
+  });
+
+  it('튜토리얼은 단계마다 제목과 설명이 있다', () => {
+    expect(TUTORIAL_STEPS.length).toBeGreaterThan(0);
+    for (const step of TUTORIAL_STEPS) {
+      expect(step.title).not.toBe('');
+      expect(step.lines.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('매뉴얼 항목 id가 겹치지 않는다', () => {
+    const ids = MANUAL_SECTIONS.map((s) => s.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});

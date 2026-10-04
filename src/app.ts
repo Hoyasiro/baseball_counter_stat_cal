@@ -26,27 +26,22 @@ import {
 import { DEFAULT_RULES } from './common/count';
 import { GameForm, gamesView } from './common/games-view';
 import { Chooser, SituationDraft, inputView } from './common/input-view';
-import { ChildRunnerAction, RunnerAction } from './common/labels';
+import { AppTab, ChildRunnerAction, RunnerAction, TAB_LABEL } from './common/labels';
 import { lineScore } from './common/line-score';
 import { ScoreDraft, recordsView } from './common/records-view';
 import { ActiveState, GameReplay, replayGame } from './common/replay';
 import { SceneDraft, defaultRole, defaultSceneDraft } from './common/scene-setup-view';
 import { GameForStats } from './common/stat-base';
-import { loadGames, saveGames } from './common/storage';
+import { hasSeenTutorial, loadGames, markTutorialSeen, saveGames } from './common/storage';
+import { manualView, tutorialView } from './common/help-view';
 import { pitcherAnalysisView } from './pitcher/analysis-view';
 
 const STORAGE_KEY = 'baseball-counter.games.v3';
 const LEGACY_STORAGE_KEYS = ['baseball-counter.pitcher.games.v2', 'baseball-counter.pitcher.games.v1'];
 
-type Tab = 'input' | 'records' | 'pitcher' | 'batter' | 'games';
+type Tab = AppTab;
 
-const TABS: readonly [Tab, string][] = [
-  ['input', '기록 입력'],
-  ['records', '기록 보기'],
-  ['pitcher', '투수 분석'],
-  ['batter', '타자 분석'],
-  ['games', '경기'],
-];
+const TABS: readonly Tab[] = ['input', 'records', 'pitcher', 'batter', 'games'];
 
 interface State {
   games: Game[];
@@ -60,6 +55,10 @@ interface State {
   sceneDraft: SceneDraft | null;
   scoreDraft: ScoreDraft | null;
   form: GameForm | null;
+  /** 도움말(사용 설명서)을 보고 있는지 */
+  helpOpen: boolean;
+  /** 처음 사용 안내의 몇 번째 단계인지. 닫혀 있으면 null */
+  tutorialStep: number | null;
 }
 
 export function replayOf(game: Game): GameReplay {
@@ -115,6 +114,8 @@ export function mountApp(root: HTMLElement): void {
     sceneDraft: null,
     scoreDraft: null,
     form: latest ? null : newGameForm(),
+    helpOpen: false,
+    tutorialStep: hasSeenTutorial() ? null : 0,
   };
 
   const currentGame = (): Game | undefined => state.games.find((g) => g.id === state.currentGameId);
@@ -136,6 +137,7 @@ export function mountApp(root: HTMLElement): void {
 
   const go = (tab: Tab): void => {
     state.tab = tab;
+    state.helpOpen = false;
     state.situationDraft = null;
     state.chooser = null;
     state.sceneDraft = null;
@@ -324,7 +326,31 @@ export function mountApp(root: HTMLElement): void {
       ? [{ label: gameShortLabel(game), replay }]
       : state.games.map((g) => ({ label: gameShortLabel(g), replay: replayOf(g) }));
 
+  const helpActions = {
+    close: () => {
+      state.helpOpen = false;
+      render();
+    },
+    openTutorial: () => {
+      state.tutorialStep = 0;
+      render();
+    },
+  };
+
+  const tutorialActions = {
+    go: (step: number) => {
+      state.tutorialStep = step;
+      render();
+    },
+    close: () => {
+      state.tutorialStep = null;
+      markTutorialSeen();
+      render();
+    },
+  };
+
   const renderBody = (game: Game | undefined): HTMLElement => {
+    if (state.helpOpen) return manualView(helpActions);
     if (state.tab === 'games' || !game) {
       return gamesView(state.games, state.currentGameId, state.form, gamesActions, replayOf);
     }
@@ -359,15 +385,26 @@ export function mountApp(root: HTMLElement): void {
   const render = (): void => {
     const game = currentGame();
     const children: Node[] = [
-      h('header', { className: 'topbar' }, [h('h1', { text: '우리 아이 야구 기록' })]),
+      h('header', { className: 'topbar' }, [
+        h('h1', { text: '우리 아이 야구 기록' }),
+        h('button', {
+          className: 'help-button',
+          text: '도움말',
+          onClick: () => {
+            state.helpOpen = true;
+            render();
+            window.scrollTo(0, 0);
+          },
+        }),
+      ]),
       h('main', { className: 'content' }, [renderBody(game)]),
       h(
         'nav',
         { className: 'tabbar' },
-        TABS.map(([tab, label]) =>
+        TABS.map((tab) =>
           h('button', {
-            className: state.tab === tab ? 'active' : '',
-            text: label,
+            className: state.tab === tab && !state.helpOpen ? 'active' : '',
+            text: TAB_LABEL[tab],
             disabled: tab !== 'games' && !game,
             onClick: () => go(tab),
           }),
@@ -381,6 +418,7 @@ export function mountApp(root: HTMLElement): void {
       };
       children.splice(1, 0, h('p', { className: 'notice', text: state.notice, onClick: dismiss }));
     }
+    if (state.tutorialStep !== null) children.push(tutorialView(state.tutorialStep, tutorialActions));
     root.replaceChildren(...children);
   };
 
