@@ -28,6 +28,7 @@ import { LineScore } from './line-score';
 import { ActiveState, GameReplay } from './replay';
 import { SceneDraft, SceneSetupActions, defaultRole, defaultSceneDraft, sceneSetupView } from './scene-setup-view';
 import { PlayFieldingActions, PlayFieldingDraft, playFieldingPopup } from './fielding-view';
+import { Hand } from './settings';
 import { FieldActions, FieldDraft, PitchSheet, PitchSheetActions, fieldPanel, pitchDetailToggle, pitchSheetView } from './pitch-detail-view';
 
 export interface SituationDraft {
@@ -77,8 +78,8 @@ export interface InputModel {
   readonly detailMode: boolean;
   /** 투구 상세 창이 열려 있으면 그 값 */
   readonly pitchSheet: PitchSheet | null;
-  /** 구속 다이얼이 처음 멈춰 있을 곳 */
-  readonly speedStart: number;
+  /** 손 설정: 구속 다이얼을 오른쪽/왼쪽 반원으로 그린다 */
+  readonly hand: Hand;
   /** 친 공의 낙구 지점·질을 고르는 중이면 그 값 */
   readonly fieldDraft: FieldDraft | null;
   /** 수비 중 주자 상황에서 아이의 수비 기록을 고르는 중이면 그 값 */
@@ -476,7 +477,7 @@ export function inputView(model: InputModel, actions: InputActions): HTMLElement
   return h('section', { className: 'input' }, [
     h('div', { className: 'board-sticky' }, [board(model, actions)]),
     controls(model, actions),
-    model.pitchSheet ? pitchSheetView(model.pitchSheet, model.speedStart, actions.sheet) : null,
+    model.pitchSheet ? pitchSheetView(model.pitchSheet, model.hand, actions.sheet) : null,
     // 친 공은 야구장 그림 창에서 낙구 지점과 질을 고른 뒤 기록한다.
     model.fieldDraft ? fieldPanel(model.fieldDraft, actions.field) : null,
     model.playFielding ? playFieldingPopup(model.playFielding, actions.playFielding) : null,

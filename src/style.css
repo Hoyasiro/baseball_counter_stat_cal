@@ -1767,14 +1767,14 @@ button {
 /* 존은 크게(세밀하게 찍도록), 오른손이면 오른쪽에 둔다. */
 .sheet-body {
   display: grid;
-  grid-template-columns: 104px minmax(0, 1fr);
+  grid-template-columns: 112px minmax(0, 1fr);
   grid-template-areas: 'wheel zone';
   gap: 12px;
   align-items: start;
 }
 
 [data-hand='left'] .sheet-body {
-  grid-template-columns: minmax(0, 1fr) 104px;
+  grid-template-columns: minmax(0, 1fr) 112px;
   grid-template-areas: 'zone wheel';
 }
 
@@ -1814,10 +1814,10 @@ button {
   order: -1;
 }
 
-/* 구속 다이얼: 정해진 범위(30~180) 숫자만 위아래로 돌린다. */
+/* 구속 다이얼: 시계 모양 반원(80~160). 오른손은 오른쪽 반원, 왼손은 왼쪽 반원 */
 .speed-dial {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .speed-readout {
@@ -1834,62 +1834,98 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
-.speed-window {
-  position: relative;
-  height: 220px;
+.dial-frame {
   border-radius: 12px;
-  border: 1px solid var(--line);
   background: var(--bg);
+  border: 1px solid var(--line);
   overflow: hidden;
 }
 
-/* 가운데 칸 = 고른 값 (WHEEL_ITEM_HEIGHT 44px × 위아래 2칸) */
-.speed-window::after {
-  content: '';
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  top: 88px;
-  height: 44px;
-  border-radius: 8px;
-  border: 2px solid var(--primary);
+.dial-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 110 / 220;
+  /* 바늘을 끄는 동안 화면이 움직이거나 글자가 선택되지 않게 */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+  outline: none;
+}
+
+.dial-svg:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.dial-track {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+
+.dial-progress {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+
+.dial-tick {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+.dial-tick.major {
+  stroke: var(--text);
+  stroke-width: 1.6;
+}
+
+.dial-label {
+  fill: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
 
-.speed-wheel {
-  height: 100%;
-  margin: 0;
-  padding: 88px 0;
-  list-style: none;
-  overflow-y: auto;
-  scroll-snap-type: y mandatory;
-  scrollbar-width: none;
-  overscroll-behavior: contain;
+.dial-needle {
+  stroke: var(--primary);
+  stroke-width: 3;
+  stroke-linecap: round;
 }
 
-.speed-wheel::-webkit-scrollbar {
-  display: none;
+.dial-knob {
+  fill: var(--primary);
+  stroke: var(--surface);
+  stroke-width: 2;
 }
 
-.speed-wheel li {
-  height: 44px;
-  line-height: 44px;
-  text-align: center;
-  font-size: 20px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  scroll-snap-align: center;
-  cursor: pointer;
+.dial-hub {
+  fill: var(--text);
 }
 
-.speed-dial.unset .speed-wheel li {
-  color: var(--muted);
-  opacity: 0.6;
+.speed-dial.unset .dial-needle {
+  stroke: var(--muted);
+  stroke-dasharray: 4 3;
 }
 
-.speed-dial.unset .speed-window::after {
-  border-style: dashed;
-  border-color: var(--muted);
+.speed-dial.unset .dial-knob {
+  fill: var(--muted);
+}
+
+.dial-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.4fr;
+  gap: 3px;
+}
+
+.dial-buttons .secondary.small {
+  padding: 7px 0;
+  font-size: 12px;
 }
 
 .secondary.small {

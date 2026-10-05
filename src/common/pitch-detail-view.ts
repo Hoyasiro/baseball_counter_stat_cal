@@ -26,7 +26,8 @@ import {
   PITCH_TYPE_LABEL,
   pitchLabel,
 } from './labels';
-import { speedWheel } from './speed-wheel';
+import { Hand } from './settings';
+import { speedDial } from './speed-dial';
 import { fieldingChips } from './fielding-view';
 import { popup } from './popup';
 
@@ -100,7 +101,7 @@ function sheetResultLabel(sheet: PitchSheet): string {
 }
 
 /** 결과 버튼을 누른 뒤 뜨는 투구 상세 창(팝업) */
-export function pitchSheetView(sheet: PitchSheet, speedStart: number, actions: PitchSheetActions): HTMLElement {
+export function pitchSheetView(sheet: PitchSheet, hand: Hand, actions: PitchSheetActions): HTMLElement {
   // 다이얼 값은 다시 그리지 않고 담기만 하므로, 다른 값을 고르거나 기록할 때 최신 구속을 함께 넘긴다.
   let speed = sheet.speed;
   const changeSpeed = (value: number | null): void => {
@@ -137,7 +138,7 @@ export function pitchSheetView(sheet: PitchSheet, speedStart: number, actions: P
             sheet.zone ? h('button', { className: 'link-button', text: '지우기', onClick: () => set({ zone: null }) }) : null,
           ]),
         ]),
-        speedWheel(sheet.speed, speedStart, changeSpeed),
+        speedDial(sheet.speed, hand, changeSpeed),
       ]),
       h('div', { className: 'confirm-buttons sheet-buttons' }, [
         h('button', { className: 'secondary', text: PITCH_SHEET_LABEL.skip, onClick: () => actions.skip(latest()) }),

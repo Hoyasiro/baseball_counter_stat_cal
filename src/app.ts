@@ -12,7 +12,6 @@ import { backupJson, exportFileName, pitchesCsv } from './common/export';
 import { EMPTY_PITCH_DETAIL, FieldDraft, PitchDetail, PitchSheet, isBattedResult } from './common/pitch-detail-view';
 import { Hand, loadHand, saveHand } from './common/settings';
 import { FIELDING_PLAYS, PlayFieldingDraft } from './common/fielding-view';
-import { SPEED_WHEEL_START, lastSpeedOf } from './common/speed-wheel';
 import { settingsView } from './common/settings-view';
 import {
   Game,
@@ -620,7 +619,7 @@ export function mountApp(root: HTMLElement): void {
             sceneDraft: state.sceneDraft,
             detailMode: state.detailMode,
             pitchSheet: state.pitchSheet,
-            speedStart: lastSpeedOf(events) ?? SPEED_WHEEL_START,
+            hand: state.hand,
             fieldDraft: state.fieldDraft,
             playFielding: state.playFielding,
           },
