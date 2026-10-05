@@ -2,7 +2,7 @@
 
 import { h } from './dom';
 import { GAME_TYPES, GameType, Team } from './events';
-import { GAME_TYPE_LABEL, Game, GameInfo, dateLabel, gameInfo, opponentLabel } from './game';
+import { GAME_TYPE_LABEL, Game, GameInfo, OPPONENT_MAX_LENGTH, dateLabel, gameInfo, opponentLabel, recentOpponents, shiftDate, today } from './game';
 import { DOWNLOAD_LABEL, IMPORT_LABEL } from './labels';
 import { GameReplay } from './replay';
 
@@ -39,7 +39,7 @@ function picker<T extends string>(options: readonly [T, string][], selected: T, 
   return h('div', { className }, buttons);
 }
 
-function formView(form: GameForm, hasGames: boolean, actions: GamesActions): HTMLElement {
+function formView(form: GameForm, hasGames: boolean, opponents: readonly string[], actions: GamesActions): HTMLElement {
   // 입력할 때마다 다시 그리면 키보드가 닫히므로, 값은 그때그때 담아 두고 저장할 때 한 번에 쓴다.
   let current = form;
   const update = (info: Partial<GameInfo>): void => {
@@ -51,15 +51,51 @@ function formView(form: GameForm, hasGames: boolean, actions: GamesActions): HTM
   dateInput.addEventListener('input', () => update({ date: dateInput.value }));
 
   const opponentInput = h('input', {
-    attrs: { id: 'game-opponent', type: 'text', value: form.info.opponent, placeholder: '예: 서울 ○○초', autocomplete: 'off' },
+    attrs: {
+      id: 'game-opponent',
+      type: 'text',
+      value: form.info.opponent,
+      placeholder: '예: 서울 ○○초',
+      autocomplete: 'off',
+      enterkeyhint: 'done',
+      maxlength: String(OPPONENT_MAX_LENGTH),
+    },
   });
   opponentInput.addEventListener('input', () => update({ opponent: opponentInput.value }));
+
+  // 키보드를 열지 않아도 되게: 날짜는 오늘·어제를, 상대팀은 예전에 입력한 이름을 눌러 고른다.
+  const todayText = today();
+  const dateChips = quickChips(
+    [
+      [todayText, '오늘'],
+      [shiftDate(todayText, -1), '어제'],
+    ],
+    form.info.date,
+    (date) => {
+      dateInput.value = date;
+      update({ date });
+    },
+  );
+  const opponentChips =
+    opponents.length > 0
+      ? quickChips(
+          opponents.map((name) => [name, name] as [string, string]),
+          form.info.opponent.trim(),
+          (name) => {
+            opponentInput.value = name;
+            update({ opponent: name });
+          },
+        )
+      : null;
 
   return h('section', { className: 'game-form' }, [
     h('h2', { text: form.gameId ? '경기 정보 고치기' : '새 경기' }),
     hasGames ? null : h('p', { className: 'help', text: '먼저 오늘 경기 정보를 입력하세요. 나중에 고칠 수 있어요.' }),
     h('label', { attrs: { for: 'game-date' } }, ['날짜', dateInput]),
+    dateChips,
     h('label', { attrs: { for: 'game-opponent' } }, ['상대팀', opponentInput]),
+    opponentChips ? h('p', { className: 'help quick-help', text: '예전 상대팀을 누르면 바로 들어가요' }) : null,
+    opponentChips,
     h('div', { className: 'field' }, [
       h('span', { text: '경기 구분' }),
       picker<GameType>(GAME_TYPES.map((t) => [t, GAME_TYPE_LABEL[t]]), form.info.gameType, (t) => update({ gameType: t }), 'type-picker'),
@@ -84,6 +120,20 @@ function formView(form: GameForm, hasGames: boolean, actions: GamesActions): HTM
     // 휴대폰을 바꾼 첫 화면에서도 예전 기록을 옮겨 올 수 있게 한다.
     hasGames ? null : h('div', { className: 'import-first' }, [h('p', { className: 'help', text: '예전에 내려받은 백업 파일이 있나요?' }), importButton(actions)]),
   ]);
+}
+
+/** 누르면 입력 칸에 바로 들어가는 작은 단추 줄 */
+function quickChips(options: readonly [string, string][], selected: string, onPick: (value: string) => void): HTMLElement {
+  const buttons = options.map(([value, label]) =>
+    h('button', { className: value === selected ? 'active' : '', text: label, attrs: { type: 'button', 'data-value': value } }),
+  );
+  buttons.forEach((b) =>
+    b.addEventListener('click', () => {
+      onPick(b.dataset.value ?? '');
+      buttons.forEach((x) => x.classList.toggle('active', x === b));
+    }),
+  );
+  return h('div', { className: 'quick-chips' }, buttons);
 }
 
 /** 숨긴 파일 선택 칸을 버튼으로 연다. */
@@ -148,7 +198,7 @@ export function gamesView(
   actions: GamesActions,
   replayOf: (g: Game) => GameReplay,
 ): HTMLElement {
-  if (form) return formView(form, games.length > 0, actions);
+  if (form) return formView(form, games.length > 0, recentOpponents(games), actions);
   const sorted = [...games].sort((a, b) => gameInfo(b).date.localeCompare(gameInfo(a).date) || b.createdAt.localeCompare(a.createdAt));
   return h('section', { className: 'games' }, [
     h('button', { className: 'primary new-game', text: '+ 새 경기', onClick: actions.openNew }),

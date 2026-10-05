@@ -148,7 +148,7 @@ button:disabled {
   width: 100%;
   max-width: 480px;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   background: var(--surface);
   border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom);
@@ -156,7 +156,8 @@ button:disabled {
 
 .tabbar button {
   padding: 14px 0;
-  font-size: 13px;
+  /* 탭 6개가 한 줄에 들어가도록 */
+  font-size: 12px;
   background: transparent;
   color: var(--muted);
   font-weight: 600;
@@ -970,7 +971,7 @@ button {
 .controls {
   display: grid;
   gap: 10px;
-  padding-top: 8px;
+  padding-top: 4px;
 }
 
 .pitch-pad {
@@ -1605,20 +1606,42 @@ button {
 }
 
 /* ── 투구 상세 ── */
+/* 켜고 끄는 단추는 엄지 쪽에 붙인다. 오른손이면 오른쪽, 왼손이면 왼쪽 (data-hand는 app.ts가 단다). */
+.detail-toggle-row {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  gap: 8px;
+}
+
+[data-hand='left'] .detail-toggle-row {
+  flex-direction: row;
+}
+
+.detail-toggle-hint {
+  flex: 1;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+[data-hand='right'] .detail-toggle-hint {
+  text-align: right;
+}
+
 .detail-toggle {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 4px;
-  background: transparent;
+  min-height: 40px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
   color: var(--muted);
-  font-size: 14px;
-  font-weight: 600;
-  justify-self: start;
-}
-
-.detail-toggle small {
-  font-weight: 400;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .switch {
@@ -1643,6 +1666,7 @@ button {
 
 .detail-toggle.on {
   color: var(--primary);
+  border-color: var(--primary);
 }
 
 .detail-toggle.on .switch {
@@ -1659,31 +1683,64 @@ button {
   }
 }
 
-.pitch-detail {
+/* 투구 상세 창: 상황판이 보이도록 아래에서 올라온다. */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(0 0 0 / 0.3);
+}
+
+.pitch-sheet {
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-  padding: 6px;
-  border-radius: var(--radius);
+  gap: 10px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-radius: 18px 18px 0 0;
   background: var(--surface);
-  border: 1px solid var(--line);
+  box-shadow: 0 -4px 20px rgb(0 0 0 / 0.2);
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sheet-head .section-title {
+  margin: 0;
+}
+
+.sheet-head .link-button {
+  white-space: nowrap;
 }
 
 .pitch-type-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
+  gap: 6px;
 }
 
 .pitch-type-row button,
 .strength-row button {
-  padding: 7px 0;
-  border-radius: 8px;
+  padding: 10px 0;
+  border-radius: 10px;
   background: var(--primary-soft);
   border: 1px solid var(--line);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
+}
+
+.strength-row button {
+  padding: 7px 0;
+  font-size: 12px;
 }
 
 .pitch-type-row button.active,
@@ -1694,6 +1751,30 @@ button {
   color: var(--on-color);
 }
 
+/* 존은 크게(세밀하게 찍도록), 오른손이면 오른쪽에 둔다. */
+.sheet-body {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  grid-template-areas: 'wheel zone';
+  gap: 12px;
+  align-items: start;
+}
+
+[data-hand='left'] .sheet-body {
+  grid-template-columns: minmax(0, 1fr) 104px;
+  grid-template-areas: 'zone wheel';
+}
+
+.sheet-zone {
+  grid-area: zone;
+  display: grid;
+  gap: 4px;
+}
+
+.speed-dial {
+  grid-area: wheel;
+}
+
 .zone-pick,
 .field-pick {
   position: relative;
@@ -1702,87 +1783,105 @@ button {
 }
 
 .zone-caption {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  min-height: 28px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.zone-caption .link-button {
+  padding: 4px 6px;
+}
+
+[data-hand='left'] .sheet-buttons .primary {
+  order: -1;
+}
+
+/* 구속 다이얼: 정해진 범위(30~180) 숫자만 위아래로 돌린다. */
+.speed-dial {
+  display: grid;
+  gap: 6px;
+}
+
+.speed-readout {
+  margin: 0;
+  min-height: 30px;
   text-align: center;
-  font-size: 11px;
-  color: #fff;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.speed-readout strong {
+  font-size: 22px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.speed-window {
+  position: relative;
+  height: 220px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+/* 가운데 칸 = 고른 값 (WHEEL_ITEM_HEIGHT 44px × 위아래 2칸) */
+.speed-window::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 88px;
+  height: 44px;
+  border-radius: 8px;
+  border: 2px solid var(--primary);
   pointer-events: none;
 }
 
-.speed-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px;
-  align-items: center;
+.speed-wheel {
+  height: 100%;
+  margin: 0;
+  padding: 88px 0;
+  list-style: none;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  overscroll-behavior: contain;
 }
 
-.pitch-detail-side {
-  display: grid;
-  gap: 6px;
+.speed-wheel::-webkit-scrollbar {
+  display: none;
 }
 
-.speed-field {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.speed-wheel li {
+  height: 44px;
+  line-height: 44px;
+  text-align: center;
+  font-size: 20px;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  scroll-snap-align: center;
+  cursor: pointer;
 }
 
-.speed-field input {
-  width: 100%;
-  min-width: 0;
-  padding: 6px 8px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: var(--bg);
-  color: var(--text);
-  font: inherit;
-  font-size: 17px;
-  font-variant-numeric: tabular-nums;
+.speed-dial.unset .speed-wheel li {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+.speed-dial.unset .speed-window::after {
+  border-style: dashed;
+  border-color: var(--muted);
 }
 
 .secondary.small {
   padding: 8px;
   font-size: 13px;
-}
-
-/* 투구 상세를 켜면 한 화면에 들어가도록 버튼 설명을 숨기고 높이를 줄인다. */
-.controls.detail-on {
-  gap: 6px;
-}
-
-.controls.detail-on .pitch {
-  min-height: 42px;
-  padding: 4px;
-}
-
-.controls.detail-on .pitch small,
-.controls.detail-on .play small,
-.controls.detail-on .pad-title {
-  display: none;
-}
-
-.controls.detail-on .pitch.extra {
-  min-height: 36px;
-}
-
-.controls.detail-on .play {
-  padding: 8px 2px;
-}
-
-.controls.detail-on .runner-section {
-  padding: 8px;
-}
-
-.controls.detail-on .undo {
-  padding: 8px;
-}
-
-.controls.detail-on .detail-toggle {
-  padding: 2px 4px;
 }
 
 /* ── 타구 기록 ── */
@@ -2086,4 +2185,75 @@ input[type='file'].visually-hidden {
 .import-first small {
   color: var(--muted);
   font-weight: 400;
+}
+
+/* ── 설정 ── */
+.settings {
+  display: grid;
+  gap: 12px;
+}
+
+.settings h2,
+.settings h3 {
+  margin: 0;
+}
+
+.settings-item {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.settings-item .help {
+  margin: 0;
+}
+
+.hand-picker {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.hand-picker button {
+  min-height: 56px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.hand-picker button.active {
+  background: var(--bar);
+  border-color: var(--bar);
+  color: var(--on-color);
+}
+
+/* ── 경기 정보 빠른 입력 ── */
+.quick-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: -6px;
+}
+
+.quick-chips button {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 14px;
+}
+
+.quick-chips button.active {
+  border-color: var(--primary);
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.quick-help {
+  margin: -6px 0 0;
 }

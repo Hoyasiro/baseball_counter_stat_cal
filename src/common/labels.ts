@@ -1,5 +1,6 @@
 // 화면에 보이는 쉬운 말 (CLAUDE.md 0.4). 입력은 상황 기준 하나이므로 투수·타자가 같은 말을 쓴다.
 
+import { Hand } from './settings';
 import { BASE_NAMES, STEAL_NAMES, basesLabel } from './bases';
 import {
   BattedBallStrength,
@@ -17,7 +18,7 @@ import { halfInningLabel } from './innings';
 import { Actor, PlateAppearance, PlateAppearanceOutcome, RunnerEventKind } from './replay';
 
 /** 아래 탭 이름 */
-export type AppTab = 'input' | 'records' | 'pitcher' | 'batter' | 'games';
+export type AppTab = 'input' | 'records' | 'pitcher' | 'batter' | 'games' | 'settings';
 
 export const TAB_LABEL: Record<AppTab, string> = {
   input: '기록 입력',
@@ -25,6 +26,7 @@ export const TAB_LABEL: Record<AppTab, string> = {
   pitcher: '투수 분석',
   batter: '타자 분석',
   games: '경기',
+  settings: '설정',
 };
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -117,6 +119,11 @@ export const FIELD_BUTTON_LABEL = { skip: '타구 기록 건너뛰기', save: '�
 /** 투구 상세 스위치 */
 export const PITCH_DETAIL_LABEL = '투구 상세';
 
+/** 투구 상세 창의 버튼 */
+export const PITCH_SHEET_LABEL = { save: '이 공 기록', next: '다음: 타구 기록', skip: '상세 없이 기록' } as const;
+
+export const HAND_LABEL: Record<Hand, string> = { right: '오른손', left: '왼손' };
+
 /** 데이터 내려받기 버튼 */
 export const DOWNLOAD_LABEL = { json: '백업 파일 (JSON)', csv: '표 파일 (CSV, 엑셀)' } as const;
 
@@ -141,7 +148,7 @@ const PITCH_LABEL: Record<PitchResult, string> = {
   hitByPitch: '몸에 맞음',
 };
 
-export function pitchLabel(pitch: PitchEvent): string {
+export function pitchLabel(pitch: Pick<PitchEvent, 'result' | 'hitType'>): string {
   if (pitch.result === 'hit') return HIT_TYPE_LABEL[pitch.hitType ?? 'single'];
   return PITCH_LABEL[pitch.result];
 }

@@ -26,15 +26,7 @@ import {
 import { LineScore } from './line-score';
 import { ActiveState, GameReplay } from './replay';
 import { SceneDraft, SceneSetupActions, defaultRole, defaultSceneDraft, sceneSetupView } from './scene-setup-view';
-import {
-  FieldActions,
-  FieldDraft,
-  PitchDetailActions,
-  PitchDraft,
-  fieldPanel,
-  pitchDetailPanel,
-  pitchDetailToggle,
-} from './pitch-detail-view';
+import { FieldActions, FieldDraft, PitchSheet, PitchSheetActions, fieldPanel, pitchDetailToggle, pitchSheetView } from './pitch-detail-view';
 
 export interface SituationDraft {
   readonly inning: number;
@@ -62,7 +54,8 @@ export interface InputActions {
   openGames: () => void;
   openScoreboard: () => void;
   scene: SceneSetupActions;
-  detail: PitchDetailActions;
+  toggleDetail: () => void;
+  sheet: PitchSheetActions;
   field: FieldActions;
 }
 
@@ -77,7 +70,10 @@ export interface InputModel {
   /** 등장 설정이 열려 있으면 그 값 */
   readonly sceneDraft: SceneDraft | null;
   readonly detailMode: boolean;
-  readonly pitchDraft: PitchDraft;
+  /** 투구 상세 창이 열려 있으면 그 값 */
+  readonly pitchSheet: PitchSheet | null;
+  /** 구속 다이얼이 처음 멈춰 있을 곳 */
+  readonly speedStart: number;
   /** 친 공의 낙구 지점·질을 고르는 중이면 그 값 */
   readonly fieldDraft: FieldDraft | null;
 }
@@ -409,9 +405,7 @@ function controls(model: InputModel, actions: InputActions): HTMLElement {
   // 친 공은 야구장 그림에서 낙구 지점과 질을 고른 뒤 기록한다.
   if (model.fieldDraft) return h('div', { className: 'controls' }, [fieldPanel(model.fieldDraft, actions.field)]);
 
-  const detail = model.detailMode
-    ? [pitchDetailToggle(true, actions.detail), pitchDetailPanel(model.pitchDraft, actions.detail)]
-    : [pitchDetailToggle(false, actions.detail)];
+  const detail = pitchDetailToggle(model.detailMode, actions.toggleDetail);
 
   const openEditor = (): void =>
     actions.editSituation({
@@ -424,16 +418,16 @@ function controls(model: InputModel, actions: InputActions): HTMLElement {
     });
 
   if (state.role === 'runner') {
-    return h('div', { className: `controls${model.detailMode ? ' detail-on' : ''}` }, [
+    return h('div', { className: 'controls' }, [
       childRunnerPad(state, actions, openEditor),
-      ...detail,
+      detail,
       pitchPad(actions, chooser, '지금 타자의 공 (기록하면 아이가 자동으로 진루)'),
       undoButton(events, actions),
     ]);
   }
 
-  return h('div', { className: `controls${model.detailMode ? ' detail-on' : ''}` }, [
-    ...detail,
+  return h('div', { className: 'controls' }, [
+    detail,
     pitchPad(actions, chooser, null),
     runnerPad(state.bases, chooser, actions, openEditor),
     undoButton(events, actions),
@@ -441,5 +435,9 @@ function controls(model: InputModel, actions: InputActions): HTMLElement {
 }
 
 export function inputView(model: InputModel, actions: InputActions): HTMLElement {
-  return h('section', { className: 'input' }, [h('div', { className: 'board-sticky' }, [board(model, actions)]), controls(model, actions)]);
+  return h('section', { className: 'input' }, [
+    h('div', { className: 'board-sticky' }, [board(model, actions)]),
+    controls(model, actions),
+    model.pitchSheet ? pitchSheetView(model.pitchSheet, model.speedStart, actions.sheet) : null,
+  ]);
 }

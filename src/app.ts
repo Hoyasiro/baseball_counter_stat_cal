@@ -9,7 +9,10 @@ import { BaseIndex, HitType, PitchResult, Role, activeEvents, playEvents } from 
 import { mergeGames, mergeSummary, parseBackup } from './common/backup-import';
 import { downloadFile } from './common/download';
 import { backupJson, exportFileName, pitchesCsv } from './common/export';
-import { EMPTY_PITCH_DRAFT, FieldDraft, PitchDraft, parseSpeed } from './common/pitch-detail-view';
+import { EMPTY_PITCH_DETAIL, FieldDraft, PitchDetail, PitchSheet, isBattedResult } from './common/pitch-detail-view';
+import { Hand, loadHand, saveHand } from './common/settings';
+import { SPEED_WHEEL_START, lastSpeedOf } from './common/speed-wheel';
+import { settingsView } from './common/settings-view';
 import {
   Game,
   GameInfo,
@@ -25,6 +28,7 @@ import {
   gameShortLabel,
   setGameInfo,
   today,
+  OPPONENT_MAX_LENGTH,
 } from './common/game';
 import { GameForm, gamesView } from './common/games-view';
 import { Chooser, SituationDraft, inputView } from './common/input-view';
@@ -43,7 +47,7 @@ const LEGACY_STORAGE_KEYS = ['baseball-counter.pitcher.games.v2', 'baseball-coun
 
 type Tab = AppTab;
 
-const TABS: readonly Tab[] = ['input', 'records', 'pitcher', 'batter', 'games'];
+const TABS: readonly Tab[] = ['input', 'records', 'pitcher', 'batter', 'games', 'settings'];
 
 interface State {
   games: Game[];
@@ -63,8 +67,10 @@ interface State {
   tutorialStep: number | null;
   /** 투구 상세(구종·존·구속)를 함께 기록하는지 */
   detailMode: boolean;
-  pitchDraft: PitchDraft;
+  pitchSheet: PitchSheet | null;
   fieldDraft: FieldDraft | null;
+  /** 엄지가 닿는 쪽 (설정) */
+  hand: Hand;
 }
 
 const DETAIL_MODE_KEY = 'baseball-counter.pitch-detail';
@@ -106,6 +112,7 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export function validateInfo(info: GameInfo): string | null {
   if (!DATE_PATTERN.test(info.date)) return '경기 날짜를 골라 주세요.';
+  if (info.opponent.trim().length > OPPONENT_MAX_LENGTH) return `상대팀 이름은 ${OPPONENT_MAX_LENGTH}자까지 넣을 수 있어요.`;
   return null;
 }
 
@@ -141,8 +148,9 @@ export function mountApp(root: HTMLElement): void {
     helpOpen: false,
     tutorialStep: hasSeenTutorial() ? null : 0,
     detailMode: loadDetailMode(),
-    pitchDraft: EMPTY_PITCH_DRAFT,
+    pitchSheet: null,
     fieldDraft: null,
+    hand: loadHand(),
   };
 
   const currentGame = (): Game | undefined => state.games.find((g) => g.id === state.currentGameId);
@@ -170,25 +178,24 @@ export function mountApp(root: HTMLElement): void {
     state.sceneDraft = null;
     state.scoreDraft = null;
     state.fieldDraft = null;
+    state.pitchSheet = null;
     render();
     window.scrollTo(0, 0);
   };
 
-  /** 공 하나를 기록한다. 투구 상세를 켜 두었으면 구종·존·구속을 함께 남기고 비운다. */
-  const recordPitch = (result: PitchResult, extra: { hitType?: HitType; battedBall?: FieldDraft | null }): void => {
-    const draft = state.detailMode ? state.pitchDraft : EMPTY_PITCH_DRAFT;
-    const speed = parseSpeed(draft.speedText);
-    state.notice = draft.speedText.trim() !== '' && speed === null ? '구속은 30~180 사이 숫자로 넣어 주세요. 이번 공은 구속 없이 기록했습니다.' : null;
+  /** 공 하나를 기록한다. 투구 상세 창에서 고른 구종·존·구속이 있으면 함께 남긴다. */
+  const recordPitch = (result: PitchResult, extra: { hitType?: HitType; pitch: PitchDetail; battedBall?: FieldDraft | null }): void => {
+    const detail = extra.pitch;
     const ball = extra.battedBall;
-    state.pitchDraft = EMPTY_PITCH_DRAFT;
+    state.pitchSheet = null;
     state.fieldDraft = null;
     state.chooser = null;
     updateCurrent((g) =>
       addPitch(g, result, {
         hitType: extra.hitType,
-        pitchType: draft.pitchType ?? undefined,
-        zone: draft.zone ?? undefined,
-        speed: speed ?? undefined,
+        pitchType: detail.pitchType ?? undefined,
+        zone: detail.zone ?? undefined,
+        speed: detail.speed ?? undefined,
         battedBall: ball ? { x: ball.x, y: ball.y, type: ball.type, strength: ball.strength } : undefined,
       }),
     );
@@ -199,29 +206,46 @@ export function mountApp(root: HTMLElement): void {
     return game ? replayOf(game) : null;
   };
 
+  /** 친 공은 야구장 그림에서 낙구 지점과 질을 고른 뒤 기록한다. 나머지는 바로 기록한다. */
+  const afterPitchDetail = (result: PitchResult, hitType: HitType | undefined, pitch: PitchDetail): void => {
+    if (isBattedResult(result)) {
+      state.pitchSheet = null;
+      state.fieldDraft = { result, hitType, x: null, y: null, type: null, strength: null, pitch };
+      render();
+      return;
+    }
+    recordPitch(result, { hitType, pitch });
+  };
+
   const inputActions = {
     pitch: (result: PitchResult, hitType?: HitType) => {
-      // 친 공은 야구장 그림에서 낙구 지점과 질을 고른 뒤 기록한다.
-      if (result === 'hit' || result === 'out' || result === 'reachedOnError') {
-        state.chooser = null;
-        state.fieldDraft = { result, hitType, x: null, y: null, type: null, strength: null };
+      state.chooser = null;
+      // 투구 상세를 켜 두었으면 그 공의 구종·존·구속을 고르는 창부터 연다.
+      if (state.detailMode) {
+        state.pitchSheet = { result, hitType, ...EMPTY_PITCH_DETAIL };
         render();
         return;
       }
-      recordPitch(result, { hitType });
+      afterPitchDetail(result, hitType, EMPTY_PITCH_DETAIL);
     },
-    detail: {
-      toggle: () => {
-        state.detailMode = !state.detailMode;
-        saveDetailMode(state.detailMode);
+    toggleDetail: () => {
+      state.detailMode = !state.detailMode;
+      saveDetailMode(state.detailMode);
+      render();
+    },
+    sheet: {
+      change: (sheet: PitchSheet) => {
+        state.pitchSheet = sheet;
         render();
       },
-      change: (draft: PitchDraft) => {
-        state.pitchDraft = draft;
-        render();
+      changeSpeed: (speed: number | null) => {
+        if (state.pitchSheet) state.pitchSheet = { ...state.pitchSheet, speed };
       },
-      changeSpeed: (text: string) => {
-        state.pitchDraft = { ...state.pitchDraft, speedText: text };
+      save: (sheet: PitchSheet) => afterPitchDetail(sheet.result, sheet.hitType, { pitchType: sheet.pitchType, zone: sheet.zone, speed: sheet.speed }),
+      skip: (sheet: PitchSheet) => afterPitchDetail(sheet.result, sheet.hitType, EMPTY_PITCH_DETAIL),
+      cancel: () => {
+        state.pitchSheet = null;
+        render();
       },
     },
     field: {
@@ -229,8 +253,8 @@ export function mountApp(root: HTMLElement): void {
         state.fieldDraft = draft;
         render();
       },
-      save: (draft: FieldDraft) => recordPitch(draft.result, { hitType: draft.hitType, battedBall: draft }),
-      skip: (draft: FieldDraft) => recordPitch(draft.result, { hitType: draft.hitType }),
+      save: (draft: FieldDraft) => recordPitch(draft.result, { hitType: draft.hitType, pitch: draft.pitch, battedBall: draft }),
+      skip: (draft: FieldDraft) => recordPitch(draft.result, { hitType: draft.hitType, pitch: draft.pitch }),
       cancel: () => {
         state.fieldDraft = null;
         render();
@@ -464,8 +488,17 @@ export function mountApp(root: HTMLElement): void {
     },
   };
 
+  const settingsActions = {
+    hand: (hand: Hand) => {
+      state.hand = hand;
+      saveHand(hand);
+      render();
+    },
+  };
+
   const renderBody = (game: Game | undefined): HTMLElement => {
     if (state.helpOpen) return manualView(helpActions);
+    if (state.tab === 'settings') return settingsView(state.hand, settingsActions);
     if (state.tab === 'games' || !game) {
       return gamesView(state.games, state.currentGameId, state.form, gamesActions, replayOf);
     }
@@ -486,7 +519,8 @@ export function mountApp(root: HTMLElement): void {
             chooser: state.chooser,
             sceneDraft: state.sceneDraft,
             detailMode: state.detailMode,
-            pitchDraft: state.pitchDraft,
+            pitchSheet: state.pitchSheet,
+            speedStart: lastSpeedOf(events) ?? SPEED_WHEEL_START,
             fieldDraft: state.fieldDraft,
           },
           inputActions,
@@ -523,7 +557,7 @@ export function mountApp(root: HTMLElement): void {
           h('button', {
             className: state.tab === tab && !state.helpOpen ? 'active' : '',
             text: TAB_LABEL[tab],
-            disabled: tab !== 'games' && !game,
+            disabled: tab !== 'games' && tab !== 'settings' && !game,
             onClick: () => go(tab),
           }),
         ),
@@ -537,6 +571,8 @@ export function mountApp(root: HTMLElement): void {
       children.splice(1, 0, h('p', { className: 'notice', text: state.notice, onClick: dismiss }));
     }
     if (state.tutorialStep !== null) children.push(tutorialView(state.tutorialStep, tutorialActions));
+    // 손 설정에 따라 CSS가 자주 누르는 단추를 엄지 쪽으로 옮긴다.
+    root.dataset.hand = state.hand;
     root.replaceChildren(...children);
   };
 
