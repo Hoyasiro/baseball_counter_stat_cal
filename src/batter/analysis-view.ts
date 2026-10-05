@@ -1,6 +1,6 @@
 // 타자 분석 화면: 아이가 타자·주자로 나온 장면만 (CLAUDE.md 0.5)
 
-import { AnalysisActions, AnalysisScope, AnalysisTab, analysisHeader, countTable, processCard, resultCards } from '../common/analysis-ui';
+import { AnalysisActions, AnalysisScope, AnalysisTab, analysisHeader, chartCards, countTable, processCard, resultCards } from '../common/analysis-ui';
 import { h } from '../common/dom';
 import { GameForStats } from '../common/stat-base';
 import { END_COUNT_BASIS, summarize } from './stats';
@@ -32,6 +32,8 @@ export function batterAnalysisView(
     ...header,
     empty,
     ...summary.sections.flatMap(resultCards),
+    h('h2', { text: '그림으로 보기' }),
+    chartCards(summary.charts.zone, summary.charts.spray, '본 공 존 분포', '친 타구 분포'),
     h('h2', { text: '카운트별 타율' }),
     h('p', { className: 'basis', text: END_COUNT_BASIS }),
     countTable(

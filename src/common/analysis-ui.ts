@@ -3,6 +3,7 @@
 import { Calculation, formatSources } from './calculation';
 import { Count, countLabel } from './count';
 import { h } from './dom';
+import { DrawPoint, LegendItem, chartCard, fieldSvg, zoneSvg } from './field-view';
 
 export type AnalysisTab = 'result' | 'process';
 export type AnalysisScope = 'game' | 'all';
@@ -99,6 +100,42 @@ export function countTable(rows: readonly CountTableRow[], rateTitle: string): H
           ]),
         ),
       ),
+    ]),
+  ]);
+}
+
+const ZONE_LEGEND: readonly LegendItem[] = [
+  { kind: 'strike', label: '스트라이크·파울' },
+  { kind: 'ball', label: '볼' },
+  { kind: 'inPlay', label: '친 공' },
+];
+
+const SPRAY_LEGEND: readonly LegendItem[] = [
+  { kind: 'hit', label: '안타' },
+  { kind: 'out', label: '아웃' },
+  { kind: 'error', label: '실책 출루' },
+];
+
+/** 존 분포·타구 분포 그림 두 장 */
+export function chartCards(zone: readonly DrawPoint[], spray: readonly DrawPoint[], zoneTitle: string, sprayTitle: string): HTMLElement {
+  return h('div', { className: 'chart-grid' }, [
+    chartCard(zoneTitle, zoneSvg({ points: zone, label: `${zoneTitle} ${zone.length}개` }), ZONE_LEGEND, `존을 찍은 공 ${zone.length}개 · 가운데 네모가 스트라이크 존 (포수 쪽에서 본 모습)`),
+    chartCard(sprayTitle, fieldSvg({ points: spray, label: `${sprayTitle} ${spray.length}개` }), SPRAY_LEGEND, `낙구 지점을 찍은 타구 ${spray.length}개`),
+  ]);
+}
+
+export interface TableColumn<T> {
+  readonly title: string;
+  readonly value: (row: T) => string;
+}
+
+/** 간단한 표 (구종별 기록 등) */
+export function dataTable<T>(rows: readonly T[], columns: readonly TableColumn<T>[], empty: string): HTMLElement {
+  if (rows.length === 0) return h('p', { className: 'empty', text: empty });
+  return h('div', { className: 'table-wrap' }, [
+    h('table', {}, [
+      h('thead', {}, [h('tr', {}, columns.map((c) => h('th', { text: c.title })))]),
+      h('tbody', {}, rows.map((row) => h('tr', {}, columns.map((c) => h('td', { text: c.value(row) }))))),
     ]),
   ]);
 }

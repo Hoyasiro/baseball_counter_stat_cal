@@ -3,6 +3,7 @@
 import { h } from './dom';
 import { GAME_TYPES, GameType, Team } from './events';
 import { GAME_TYPE_LABEL, Game, GameInfo, dateLabel, gameInfo, opponentLabel } from './game';
+import { DOWNLOAD_LABEL } from './labels';
 import { GameReplay } from './replay';
 
 export interface GameForm {
@@ -19,6 +20,7 @@ export interface GamesActions {
   changeForm: (form: GameForm) => void;
   cancelForm: () => void;
   saveForm: (form: GameForm) => void;
+  download: (kind: 'backup' | 'pitches') => void;
 }
 
 
@@ -81,6 +83,21 @@ function formView(form: GameForm, hasGames: boolean, actions: GamesActions): HTM
   ]);
 }
 
+function downloadSection(actions: GamesActions): HTMLElement {
+  return h('section', { className: 'download-section' }, [
+    h('h2', { text: '데이터 내려받기' }),
+    h('p', { className: 'help', text: '모든 경기 기록을 파일로 저장합니다. 휴대폰을 바꾸거나 브라우저 데이터를 지우기 전에 백업해 두세요.' }),
+    h('button', { className: 'secondary', onClick: () => actions.download('backup') }, [
+      h('strong', { text: DOWNLOAD_LABEL.json }),
+      h('small', { text: '모든 기록을 그대로 저장 (보관·옮기기용)' }),
+    ]),
+    h('button', { className: 'secondary', onClick: () => actions.download('pitches') }, [
+      h('strong', { text: DOWNLOAD_LABEL.csv }),
+      h('small', { text: '공 하나당 한 줄 · 엑셀·구글 시트에서 열기' }),
+    ]),
+  ]);
+}
+
 function gameCard(game: Game, isCurrent: boolean, replay: GameReplay, actions: GamesActions): HTMLElement {
   const info = gameInfo(game);
   const pitched = replay.plateAppearances.filter((pa) => pa.actor === 'opponent');
@@ -112,5 +129,6 @@ export function gamesView(
   return h('section', { className: 'games' }, [
     h('button', { className: 'primary new-game', text: '+ 새 경기', onClick: actions.openNew }),
     ...sorted.map((g) => gameCard(g, g.id === currentGameId, replayOf(g), actions)),
+    games.length > 0 ? downloadSection(actions) : null,
   ]);
 }

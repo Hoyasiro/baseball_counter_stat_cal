@@ -6,6 +6,9 @@ import { batterAnalysisView } from './batter/analysis-view';
 import { AnalysisScope, AnalysisTab } from './common/analysis-ui';
 import { h } from './common/dom';
 import { BaseIndex, HitType, PitchResult, Role, activeEvents, playEvents } from './common/events';
+import { downloadFile } from './common/download';
+import { backupJson, exportFileName, pitchesCsv } from './common/export';
+import { EMPTY_PITCH_DRAFT, FieldDraft, PitchDraft, parseSpeed } from './common/pitch-detail-view';
 import {
   Game,
   GameInfo,
@@ -57,6 +60,29 @@ interface State {
   helpOpen: boolean;
   /** 처음 사용 안내의 몇 번째 단계인지. 닫혀 있으면 null */
   tutorialStep: number | null;
+  /** 투구 상세(구종·존·구속)를 함께 기록하는지 */
+  detailMode: boolean;
+  pitchDraft: PitchDraft;
+  fieldDraft: FieldDraft | null;
+}
+
+const DETAIL_MODE_KEY = 'baseball-counter.pitch-detail';
+
+/** 투구 상세 켜짐/꺼짐은 이 휴대폰에만 기억한다 (편의 설정). */
+function loadDetailMode(): boolean {
+  try {
+    return localStorage.getItem(DETAIL_MODE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function saveDetailMode(on: boolean): void {
+  try {
+    localStorage.setItem(DETAIL_MODE_KEY, on ? '1' : '0');
+  } catch {
+    // 기억하지 못해도 이번에는 그대로 쓴다.
+  }
 }
 
 export function replayOf(game: Game): GameReplay {
@@ -113,6 +139,9 @@ export function mountApp(root: HTMLElement): void {
     form: latest ? null : newGameForm(),
     helpOpen: false,
     tutorialStep: hasSeenTutorial() ? null : 0,
+    detailMode: loadDetailMode(),
+    pitchDraft: EMPTY_PITCH_DRAFT,
+    fieldDraft: null,
   };
 
   const currentGame = (): Game | undefined => state.games.find((g) => g.id === state.currentGameId);
@@ -139,8 +168,29 @@ export function mountApp(root: HTMLElement): void {
     state.chooser = null;
     state.sceneDraft = null;
     state.scoreDraft = null;
+    state.fieldDraft = null;
     render();
     window.scrollTo(0, 0);
+  };
+
+  /** 공 하나를 기록한다. 투구 상세를 켜 두었으면 구종·존·구속을 함께 남기고 비운다. */
+  const recordPitch = (result: PitchResult, extra: { hitType?: HitType; battedBall?: FieldDraft | null }): void => {
+    const draft = state.detailMode ? state.pitchDraft : EMPTY_PITCH_DRAFT;
+    const speed = parseSpeed(draft.speedText);
+    state.notice = draft.speedText.trim() !== '' && speed === null ? '구속은 30~180 사이 숫자로 넣어 주세요. 이번 공은 구속 없이 기록했습니다.' : null;
+    const ball = extra.battedBall;
+    state.pitchDraft = EMPTY_PITCH_DRAFT;
+    state.fieldDraft = null;
+    state.chooser = null;
+    updateCurrent((g) =>
+      addPitch(g, result, {
+        hitType: extra.hitType,
+        pitchType: draft.pitchType ?? undefined,
+        zone: draft.zone ?? undefined,
+        speed: speed ?? undefined,
+        battedBall: ball ? { x: ball.x, y: ball.y, type: ball.type, strength: ball.strength } : undefined,
+      }),
+    );
   };
 
   const currentReplay = (): GameReplay | null => {
@@ -150,9 +200,40 @@ export function mountApp(root: HTMLElement): void {
 
   const inputActions = {
     pitch: (result: PitchResult, hitType?: HitType) => {
-      state.notice = null;
-      state.chooser = null;
-      updateCurrent((g) => addPitch(g, result, hitType));
+      // 친 공은 야구장 그림에서 낙구 지점과 질을 고른 뒤 기록한다.
+      if (result === 'hit' || result === 'out' || result === 'reachedOnError') {
+        state.chooser = null;
+        state.fieldDraft = { result, hitType, x: null, y: null, type: null, strength: null };
+        render();
+        return;
+      }
+      recordPitch(result, { hitType });
+    },
+    detail: {
+      toggle: () => {
+        state.detailMode = !state.detailMode;
+        saveDetailMode(state.detailMode);
+        render();
+      },
+      change: (draft: PitchDraft) => {
+        state.pitchDraft = draft;
+        render();
+      },
+      changeSpeed: (text: string) => {
+        state.pitchDraft = { ...state.pitchDraft, speedText: text };
+      },
+    },
+    field: {
+      change: (draft: FieldDraft) => {
+        state.fieldDraft = draft;
+        render();
+      },
+      save: (draft: FieldDraft) => recordPitch(draft.result, { hitType: draft.hitType, battedBall: draft }),
+      skip: (draft: FieldDraft) => recordPitch(draft.result, { hitType: draft.hitType }),
+      cancel: () => {
+        state.fieldDraft = null;
+        render();
+      },
     },
     runner: (action: RunnerAction, base?: BaseIndex) => {
       state.chooser = null;
@@ -305,6 +386,17 @@ export function mountApp(root: HTMLElement): void {
       const game = state.games.find((g) => g.id === form.gameId);
       if (game) replaceGame(setGameInfo(game, form.info));
     },
+    download: (kind: 'backup' | 'pitches') => {
+      const file =
+        kind === 'backup'
+          ? { name: exportFileName('backup', today()), data: backupJson(state.games, new Date().toISOString()), type: 'application/json' }
+          : { name: exportFileName('pitches', today()), data: pitchesCsv(state.games, replayOf), type: 'text/csv' };
+      void downloadFile(file.name, file.data, file.type).then((result) => {
+        if (result === 'saved') return;
+        state.notice = result === 'declined' ? '내려받기를 취소했습니다.' : '이 화면에서는 파일을 내려받을 수 없습니다. 휴대폰 브라우저에서 앱을 열어 다시 해 보세요.';
+        render();
+      });
+    },
   };
 
   const analysisActions = {
@@ -367,6 +459,9 @@ export function mountApp(root: HTMLElement): void {
             draft: state.situationDraft,
             chooser: state.chooser,
             sceneDraft: state.sceneDraft,
+            detailMode: state.detailMode,
+            pitchDraft: state.pitchDraft,
+            fieldDraft: state.fieldDraft,
           },
           inputActions,
         );

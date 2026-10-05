@@ -4,7 +4,13 @@ import { describe, expect, it } from 'vitest';
 import { GAME_TYPE_LABEL } from './game';
 import { MANUAL_SECTIONS, TUTORIAL_STEPS } from './help-content';
 import {
+  BATTED_BALL_STRENGTH_LABEL,
+  BATTED_BALL_TYPE_LABEL,
   CHILD_RUNNER_BUTTONS,
+  DOWNLOAD_LABEL,
+  FIELD_BUTTON_LABEL,
+  PITCH_DETAIL_LABEL,
+  PITCH_TYPE_LABEL,
   EXTRA_PITCH_BUTTONS,
   HIT_BUTTONS,
   MAIN_PITCH_BUTTONS,
@@ -36,6 +42,15 @@ describe('도움말이 화면과 맞는지', () => {
     expect(missing(Object.values(POSITION_LABEL))).toEqual([]);
     expect(missing(Object.values(GAME_TYPE_LABEL))).toEqual([]);
     expect(missing(Object.values(TAB_LABEL))).toEqual([]);
+  });
+
+  it('타구 기록·투구 상세·내려받기 버튼이 매뉴얼에 있다', () => {
+    expect(missing(Object.values(BATTED_BALL_TYPE_LABEL))).toEqual([]);
+    expect(missing(Object.values(BATTED_BALL_STRENGTH_LABEL))).toEqual([]);
+    expect(missing(Object.values(FIELD_BUTTON_LABEL))).toEqual([]);
+    expect(missing(Object.values(PITCH_TYPE_LABEL))).toEqual([]);
+    expect(missing([PITCH_DETAIL_LABEL])).toEqual([]);
+    expect(missing(Object.values(DOWNLOAD_LABEL))).toEqual([]);
   });
 
   it('튜토리얼은 단계마다 제목과 설명이 있다', () => {

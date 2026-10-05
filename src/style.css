@@ -20,6 +20,10 @@
   --strike-light: #f2b34a;
   --child: #4fb6f2;
   --danger: #b3261e;
+  --grass: #4a9a5a;
+  --infield-grass: #5aa86a;
+  --dirt: #c9a46c;
+  --chalk: #ffffff;
   --warn-bg: #fff4e0;
   --warn-text: #7a4b00;
   --radius: 14px;
@@ -43,6 +47,9 @@
     --bar: #1a4630;
     --warn-bg: #3a2c12;
     --warn-text: #f2cf8e;
+    --grass: #2f6b3c;
+    --infield-grass: #3a7a48;
+    --dirt: #8a6a40;
     color-scheme: dark;
   }
 }
@@ -59,6 +66,9 @@
   --bar: #1a4630;
   --warn-bg: #3a2c12;
   --warn-text: #f2cf8e;
+  --grass: #2f6b3c;
+  --infield-grass: #3a7a48;
+  --dirt: #8a6a40;
   color-scheme: dark;
 }
 
@@ -126,7 +136,8 @@ button:disabled {
 
 .content {
   flex: 1;
-  padding: 16px 16px 88px;
+  /* 아래 탭 높이(약 47px)만큼 비워 둔다. */
+  padding: 16px 16px calc(56px + env(safe-area-inset-bottom, 0px));
 }
 
 .tabbar {
@@ -1591,4 +1602,450 @@ button {
   margin: 8px 0 0;
   line-height: 1.6;
   font-size: 15px;
+}
+
+/* ── 투구 상세 ── */
+.detail-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  justify-self: start;
+}
+
+.detail-toggle small {
+  font-weight: 400;
+}
+
+.switch {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--surface);
+  transition: left 0.15s;
+}
+
+.detail-toggle.on {
+  color: var(--primary);
+}
+
+.detail-toggle.on .switch {
+  background: var(--primary);
+}
+
+.detail-toggle.on .switch::after {
+  left: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch::after {
+    transition: none;
+  }
+}
+
+.pitch-detail {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 6px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.pitch-type-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.pitch-type-row button,
+.strength-row button {
+  padding: 7px 0;
+  border-radius: 8px;
+  background: var(--primary-soft);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pitch-type-row button.active,
+.strength-row button.active,
+.batted-type-row button.active {
+  background: var(--bar);
+  border-color: var(--bar);
+  color: var(--on-color);
+}
+
+.zone-pick,
+.field-pick {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.zone-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  text-align: center;
+  font-size: 11px;
+  color: #fff;
+  pointer-events: none;
+}
+
+.speed-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.pitch-detail-side {
+  display: grid;
+  gap: 6px;
+}
+
+.speed-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.speed-field input {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.secondary.small {
+  padding: 8px;
+  font-size: 13px;
+}
+
+/* 투구 상세를 켜면 한 화면에 들어가도록 버튼 설명을 숨기고 높이를 줄인다. */
+.controls.detail-on {
+  gap: 6px;
+}
+
+.controls.detail-on .pitch {
+  min-height: 42px;
+  padding: 4px;
+}
+
+.controls.detail-on .pitch small,
+.controls.detail-on .play small,
+.controls.detail-on .pad-title {
+  display: none;
+}
+
+.controls.detail-on .pitch.extra {
+  min-height: 36px;
+}
+
+.controls.detail-on .play {
+  padding: 8px 2px;
+}
+
+.controls.detail-on .runner-section {
+  padding: 8px;
+}
+
+.controls.detail-on .undo {
+  padding: 8px;
+}
+
+.controls.detail-on .detail-toggle {
+  padding: 2px 4px;
+}
+
+/* ── 타구 기록 ── */
+.field-panel {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 2px solid var(--hit);
+}
+
+.field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.field-head .section-title {
+  margin: 0;
+}
+
+.field-head .link-button {
+  white-space: nowrap;
+}
+
+.field-panel .confirm-buttons button {
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.field-pick {
+  max-width: 270px;
+  width: 100%;
+  justify-self: center;
+}
+
+.batted-type-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.batted-type-row button {
+  display: grid;
+  gap: 1px;
+  padding: 6px 1px;
+  border-radius: 8px;
+  background: var(--primary-soft);
+  border: 1px solid var(--line);
+}
+
+.batted-type-row strong {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.batted-type-row small {
+  font-size: 10px;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.batted-type-row button.active small {
+  color: var(--on-color);
+}
+
+.strength-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.link-button {
+  padding: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ── 그림: 야구장 · 스트라이크 존 ── */
+.field-svg,
+.zone-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  max-width: 100%;
+}
+
+/* 담장 위 빈 곳을 잘라 낸 비율 (field-view.ts FIELD_TOP) */
+.field-svg {
+  aspect-ratio: 100 / 84;
+}
+
+.pickable {
+  cursor: crosshair;
+  touch-action: manipulation;
+}
+
+.field-foul-ground {
+  fill: var(--primary-soft);
+}
+
+.field-grass {
+  fill: var(--grass);
+}
+
+.field-dirt {
+  fill: var(--dirt);
+}
+
+.field-infield-grass {
+  fill: var(--infield-grass);
+}
+
+.field-line {
+  stroke: var(--chalk);
+  stroke-width: 0.6;
+}
+
+.field-base {
+  fill: var(--chalk);
+}
+
+.zone-bg {
+  fill: var(--board);
+}
+
+.zone-box {
+  fill: rgba(255, 255, 255, 0.08);
+  stroke: var(--chalk);
+  stroke-width: 1.2;
+}
+
+.zone-grid {
+  stroke: var(--board-dot);
+  stroke-width: 0.5;
+}
+
+.picked-ring {
+  fill: none;
+  stroke: var(--strike-light);
+  stroke-width: 1.5;
+}
+
+.picked-dot {
+  fill: var(--strike-light);
+}
+
+.legend-dot {
+  background: var(--muted);
+}
+
+.chart-dot {
+  stroke: var(--chalk);
+  stroke-width: 0.5;
+  fill: var(--muted);
+}
+
+.chart-dot.hit,
+.legend-dot.hit,
+.chart-dot.inPlay,
+.legend-dot.inPlay {
+  fill: var(--hit);
+  background: var(--hit);
+}
+
+.chart-dot.out,
+.legend-dot.out {
+  fill: var(--out);
+  background: var(--out);
+}
+
+.chart-dot.error,
+.legend-dot.error {
+  fill: var(--extra);
+  background: var(--extra);
+}
+
+.chart-dot.strike,
+.legend-dot.strike {
+  fill: var(--strike-light);
+  background: var(--strike-light);
+}
+
+.chart-dot.ball,
+.legend-dot.ball {
+  fill: var(--ball-light);
+  background: var(--ball-light);
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.chart-card {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  min-width: 0;
+}
+
+.chart-card h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.chart-frame {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 'error' 같은 종류 이름이 다른 화면의 클래스와 겹쳐도 점 모양이 바뀌지 않게 */
+.legend-dot {
+  display: inline-block;
+  flex: none;
+  padding: 0;
+  border-radius: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* ── 데이터 내려받기 ── */
+.download-section {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.download-section h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.download-section .secondary {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+}
+
+.download-section small {
+  color: var(--muted);
+  font-weight: 400;
 }
