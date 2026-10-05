@@ -3,7 +3,7 @@
 import { h } from './dom';
 import { GAME_TYPES, GameType, Team } from './events';
 import { GAME_TYPE_LABEL, Game, GameInfo, dateLabel, gameInfo, opponentLabel } from './game';
-import { DOWNLOAD_LABEL } from './labels';
+import { DOWNLOAD_LABEL, IMPORT_LABEL } from './labels';
 import { GameReplay } from './replay';
 
 export interface GameForm {
@@ -21,6 +21,7 @@ export interface GamesActions {
   cancelForm: () => void;
   saveForm: (form: GameForm) => void;
   download: (kind: 'backup' | 'pitches') => void;
+  importBackup: (file: File) => void;
 }
 
 
@@ -80,6 +81,25 @@ function formView(form: GameForm, hasGames: boolean, actions: GamesActions): HTM
       hasGames ? h('button', { className: 'secondary', text: '취소', onClick: actions.cancelForm }) : null,
       h('button', { className: 'primary', text: form.gameId ? '저장' : '경기 시작', onClick: () => actions.saveForm(current) }),
     ]),
+    // 휴대폰을 바꾼 첫 화면에서도 예전 기록을 옮겨 올 수 있게 한다.
+    hasGames ? null : h('div', { className: 'import-first' }, [h('p', { className: 'help', text: '예전에 내려받은 백업 파일이 있나요?' }), importButton(actions)]),
+  ]);
+}
+
+/** 숨긴 파일 선택 칸을 버튼으로 연다. */
+function importButton(actions: GamesActions): HTMLElement {
+  const input = h('input', { className: 'visually-hidden', attrs: { type: 'file', accept: '.json,application/json', tabindex: '-1', 'aria-hidden': 'true' } });
+  input.addEventListener('change', () => {
+    const file = input.files?.[0];
+    if (file) actions.importBackup(file);
+    input.value = '';
+  });
+  return h('div', {}, [
+    input,
+    h('button', { className: 'secondary', onClick: () => input.click() }, [
+      h('strong', { text: IMPORT_LABEL }),
+      h('small', { text: '지금 기록은 지우지 않고 합칩니다' }),
+    ]),
   ]);
 }
 
@@ -95,6 +115,9 @@ function downloadSection(actions: GamesActions): HTMLElement {
       h('strong', { text: DOWNLOAD_LABEL.csv }),
       h('small', { text: '공 하나당 한 줄 · 엑셀·구글 시트에서 열기' }),
     ]),
+    h('h2', { text: '백업 불러오기' }),
+    h('p', { className: 'help', text: '내려받아 둔 백업 파일(JSON)에서 기록을 가져옵니다. 이미 있는 경기는 늘어난 기록만 덧붙입니다.' }),
+    importButton(actions),
   ]);
 }
 
@@ -110,6 +133,7 @@ function gameCard(game: Game, isCurrent: boolean, replay: GameReplay, actions: G
     ]),
     h('p', { className: 'opponent', text: `상대: ${opponentLabel(info.opponent)} · ${info.battingFirst === 'us' ? '선공' : '후공'}` }),
     h('p', { className: 'sub', text: `장면 ${replay.scenes.length} · 투구 ${pitches}개 · 타석 ${batted}` }),
+    game.copiedFrom ? h('p', { className: 'sub', text: '백업에서 불러온 사본 (같은 경기가 다르게 기록되어 있어 따로 만듦)' }) : null,
     h('div', { className: 'confirm-buttons' }, [
       h('button', { className: 'secondary', text: '정보 고치기', onClick: () => actions.openEdit(game) }),
       h('button', { className: 'primary', text: isCurrent ? '기록 중 · 이어서' : '이 경기 기록하기', onClick: () => actions.select(game.id) }),

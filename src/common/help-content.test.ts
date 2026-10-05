@@ -9,6 +9,7 @@ import {
   CHILD_RUNNER_BUTTONS,
   DOWNLOAD_LABEL,
   FIELD_BUTTON_LABEL,
+  IMPORT_LABEL,
   PITCH_DETAIL_LABEL,
   PITCH_TYPE_LABEL,
   EXTRA_PITCH_BUTTONS,
@@ -51,6 +52,7 @@ describe('도움말이 화면과 맞는지', () => {
     expect(missing(Object.values(PITCH_TYPE_LABEL))).toEqual([]);
     expect(missing([PITCH_DETAIL_LABEL])).toEqual([]);
     expect(missing(Object.values(DOWNLOAD_LABEL))).toEqual([]);
+    expect(missing([IMPORT_LABEL])).toEqual([]);
   });
 
   it('튜토리얼은 단계마다 제목과 설명이 있다', () => {

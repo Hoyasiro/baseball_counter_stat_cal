@@ -2049,3 +2049,41 @@ button {
   color: var(--muted);
   font-weight: 400;
 }
+
+/* ── 백업 불러오기 ── */
+/* 입력 칸 공통 스타일(width: 100%)보다 앞서도록 선택자를 구체적으로 쓴다. */
+input[type='file'].visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.import-first {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.import-first .help {
+  margin: 0;
+}
+
+.import-first .secondary,
+.download-section .secondary {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+}
+
+.import-first small {
+  color: var(--muted);
+  font-weight: 400;
+}

@@ -6,6 +6,7 @@ import { batterAnalysisView } from './batter/analysis-view';
 import { AnalysisScope, AnalysisTab } from './common/analysis-ui';
 import { h } from './common/dom';
 import { BaseIndex, HitType, PitchResult, Role, activeEvents, playEvents } from './common/events';
+import { mergeGames, mergeSummary, parseBackup } from './common/backup-import';
 import { downloadFile } from './common/download';
 import { backupJson, exportFileName, pitchesCsv } from './common/export';
 import { EMPTY_PITCH_DRAFT, FieldDraft, PitchDraft, parseSpeed } from './common/pitch-detail-view';
@@ -396,6 +397,31 @@ export function mountApp(root: HTMLElement): void {
         state.notice = result === 'declined' ? '내려받기를 취소했습니다.' : '이 화면에서는 파일을 내려받을 수 없습니다. 휴대폰 브라우저에서 앱을 열어 다시 해 보세요.';
         render();
       });
+    },
+    importBackup: (file: File) => {
+      void file
+        .text()
+        .then((text) => {
+          const parsed = parseBackup(text);
+          if (!parsed.ok) {
+            state.notice = parsed.message;
+            render();
+            return;
+          }
+          const merged = mergeGames(state.games, parsed.games);
+          state.games = [...merged.games];
+          // 첫 화면(경기가 하나도 없을 때)에서 불러왔다면 새 경기 입력 대신 경기 목록을 보여준다.
+          if (state.form?.gameId === null && merged.games.length > 0) state.form = null;
+          state.currentGameId ??= state.games[state.games.length - 1]?.id ?? null;
+          state.notice = saveGames(STORAGE_KEY, state.games)
+            ? mergeSummary(merged)
+            : '불러온 기록을 저장하지 못했습니다. 저장 공간을 확인하세요. 앱을 닫으면 불러온 기록이 사라집니다.';
+          render();
+        })
+        .catch(() => {
+          state.notice = '파일을 열 수 없습니다. 다시 골라 주세요.';
+          render();
+        });
     },
   };
 

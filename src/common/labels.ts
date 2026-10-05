@@ -120,6 +120,8 @@ export const PITCH_DETAIL_LABEL = '투구 상세';
 /** 데이터 내려받기 버튼 */
 export const DOWNLOAD_LABEL = { json: '백업 파일 (JSON)', csv: '표 파일 (CSV, 엑셀)' } as const;
 
+export const IMPORT_LABEL = '백업 파일 불러오기';
+
 export const HIT_TYPE_LABEL: Record<HitType, string> = {
   single: '1루타',
   double: '2루타',
