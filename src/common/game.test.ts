@@ -50,3 +50,19 @@ describe('경기 정보 빠른 입력', () => {
     expect(recentOpponents(games, 1)).toEqual(['나팀']);
   });
 });
+
+describe('아웃 종류 저장 검사', () => {
+  const withPitch = (pitch: Record<string, unknown>): unknown => ({
+    id: 'g',
+    createdAt: '2026-10-05T00:00:00.000Z',
+    author: '나',
+    events: [{ kind: 'pitch', id: 'p', createdAt: '2026-10-05T00:00:00.000Z', author: '나', ...pitch }],
+  });
+
+  it('아웃에만 붙고, 병살과 함께 쓸 수 없다', () => {
+    expect(isGame(withPitch({ result: 'out', outType: 'sacrificeFly' }))).toBe(true);
+    expect(isGame(withPitch({ result: 'hit', outType: 'sacrificeFly' }))).toBe(false);
+    expect(isGame(withPitch({ result: 'out', outType: 'sacrificeBunt', doublePlay: 0 }))).toBe(false);
+    expect(isGame(withPitch({ result: 'out', outType: 'triple' }))).toBe(false);
+  });
+});

@@ -9,6 +9,7 @@ import {
   BattedBallType,
   FieldingCredit,
   HitType,
+  OutType,
   PITCH_TYPES,
   PitchResult,
   PitchType,
@@ -21,6 +22,8 @@ import {
   BATTED_BALL_TYPE_HINT,
   BATTED_BALL_TYPE_LABEL,
   FIELD_BUTTON_LABEL,
+  OUT_TYPE_HINT,
+  OUT_TYPE_LABEL,
   PITCH_DETAIL_LABEL,
   PITCH_SHEET_LABEL,
   PITCH_TYPE_LABEL,
@@ -62,6 +65,10 @@ export interface FieldDraft {
   readonly pitch: PitchDetail;
   /** 아이가 수비 중이면 이 타구에서 받은 기록. 공격 중이면 null (고르는 줄을 숨긴다) */
   readonly fielding: readonly FieldingCredit[] | null;
+  /** 아웃일 때 고른 희생번트·희생플라이·진루타 */
+  readonly outType: OutType | null;
+  /** 지금 상황에서 고를 수 있는 아웃 종류 (2아웃이거나 주자가 없으면 비어 있어 줄을 숨긴다) */
+  readonly outTypeOptions: readonly OutType[];
 }
 
 export interface PitchSheetActions {
@@ -150,7 +157,8 @@ export function pitchSheetView(sheet: PitchSheet, hand: Hand, actions: PitchShee
 /** 친 공의 낙구 지점·질을 고르는 창(팝업). 야구장 그림은 엄지 쪽, 타구 종류는 반대쪽에 둔다. */
 export function fieldPanel(draft: FieldDraft, actions: FieldActions): HTMLElement {
   const set = (change: Partial<FieldDraft>): void => actions.change({ ...draft, ...change });
-  const what = draft.result === 'out' ? (draft.doublePlay !== undefined ? '병살' : '아웃') : pitchLabel(draft);
+  const outName = draft.doublePlay !== undefined ? '병살' : draft.outType ? OUT_TYPE_LABEL[draft.outType] : '아웃';
+  const what = draft.result === 'out' ? outName : pitchLabel({ result: draft.result, hitType: draft.hitType });
   const where = draft.x !== null && draft.y !== null ? placementLabel(draft.x, draft.y) : '공이 떨어진 곳을 누르세요';
   return popup('field-panel', '타구 기록', actions.cancel, [
     h('div', { className: 'sheet-head' }, [
@@ -190,6 +198,23 @@ export function fieldPanel(draft: FieldDraft, actions: FieldActions): HTMLElemen
         }),
       ),
     ),
+    draft.outTypeOptions.length > 0
+      ? h(
+          'div',
+          { className: 'out-type-row', attrs: { role: 'group', 'aria-label': '주자를 보낸 아웃' } },
+          draft.outTypeOptions.map((t) =>
+            h(
+              'button',
+              {
+                className: draft.outType === t ? 'active' : '',
+                attrs: { 'aria-pressed': draft.outType === t ? 'true' : 'false' },
+                onClick: () => set({ outType: draft.outType === t ? null : t }),
+              },
+              [h('strong', { text: OUT_TYPE_LABEL[t] }), h('small', { text: OUT_TYPE_HINT[t] })],
+            ),
+          ),
+        )
+      : null,
     draft.fielding ? fieldingChips(draft.fielding, (fielding) => set({ fielding })) : null,
     h('div', { className: 'confirm-buttons sheet-buttons' }, [
       h('button', { className: 'secondary', text: FIELD_BUTTON_LABEL.skip, onClick: () => actions.skip(draft) }),

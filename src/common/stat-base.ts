@@ -3,7 +3,7 @@
 
 import { Calculation, SourceRef, safeDivide, term } from './calculation';
 import { Count, compareCounts, countKey } from './count';
-import { BattedBall, BattedBallType, HIT_BASES, PitchEvent, PitchResult, PlayKind } from './events';
+import { BattedBall, BattedBallType, HIT_BASES, OutType, PitchEvent, PitchResult, PlayKind } from './events';
 import { NO_VALUE_DISPLAY, formatPercent, formatRate } from './format';
 import { Actor, GameReplay, PlateAppearance, PlateAppearanceOutcome, isInterrupted } from './replay';
 
@@ -19,8 +19,20 @@ export interface ScopedPlateAppearance {
   readonly pa: PlateAppearance;
 }
 
-/** 타수에서 빠지는 결과 (데모에는 희생타 구분이 없다) */
+/** 타수에서 빠지는 결과. 희생번트·희생플라이도 빠진다. (isSacrifice) */
 const NOT_AT_BAT: ReadonlySet<PlateAppearanceOutcome> = new Set(['walk', 'hitByPitch']);
+
+/** 아웃으로 끝난 타석의 아웃 종류 (희생번트·희생플라이·진루타). 없으면 null */
+export function outTypeOf(pa: PlateAppearance): OutType | null {
+  if (pa.outcome !== 'out') return null;
+  return pa.pitches[pa.pitches.length - 1]?.outType ?? null;
+}
+
+/** 희생번트·희생플라이 (공식 기록 규칙: 타수에서 뺀다) */
+export function isSacrifice(pa: PlateAppearance): boolean {
+  const type = outTypeOf(pa);
+  return type === 'sacrificeBunt' || type === 'sacrificeFly';
+}
 
 /** 출루로 세는 결과 (출루율) */
 export const ON_BASE: ReadonlySet<PlateAppearanceOutcome> = new Set(['hit', 'walk', 'hitByPitch']);
@@ -46,7 +58,7 @@ export function withOutcome(pas: readonly ScopedPlateAppearance[], outcome: Plat
 
 export function atBats(pas: readonly ScopedPlateAppearance[]): SourceRef[] {
   return completed(pas)
-    .filter((s) => s.pa.outcome !== null && !NOT_AT_BAT.has(s.pa.outcome))
+    .filter((s) => s.pa.outcome !== null && !NOT_AT_BAT.has(s.pa.outcome) && !isSacrifice(s.pa))
     .map(ref);
 }
 

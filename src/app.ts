@@ -5,7 +5,8 @@
 import { batterAnalysisView } from './batter/analysis-view';
 import { AnalysisScope, AnalysisTab } from './common/analysis-ui';
 import { h, segmented } from './common/dom';
-import { BaseIndex, FieldingCredit, HitType, PitchResult, Role, activeEvents, playEvents } from './common/events';
+import { BaseIndex, FieldingCredit, HitType, OutType, PitchResult, Role, activeEvents, playEvents } from './common/events';
+import { outTypeOptions } from './common/bases';
 import { mergeGames, mergeSummary, parseBackup } from './common/backup-import';
 import { BACKUP_REMINDER_MIN_GAMES, backupBanner } from './common/backup-banner';
 import { gamesChangedSince, loadLastBackup, saveLastBackup } from './common/backup-reminder';
@@ -131,6 +132,7 @@ export function replayOf(game: Game): GameReplay {
 }
 
 const ERROR_REASON = '실책으로 바뀐 주자·아웃·점수를 맞춰 주세요. 바뀐 게 없으면 취소를 누르세요.';
+const ROE_REASON = '실책으로 더 간 주자나, 그 뒤 아웃된 주자(타자 포함)가 있으면 맞춰 주세요. 그대로면 취소를 누르세요.';
 const BLOCKED_ADVANCE_REASON = '다음 베이스에 주자가 있어요. 주자들이 어떻게 움직였는지 맞춰 주세요.';
 
 function newGameForm(): GameForm {
@@ -225,7 +227,14 @@ export function mountApp(root: HTMLElement): void {
   /** 공 하나를 기록한다. 투구 상세 창에서 고른 구종·존·구속이 있으면 함께 남긴다. */
   const recordPitch = (
     result: PitchResult,
-    extra: { hitType?: HitType; doublePlay?: BaseIndex; pitch: PitchDetail; battedBall?: FieldDraft | null; fielding?: readonly FieldingCredit[] | null },
+    extra: {
+      hitType?: HitType;
+      doublePlay?: BaseIndex;
+      outType?: OutType | null;
+      pitch: PitchDetail;
+      battedBall?: FieldDraft | null;
+      fielding?: readonly FieldingCredit[] | null;
+    },
   ): void => {
     const detail = extra.pitch;
     const ball = extra.battedBall;
@@ -236,6 +245,7 @@ export function mountApp(root: HTMLElement): void {
       addPitch(g, result, {
         hitType: extra.hitType,
         doublePlay: extra.doublePlay,
+        outType: extra.outType ?? undefined,
         pitchType: detail.pitchType ?? undefined,
         zone: detail.zone ?? undefined,
         speed: detail.speed ?? undefined,
@@ -243,11 +253,28 @@ export function mountApp(root: HTMLElement): void {
         fielding: extra.fielding ?? undefined,
       }),
     );
+    // 실책 출루 뒤에는 더 간 주자나 아웃된 주자(3아웃 포함)를 바로 맞추게 한다.
+    if (result === 'reachedOnError') openErrorAdjust(ROE_REASON);
   };
 
   const currentReplay = (): GameReplay | null => {
     const game = currentGame();
     return game ? replayOf(game) : null;
+  };
+
+  /** 실책 뒤 상황 고치기를 연다. 바뀐 게 없으면 사용자가 취소한다. */
+  const openErrorAdjust = (reason: string): void => {
+    const active = currentReplay()?.state;
+    if (!active) return;
+    state.situationDraft = {
+      inning: active.inning,
+      outs: active.outs,
+      bases: active.bases,
+      runs: 0,
+      child: active.role === 'runner' ? active.childBase : null,
+      reason,
+    };
+    render();
   };
 
   /** 아이가 수비 중인지 (투수 또는 수비수 장면) */
@@ -260,7 +287,21 @@ export function mountApp(root: HTMLElement): void {
   const afterPitchDetail = (result: PitchResult, hitType: HitType | undefined, pitch: PitchDetail, doublePlay?: BaseIndex): void => {
     if (isBattedResult(result)) {
       state.pitchSheet = null;
-      state.fieldDraft = { result, hitType, doublePlay, x: null, y: null, type: null, strength: null, pitch, fielding: childIsFielding() ? [] : null };
+      const active = currentReplay()?.state;
+      const outTypes = result === 'out' && doublePlay === undefined && active ? outTypeOptions(active.bases, active.outs) : [];
+      state.fieldDraft = {
+        result,
+        hitType,
+        doublePlay,
+        x: null,
+        y: null,
+        type: null,
+        strength: null,
+        pitch,
+        fielding: childIsFielding() ? [] : null,
+        outType: null,
+        outTypeOptions: outTypes,
+      };
       render();
       return;
     }
@@ -270,20 +311,7 @@ export function mountApp(root: HTMLElement): void {
   /** 주자 상황 기록. 실책 뒤에는 바로 상황 고치기를 열어 바뀐 주자·점수를 맞추게 한다. */
   const recordRunnerPlay = (action: RunnerAction, base: BaseIndex | undefined, fielding: readonly FieldingCredit[]): void => {
     updateCurrent((g) => addPlay(g, action, base, fielding));
-    if (action === 'error') {
-      // 실책 뒤에는 바로 상황 고치기를 열어 바뀐 주자·점수를 맞추게 한다.
-      const active = currentReplay()?.state;
-      if (!active) return;
-      state.situationDraft = {
-        inning: active.inning,
-        outs: active.outs,
-        bases: active.bases,
-        runs: 0,
-        child: active.role === 'runner' ? active.childBase : null,
-        reason: ERROR_REASON,
-      };
-      render();
-    }
+    if (action === 'error') openErrorAdjust(ERROR_REASON);
   };
 
   const inputActions = {
@@ -332,10 +360,9 @@ export function mountApp(root: HTMLElement): void {
         state.fieldDraft = draft;
         render();
       },
-      save: (draft: FieldDraft) =>
-        recordPitch(draft.result, { hitType: draft.hitType, doublePlay: draft.doublePlay, pitch: draft.pitch, battedBall: draft, fielding: draft.fielding }),
-      // 낙구 지점·질만 건너뛴다. 고른 수비 기록은 남긴다.
-      skip: (draft: FieldDraft) => recordPitch(draft.result, { hitType: draft.hitType, doublePlay: draft.doublePlay, pitch: draft.pitch, fielding: draft.fielding }),
+      save: (draft: FieldDraft) => recordPitch(draft.result, { ...draft, battedBall: draft }),
+      // 낙구 지점·질만 건너뛴다. 고른 수비 기록·아웃 종류는 남긴다.
+      skip: (draft: FieldDraft) => recordPitch(draft.result, { ...draft, battedBall: null }),
       cancel: () => {
         state.fieldDraft = null;
         render();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advanceRunners, basesLabel, batterAdvance, forceAdvance, fromBases, stealAdvance, stealableBases, toBases } from './bases';
+import { advanceRunners, basesLabel, batterAdvance, forceAdvance, fromBases, outTypeAdvance, outTypeOptions, stealAdvance, stealableBases, toBases } from './bases';
 
 const on = (b1: boolean, b2: boolean, b3: boolean) => fromBases([b1, b2, b3]);
 
@@ -45,5 +45,25 @@ describe('주자 이동과 득점', () => {
     expect(basesLabel([false, false, false])).toBe('주자 없음');
     expect(basesLabel([true, false, true])).toBe('주자 1·3루');
     expect(basesLabel([true, true, true])).toBe('만루');
+  });
+});
+
+describe('희생타 · 진루타 주자 이동', () => {
+  it('희생플라이: 3루 주자만 홈인', () => {
+    const sf = outTypeAdvance(on(true, false, true), 'sacrificeFly');
+    expect(sf.runs).toBe(1);
+    expect(toBases(sf.runners)).toEqual([true, false, false]);
+  });
+
+  it('희생번트·진루타: 모든 주자 한 베이스', () => {
+    expect(toBases(outTypeAdvance(on(true, false, false), 'sacrificeBunt').runners)).toEqual([false, true, false]);
+    expect(toBases(outTypeAdvance(on(false, true, false), 'productive').runners)).toEqual([false, false, true]);
+  });
+
+  it('2아웃·주자 없음이면 고를 수 없고, 희생플라이는 3루 주자가 있을 때만', () => {
+    expect(outTypeOptions([true, false, false], 2)).toEqual([]);
+    expect(outTypeOptions([false, false, false], 0)).toEqual([]);
+    expect(outTypeOptions([true, false, false], 1)).toEqual(['sacrificeBunt', 'productive']);
+    expect(outTypeOptions([false, false, true], 0)).toEqual(['sacrificeBunt', 'sacrificeFly', 'productive']);
   });
 });

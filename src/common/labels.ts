@@ -9,6 +9,7 @@ import {
   HitType,
   FieldingCredit,
   FieldingPosition,
+  OutType,
   PitchEvent,
   PitchResult,
   PitchType,
@@ -150,6 +151,19 @@ export const BATTED_BALL_STRENGTH_LABEL: Record<BattedBallStrength, string> = {
   hard: '세게',
 };
 
+/** 아웃의 종류 (타구 기록 창에서 고름) */
+export const OUT_TYPE_LABEL: Record<OutType, string> = {
+  sacrificeBunt: '희생번트',
+  sacrificeFly: '희생플라이',
+  productive: '진루타',
+};
+
+export const OUT_TYPE_HINT: Record<OutType, string> = {
+  sacrificeBunt: '번트로 주자 보냄',
+  sacrificeFly: '뜬공에 3루 주자 홈인',
+  productive: '아웃, 주자는 진루',
+};
+
 /** 타구 기록 화면 버튼 */
 export const FIELD_BUTTON_LABEL = { skip: '타구 기록 건너뛰기', save: '이 타구로 기록' } as const;
 
@@ -194,9 +208,10 @@ const PITCH_LABEL: Record<PitchResult, string> = {
   hitByPitch: '몸에 맞음',
 };
 
-export function pitchLabel(pitch: Pick<PitchEvent, 'result' | 'hitType' | 'doublePlay'>): string {
+export function pitchLabel(pitch: Pick<PitchEvent, 'result' | 'hitType' | 'doublePlay' | 'outType'>): string {
   if (pitch.result === 'hit') return HIT_TYPE_LABEL[pitch.hitType ?? 'single'];
   if (pitch.result === 'out' && pitch.doublePlay !== undefined) return `병살 (${BASE_NAMES[pitch.doublePlay]} 주자도 아웃)`;
+  if (pitch.result === 'out' && pitch.outType !== undefined) return OUT_TYPE_LABEL[pitch.outType];
   return PITCH_LABEL[pitch.result];
 }
 
@@ -307,6 +322,7 @@ export function outcomeLabel(pa: PlateAppearance): string {
   const lastPitch = pa.pitches[pa.pitches.length - 1];
   if (pa.outcome === 'strikeout' && lastPitch?.result === 'buntFoul') return '삼진 (쓰리번트 아웃)';
   if (pa.outcome === 'out' && lastPitch?.doublePlay !== undefined) return '병살';
+  if (pa.outcome === 'out' && lastPitch?.outType !== undefined) return OUT_TYPE_LABEL[lastPitch.outType];
   return OUTCOME_LABEL[pa.outcome];
 }
 

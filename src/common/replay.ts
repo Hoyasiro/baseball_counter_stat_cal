@@ -22,6 +22,7 @@ import {
   Advance,
   Runners,
   advanceRunners,
+  outTypeAdvance,
   batterAdvance,
   childBaseOf,
   forceAdvance,
@@ -97,6 +98,10 @@ export interface PlateAppearance {
   readonly hitType: HitType | null;
   /** 이 타석 동안 홈에 들어온 점수 */
   readonly runs: number;
+  /** 그중 타석을 끝낸 공(안타·볼넷·희생타 등)으로 들어온 점수 (타점 계산용) */
+  readonly runsOnResult: number;
+  /** 타석이 끝난 뒤 다음 타자 전에 "상황 고치기"로 넣은 점수 (예: 안타 때 2루 주자도 홈인) */
+  readonly runsAfterEnd: number;
   /** 이 타석 동안 나온 수비 실책 수 */
   readonly errors: number;
 }
@@ -223,6 +228,7 @@ interface OpenPlateAppearance {
   count: Count;
   outsRecorded: number;
   runs: number;
+  runsOnResult: number;
   errors: number;
 }
 
@@ -291,6 +297,7 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
     count,
     outsRecorded: 0,
     runs: 0,
+    runsOnResult: 0,
     errors: 0,
   });
 
@@ -321,6 +328,8 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
     plays: pa.plays,
     hitType: outcome === 'hit' ? (pa.pitches[pa.pitches.length - 1]?.hitType ?? 'single') : null,
     runs: pa.runs,
+    runsOnResult: pa.runsOnResult,
+    runsAfterEnd: 0,
     errors: pa.errors,
   });
 
@@ -427,6 +436,7 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
       return;
     }
     const batterIsChild = pa.actor === 'child';
+    const runsBefore = pa.runs;
     switch (applied.outcome) {
       case 'walk':
       case 'hitByPitch':
@@ -443,10 +453,13 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
         applyAdvance(s, batterAdvance(s.runners, HIT_BASES.single, batterIsChild), pa);
         break;
       default:
+        // 희생타·진루타는 주자가 먼저 움직이고 타자가 아웃된다.
+        if (event.outType !== undefined) applyAdvance(s, outTypeAdvance(s.runners, event.outType), pa);
         s.outs += 1;
         pa.outsRecorded += 1;
         if (event.doublePlay !== undefined) doubledUp(s, pa, event.doublePlay);
     }
+    pa.runsOnResult = pa.runs - runsBefore;
     if (batterIsChild) s.childBatting = false;
     closePa(s, applied.outcome, pa.count);
     endHalfIfOver(s);
@@ -524,6 +537,7 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
     if (runs > 0) {
       totals(s).runs += runs;
       if (owner) owner.runs += runs;
+      if (owner && owner === s.lastClosed) s.lastClosed.runsAfterEnd += runs;
     }
     s.outs = event.outs;
     s.runners = fromBases(bases, childBase);

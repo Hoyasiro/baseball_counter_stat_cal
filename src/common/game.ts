@@ -5,6 +5,7 @@ import {
   FieldingCredit,
   PitchType,
   ZonePoint,
+  OutType,
   GameInfoEvent,
   GameType,
   HitType,
@@ -113,6 +114,7 @@ export interface PitchDetails {
   readonly battedBall?: BattedBall;
   readonly fielding?: readonly FieldingCredit[];
   readonly doublePlay?: BaseIndex;
+  readonly outType?: OutType;
 }
 
 export function addPitch(game: Game, result: PitchResult, details: PitchDetails = {}): Game {

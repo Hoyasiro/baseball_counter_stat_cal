@@ -39,7 +39,7 @@ export type { GameForStats };
 /** 스트라이크로 세는 공. 파울·번트 파울과 친 공(안타·실책 출루·아웃)도 스트라이크로 센다. 몸에 맞는 공은 볼로 센다. */
 const STRIKE_LIKE: ReadonlySet<PitchResult> = new Set(['strike', 'foul', 'buntFoul', 'hit', 'reachedOnError', 'out']);
 
-const AT_BATS_LABEL = '상대 타수 (끝난 타석에서 볼넷·몸에 맞는 공 제외)';
+const AT_BATS_LABEL = '상대 타수 (끝난 타석에서 볼넷·몸에 맞는 공·희생번트·희생플라이 제외)';
 
 function faced(games: readonly GameForStats[]): ScopedPlateAppearance[] {
   return platesOf(games, 'opponent').filter((s) => s.pa.fieldingPosition === 'pitcher');

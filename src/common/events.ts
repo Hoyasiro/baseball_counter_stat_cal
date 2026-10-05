@@ -99,6 +99,15 @@ export interface BattedBall {
   readonly strength: BattedBallStrength | null;
 }
 
+/**
+ * 아웃의 종류. 타자는 아웃됐지만 주자를 보낸 경우를 구분한다. (result가 'out'이고 병살이 아닐 때만)
+ * - sacrificeBunt(희생번트) · sacrificeFly(희생플라이): 공식 기록 규칙상 타수에서 빠진다.
+ * - productive(진루타): 공식 기록이 아니어서 타수는 그대로, 개수만 센다.
+ */
+export type OutType = 'sacrificeBunt' | 'sacrificeFly' | 'productive';
+
+export const OUT_TYPES: readonly OutType[] = ['sacrificeBunt', 'sacrificeFly', 'productive'];
+
 /** 0: 1루, 1: 2루, 2: 3루 */
 export type BaseIndex = 0 | 1 | 2;
 
@@ -181,6 +190,8 @@ export interface PitchEvent extends EventBase {
   readonly fielding?: readonly FieldingCredit[];
   /** 병살: result가 'out'일 때 타자와 함께 아웃된 주자가 있던 베이스 */
   readonly doublePlay?: BaseIndex;
+  /** 희생번트·희생플라이·진루타: result가 'out'일 때 아웃의 종류 */
+  readonly outType?: OutType;
 }
 
 export interface PlayEvent extends EventBase {
@@ -334,7 +345,9 @@ export function isLogEvent(value: unknown): value is LogEvent {
         (value.speed === undefined || isCount(value.speed, SPEED_MIN, SPEED_MAX)) &&
         (value.battedBall === undefined || isBattedBall(value.battedBall)) &&
         (value.fielding === undefined || isFieldingCredits(value.fielding)) &&
-        (value.doublePlay === undefined || (value.result === 'out' && isCount(value.doublePlay, 0, 2)))
+        (value.doublePlay === undefined || (value.result === 'out' && isCount(value.doublePlay, 0, 2))) &&
+        (value.outType === undefined ||
+          (value.result === 'out' && value.doublePlay === undefined && OUT_TYPES.includes(value.outType as OutType)))
       );
     case 'play':
       return (
