@@ -87,6 +87,7 @@ button {
   color: inherit;
   cursor: pointer;
   border: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button:disabled {
@@ -118,11 +119,13 @@ button:disabled {
   background: var(--bar);
   color: var(--on-color);
   z-index: 1;
+  min-height: var(--topbar-h);
+  justify-content: space-between;
 }
 
 .topbar h1 {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
 }
 
 .notice {
@@ -161,6 +164,7 @@ button:disabled {
   background: transparent;
   color: var(--muted);
   font-weight: 600;
+  position: relative;
 }
 
 .tabbar button.active {
@@ -179,8 +183,9 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 18px;
   font-weight: 600;
+  gap: 12px;
+  font-size: 16px;
 }
 
 .dots {
@@ -189,10 +194,10 @@ button:disabled {
 }
 
 .dot {
-  width: 22px;
-  height: 22px;
   border-radius: 50%;
   border: 2px solid var(--board-dot);
+  width: 20px;
+  height: 20px;
 }
 
 .ball .dot.on {
@@ -222,7 +227,6 @@ button:disabled {
 }
 
 .pitch {
-  min-height: 84px;
   border-radius: var(--radius);
   display: flex;
   flex-direction: column;
@@ -230,10 +234,11 @@ button:disabled {
   gap: 4px;
   color: var(--on-color);
   padding: 8px 4px;
+  min-height: 60px;
 }
 
 .pitch strong {
-  font-size: 19px;
+  font-size: 18px;
 }
 
 .pitch small {
@@ -295,6 +300,7 @@ button:disabled {
   flex-wrap: wrap;
   gap: 6px;
   margin: 8px 0 0;
+  align-items: flex-start;
 }
 
 .chip {
@@ -303,6 +309,8 @@ button:disabled {
   font-size: 13px;
   color: var(--on-color);
   background: var(--muted);
+  white-space: nowrap;
+  line-height: 1.4;
 }
 
 .chip.ball {
@@ -380,6 +388,7 @@ button:disabled {
 
 .card strong {
   font-size: 24px;
+  font-variant-numeric: tabular-nums;
 }
 
 .basis {
@@ -425,20 +434,6 @@ th {
 
 .note {
   color: var(--warn-text);
-}
-
-.confirm {
-  display: grid;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: var(--radius);
-  background: var(--warn-bg);
-  color: var(--warn-text);
-}
-
-.confirm p {
-  margin: 0;
-  font-size: 15px;
 }
 
 .confirm-buttons {
@@ -495,16 +490,6 @@ button:focus-visible {
 .inning span {
   font-size: 13px;
   opacity: 0.8;
-}
-
-.count-row {
-  gap: 12px;
-  font-size: 16px;
-}
-
-.dot {
-  width: 20px;
-  height: 20px;
 }
 
 .out .dot.on {
@@ -570,27 +555,29 @@ button:focus-visible {
 /* 보조 투구 버튼 */
 .extra-buttons {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
 }
 
 .pitch.extra {
-  min-height: 56px;
   background: var(--extra);
+  min-height: 48px;
+  padding: 6px 1px;
 }
 
 .pitch.extra strong {
-  font-size: 16px;
+  font-size: 14px;
+  white-space: nowrap;
 }
 
 /* 주자 상황 */
 .runner-section {
   display: grid;
-  gap: 8px;
-  padding: 12px;
   border-radius: var(--radius);
   background: var(--surface);
   border: 1px solid var(--line);
+  gap: 6px;
+  padding: 10px;
 }
 
 .section-title {
@@ -617,18 +604,19 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 10px 6px;
   border-radius: 10px;
   background: var(--primary-soft);
   color: var(--text);
   border: 1px solid var(--line);
   font-weight: 600;
+  padding: 8px 4px;
+  font-size: 14px;
 }
 
 .play small {
-  font-size: 11px;
   font-weight: 400;
   color: var(--muted);
+  font-size: 10px;
 }
 
 /* 상황 고치기 */
@@ -748,10 +736,6 @@ button:focus-visible {
   overflow-x: auto;
 }
 
-.card strong {
-  font-variant-numeric: tabular-nums;
-}
-
 /* 경기 목록 · 경기 정보 */
 .games {
   display: grid;
@@ -856,28 +840,12 @@ input:focus-visible {
   outline-offset: 1px;
 }
 
-button {
-  -webkit-tap-highlight-color: transparent;
-}
-
-.chips {
-  align-items: flex-start;
-}
-
-.chip {
-  white-space: nowrap;
-  line-height: 1.4;
-}
-
 /* 버튼이 하나뿐이면 한 줄을 다 쓴다. */
 .confirm-buttons > :only-child {
   grid-column: 1 / -1;
 }
 
 /* ── 기록 입력: 상황판 고정 + 스크롤 없는 버튼 배치 ── */
-.topbar {
-  min-height: var(--topbar-h);
-}
 
 .board-sticky {
   position: sticky;
@@ -979,40 +947,15 @@ button {
   gap: 8px;
 }
 
-.pitch {
-  min-height: 60px;
-}
-
-.pitch strong {
-  font-size: 18px;
-}
-
 /* 가끔 쓰는 공 4개(병살 포함)를 한 줄에 */
-.extra-buttons {
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-}
-
-.pitch.extra {
-  min-height: 48px;
-  padding: 6px 1px;
-}
-
-.pitch.extra strong {
-  font-size: 14px;
-  white-space: nowrap;
-}
 
 .pitch.extra small {
   white-space: nowrap;
+  font-size: 10px;
 }
 
 .pitch.extra.double-play {
   background: var(--out);
-}
-
-.pitch.extra small {
-  font-size: 10px;
 }
 
 .chooser {
@@ -1030,24 +973,10 @@ button {
   gap: 8px;
 }
 
-.runner-section {
-  gap: 6px;
-  padding: 10px;
-}
-
 .play-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
-}
-
-.play {
-  padding: 8px 4px;
-  font-size: 14px;
-}
-
-.play small {
-  font-size: 10px;
 }
 
 .play.edit {
@@ -1195,9 +1124,6 @@ button {
 }
 
 /* ── 상황 기준 입력: 장면·역할 ── */
-.topbar h1 {
-  font-size: 17px;
-}
 
 .board-head {
   display: flex;
@@ -1447,9 +1373,6 @@ button {
 }
 
 /* ── 도움말 · 처음 사용 안내 ── */
-.topbar {
-  justify-content: space-between;
-}
 
 .help-button {
   padding: 6px 12px;
@@ -1786,6 +1709,8 @@ button {
 
 .speed-dial {
   grid-area: wheel;
+  display: grid;
+  gap: 4px;
 }
 
 .zone-pick,
@@ -1815,10 +1740,6 @@ button {
 }
 
 /* 구속 다이얼: 시계 모양 반원(80~160). 오른손은 오른쪽 반원, 왼손은 왼쪽 반원 */
-.speed-dial {
-  display: grid;
-  gap: 4px;
-}
 
 .speed-readout {
   margin: 0;
@@ -2075,6 +1996,12 @@ button {
 
 .legend-dot {
   background: var(--muted);
+  display: inline-block;
+  flex: none;
+  padding: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
 }
 
 .chart-dot {
@@ -2156,15 +2083,6 @@ button {
 }
 
 /* 'error' 같은 종류 이름이 다른 화면의 클래스와 겹쳐도 점 모양이 바뀌지 않게 */
-.legend-dot {
-  display: inline-block;
-  flex: none;
-  padding: 0;
-  border-radius: 50%;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
 
 /* ── 데이터 관리 (설정 탭) ── */
 .data-section h4 {
@@ -2488,10 +2406,6 @@ input[type='file'].visually-hidden {
 .backup-now small {
   font-weight: 400;
   opacity: 0.85;
-}
-
-.tabbar button {
-  position: relative;
 }
 
 .tab-badge {
