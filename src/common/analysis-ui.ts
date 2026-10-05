@@ -131,7 +131,7 @@ const SPRAY_LEGEND: readonly LegendItem[] = [
 /** 존 분포·타구 분포 그림 두 장 */
 export function chartCards(zone: readonly DrawPoint[], spray: readonly DrawPoint[], zoneTitle: string, sprayTitle: string): HTMLElement {
   return h('div', { className: 'chart-grid' }, [
-    chartCard(zoneTitle, zoneSvg({ points: zone, label: `${zoneTitle} ${zone.length}개` }), ZONE_LEGEND, `존을 찍은 공 ${zone.length}개 · 가운데 네모가 스트라이크 존 (포수 쪽에서 본 모습)`),
+    chartCard(zoneTitle, zoneSvg({ points: zone, label: `${zoneTitle} ${zone.length}개`, batters: { highlight: null } }), ZONE_LEGEND, `존을 찍은 공 ${zone.length}개 · 가운데 네모가 스트라이크 존 (포수 쪽에서 본 모습)`),
     chartCard(sprayTitle, fieldSvg({ points: spray, label: `${sprayTitle} ${spray.length}개` }), SPRAY_LEGEND, `낙구 지점을 찍은 타구 ${spray.length}개`),
   ]);
 }

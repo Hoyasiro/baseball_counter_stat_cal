@@ -17,6 +17,7 @@ import {
   ChildPosition,
   Team,
   Venue,
+  BatterHand,
   isLogEvent,
 } from './events';
 
@@ -202,6 +203,15 @@ export function addAppearance(game: Game, input: AppearanceInput): Game {
 
 export function addExit(game: Game): Game {
   return append(game, { kind: 'exit', ...base() });
+}
+
+export function addBatter(game: Game, hand: BatterHand | null, grade: number | null): Game {
+  return append(game, {
+    kind: 'batter',
+    ...base(),
+    ...(hand === null ? {} : { hand }),
+    ...(grade === null ? {} : { grade }),
+  });
 }
 
 export function addScore(game: Game, team: Team, inning: number, runs: number): Game {

@@ -5,6 +5,7 @@ import {
   BATTED_BALL_STRENGTHS,
   BATTED_BALL_TYPES,
   BattedBallStrength,
+  BatterHand,
   BaseIndex,
   BattedBallType,
   FieldingCredit,
@@ -108,7 +109,7 @@ function sheetResultLabel(sheet: PitchSheet): string {
 }
 
 /** 결과 버튼을 누른 뒤 뜨는 투구 상세 창(팝업) */
-export function pitchSheetView(sheet: PitchSheet, hand: Hand, actions: PitchSheetActions): HTMLElement {
+export function pitchSheetView(sheet: PitchSheet, hand: Hand, actions: PitchSheetActions, batterHand: BatterHand | null): HTMLElement {
   // 다이얼 값은 다시 그리지 않고 담기만 하므로, 다른 값을 고르거나 기록할 때 최신 구속을 함께 넘긴다.
   let speed = sheet.speed;
   const changeSpeed = (value: number | null): void => {
@@ -138,7 +139,12 @@ export function pitchSheetView(sheet: PitchSheet, hand: Hand, actions: PitchShee
       h('div', { className: 'sheet-body' }, [
         h('div', { className: 'sheet-zone' }, [
           h('div', { className: 'zone-pick' }, [
-            zoneSvg({ picked: sheet.zone, onPick: (x, y) => set({ zone: { x, y } }), label: '스트라이크 존. 공이 지나간 곳을 누르세요' }),
+            zoneSvg({
+              picked: sheet.zone,
+              onPick: (x, y) => set({ zone: { x, y } }),
+              label: '스트라이크 존 (포수 쪽에서 본 모습). 공이 지나간 곳을 누르세요',
+              batters: { highlight: batterHand },
+            }),
           ]),
           h('p', { className: 'zone-caption' }, [
             zoneText,

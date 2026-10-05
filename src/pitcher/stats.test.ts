@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { formatSources } from '../common/calculation';
 import { PlayLogEvent } from '../common/events';
 import { replayGame } from '../common/replay';
-import { appear, hit, pitchWith, pitches, play, settings } from '../common/test-helpers';
+import { appear, batter, hit, pitchWith, pitches, play, settings } from '../common/test-helpers';
 import {
   GameForStats,
   averageSpeed,
   battedBallTypes,
+  byBatterHand,
   byPitchType,
   charts,
   topSpeed,
@@ -207,5 +208,37 @@ describe('병살', () => {
     expect(inningsPitched([g]).expression).toBe('2 ÷ 3');
     expect(inningsPitched([g]).display).toBe('2/3');
     expect(battersFaced([g]).value).toBe(1);
+  });
+});
+
+describe('좌타 · 우타별', () => {
+  it('타자 정보를 고른 타석만 나눠 센다: 우타 2타수 1안타 .500, 좌타 1타수 0안타 .000', () => {
+    const games: GameForStats[] = [
+      {
+        label: '10월 5일 ○○전',
+        replay: replayGame(
+          [
+            appear('pitcher'),
+            batter('right', 5),
+            hit('single'),
+            batter('right', null),
+            ...pitches('out'),
+            batter('left', 6),
+            ...pitches('out'),
+            ...pitches('out'),
+          ],
+          settings(),
+        ),
+      },
+    ];
+    const [rightPa, rightAvg, leftPa, leftAvg] = byBatterHand(games);
+    expect(rightPa.value).toBe(2);
+    expect(rightAvg.expression).toBe('1 ÷ 2');
+    expect(rightAvg.display).toBe('.500');
+    expect(leftPa.value).toBe(1);
+    expect(leftAvg.display).toBe('.000');
+    // 고르지 않은 네 번째 타자는 어느 쪽에도 들어가지 않는다.
+    expect(games[0].replay.plateAppearances[3].batterHand).toBeNull();
+    expect(games[0].replay.plateAppearances[0].batterGrade).toBe(5);
   });
 });

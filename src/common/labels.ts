@@ -4,6 +4,7 @@ import { GameOrder } from './game-list';
 import { Hand } from './settings';
 import { BASE_NAMES, STEAL_NAMES, basesLabel } from './bases';
 import {
+  BatterHand,
   BattedBallStrength,
   BattedBallType,
   HitType,
@@ -295,6 +296,18 @@ function fieldingSuffix(fielding: readonly FieldingCredit[] | undefined): string
   return text ? ` · 아이: ${text}` : '';
 }
 
+/** 타자가 선 쪽. 포수 쪽에서 보면 우타자는 왼쪽, 좌타자는 오른쪽에 선다. */
+export const BATTER_HAND_LABEL: Record<BatterHand, string> = { right: '우타', left: '좌타' };
+
+/** 상대 타자 정보 창 단추 */
+export const BATTER_INFO_LABEL = { open: '타자 정보', unknown: '모름', save: '이 타자로' } as const;
+
+/** 예: "우타 · 5학년". 아무것도 모르면 null */
+export function batterInfoText(hand: BatterHand | null, grade: number | null): string | null {
+  const parts = [hand ? BATTER_HAND_LABEL[hand] : null, grade ? `${grade}학년` : null].filter((p): p is string => p !== null);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
 export function eventLabel(event: UndoableEvent): string {
   switch (event.kind) {
     case 'pitch':
@@ -315,6 +328,8 @@ export function eventLabel(event: UndoableEvent): string {
       return `${ROLE_LABEL[event.role]}로 등장 (${event.inning}회)`;
     case 'exit':
       return '교체됨';
+    case 'batter':
+      return `타자 정보: ${batterInfoText(event.hand ?? null, event.grade ?? null) ?? '모름'}`;
     case 'score':
       return `점수 넣음: ${event.team === 'us' ? '우리 팀' : '상대팀'} ${event.inning}회 ${event.runs}점`;
   }

@@ -15,12 +15,14 @@ import { backupJson, exportFileName, pitchesCsv } from './common/export';
 import { EMPTY_PITCH_DETAIL, FieldDraft, PitchDetail, PitchSheet, isBattedResult } from './common/pitch-detail-view';
 import { Hand, loadHand, loadShowScoreboard, loadTeamName, saveHand, saveShowScoreboard, saveTeamName } from './common/settings';
 import { FIELDING_PLAYS, PlayFieldingDraft } from './common/fielding-view';
+import { BatterDraft } from './common/batter-info-view';
 import { settingsView } from './common/settings-view';
 import {
   Game,
   GameInfo,
   addAdjust,
   addAppearance,
+  addBatter,
   addExit,
   addPitch,
   addPlay,
@@ -98,6 +100,8 @@ interface State {
   gameList: GameListView;
   /** 수비 중 주자 상황에서 아이의 수비 기록을 고르는 중 */
   playFielding: PlayFieldingDraft | null;
+  /** 상대 타자 정보를 고르는 중 */
+  batterDraft: BatterDraft | null;
   /** "경기" 탭에서 결과를 보고 있는 경기. 목록이면 null */
   resultGameId: string | null;
   /** 지울지 묻고 있는 경기 */
@@ -205,6 +209,7 @@ export function mountApp(root: HTMLElement): void {
     hand: loadHand(),
     gameList: { order: 'newest', type: 'all', query: '' },
     playFielding: null,
+    batterDraft: null,
     resultGameId: null,
     deletingId: null,
     analysisGameId: null,
@@ -242,6 +247,7 @@ export function mountApp(root: HTMLElement): void {
     state.fieldDraft = null;
     state.pitchSheet = null;
     state.playFielding = null;
+    state.batterDraft = null;
     render();
     window.scrollTo(0, 0);
   };
@@ -411,6 +417,25 @@ export function mountApp(root: HTMLElement): void {
       },
       cancel: () => {
         state.playFielding = null;
+        render();
+      },
+    },
+    batter: {
+      open: () => {
+        const active = currentReplay()?.state;
+        state.batterDraft = { hand: active?.batterHand ?? null, grade: active?.batterGrade ?? null };
+        render();
+      },
+      change: (draft: BatterDraft) => {
+        state.batterDraft = draft;
+        render();
+      },
+      save: (draft: BatterDraft) => {
+        state.batterDraft = null;
+        updateCurrent((g) => addBatter(g, draft.hand, draft.grade));
+      },
+      cancel: () => {
+        state.batterDraft = null;
         render();
       },
     },
@@ -781,6 +806,7 @@ export function mountApp(root: HTMLElement): void {
             hand: state.hand,
             fieldDraft: state.fieldDraft,
             playFielding: state.playFielding,
+            batterDraft: state.batterDraft,
           },
           inputActions,
         );

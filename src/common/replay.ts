@@ -35,6 +35,8 @@ import {
   AdjustEvent,
   AppearanceEvent,
   BaseIndex,
+  BatterEvent,
+  BatterHand,
   Bases,
   HIT_BASES,
   FieldingPosition,
@@ -104,6 +106,10 @@ export interface PlateAppearance {
   readonly runsAfterEnd: number;
   /** 이 타석 동안 나온 수비 실책 수 */
   readonly errors: number;
+  /** 타자가 선 쪽 (고른 경우만) */
+  readonly batterHand: BatterHand | null;
+  /** 타자 학년 (고른 경우만) */
+  readonly batterGrade: number | null;
 }
 
 /** 주자로서 우리 아이에게 일어난 일 */
@@ -149,6 +155,9 @@ export interface ActiveState {
   /** 우리 아이가 있는 베이스 (주자일 때) */
   readonly childBase: BaseIndex | null;
   readonly position: Position | null;
+  /** 지금 타자의 정보 (고른 경우만) */
+  readonly batterHand: BatterHand | null;
+  readonly batterGrade: number | null;
 }
 
 export interface HalfTotals {
@@ -230,6 +239,8 @@ interface OpenPlateAppearance {
   runs: number;
   runsOnResult: number;
   errors: number;
+  batterHand: BatterHand | null;
+  batterGrade: number | null;
 }
 
 type MutablePlateAppearance = { -readonly [K in keyof PlateAppearance]: PlateAppearance[K] } & {
@@ -299,6 +310,8 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
     runs: 0,
     runsOnResult: 0,
     errors: 0,
+    batterHand: null,
+    batterGrade: null,
   });
 
   /** 공이나 주자 상황이 하나라도 있으면 타석으로 남긴다. */
@@ -331,6 +344,8 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
     runsOnResult: pa.runsOnResult,
     runsAfterEnd: 0,
     errors: pa.errors,
+    batterHand: pa.batterHand,
+    batterGrade: pa.batterGrade,
   });
 
   const closePa = (s: OpenScene, outcome: PlateAppearanceOutcome, endCount: Count | null): void => {
@@ -550,6 +565,13 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
     endIfChildDone(s);
   };
 
+  /** 타자 정보는 지금 타석(아직 공이 없으면 다음 타자)에 붙는다. 다시 고르면 바꾼다. */
+  const onBatter = (s: OpenScene, event: BatterEvent): void => {
+    if (!s.current) return;
+    s.current.batterHand = event.hand ?? null;
+    s.current.batterGrade = event.grade ?? null;
+  };
+
   for (const event of events) {
     if (event.kind === 'appearance') {
       startScene(event);
@@ -564,6 +586,10 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
     }
     if (event.kind === 'adjust') {
       onAdjust(s, event);
+      continue;
+    }
+    if (event.kind === 'batter') {
+      onBatter(s, event);
       continue;
     }
     if (!s.current) continue;
@@ -596,5 +622,7 @@ function activeState(s: OpenScene): ActiveState {
     count: s.current?.count ?? FIRST_PITCH_COUNT,
     childBase: childBaseOf(s.runners),
     position: s.record.position,
+    batterHand: s.current?.batterHand ?? null,
+    batterGrade: s.current?.batterGrade ?? null,
   };
 }

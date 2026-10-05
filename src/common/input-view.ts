@@ -29,6 +29,7 @@ import { ActiveState, GameReplay } from './replay';
 import { SceneDraft, SceneSetupActions, defaultRole, defaultSceneDraft, sceneSetupView } from './scene-setup-view';
 import { PlayFieldingActions, PlayFieldingDraft, playFieldingPopup } from './fielding-view';
 import { Hand } from './settings';
+import { BatterActions, BatterDraft, batterPill, batterPopup } from './batter-info-view';
 import { FieldActions, FieldDraft, PitchSheet, PitchSheetActions, fieldPanel, pitchDetailToggle, pitchSheetView } from './pitch-detail-view';
 
 export interface SituationDraft {
@@ -63,6 +64,7 @@ export interface InputActions {
   playFielding: PlayFieldingActions;
   sheet: PitchSheetActions;
   field: FieldActions;
+  batter: BatterActions;
 }
 
 export interface InputModel {
@@ -84,6 +86,8 @@ export interface InputModel {
   readonly fieldDraft: FieldDraft | null;
   /** 수비 중 주자 상황에서 아이의 수비 기록을 고르는 중이면 그 값 */
   readonly playFielding: PlayFieldingDraft | null;
+  /** 상대 타자 정보를 고르는 중이면 그 값 */
+  readonly batterDraft: BatterDraft | null;
 }
 
 function dots(filled: number, total: number, kind: string, label: string): HTMLElement {
@@ -181,6 +185,8 @@ function board(model: InputModel, actions: InputActions): HTMLElement {
         h('p', { className: 'inning' }, [
           h('strong', { text: halfInningLabel(inning, half) }),
           h('span', { className: `role-badge ${state.role}`, text: roleText(state) }),
+          // 상대 타자를 상대할 때(투수·수비)만 타자 정보를 고른다.
+          state.role === 'pitcher' || state.role === 'fielder' ? batterPill(state.batterHand, state.batterGrade, actions.batter.open) : null,
         ]),
         h('div', { className: 'count-row' }, [h('span', { text: '볼' }), dots(count.balls, MAX_BALLS_IN_COUNT, 'ball', '볼')]),
         h('div', { className: 'count-row' }, [
@@ -477,9 +483,10 @@ export function inputView(model: InputModel, actions: InputActions): HTMLElement
   return h('section', { className: 'input' }, [
     h('div', { className: 'board-sticky' }, [board(model, actions)]),
     controls(model, actions),
-    model.pitchSheet ? pitchSheetView(model.pitchSheet, model.hand, actions.sheet) : null,
+    model.pitchSheet ? pitchSheetView(model.pitchSheet, model.hand, actions.sheet, model.replay.state?.batterHand ?? null) : null,
     // 친 공은 야구장 그림 창에서 낙구 지점과 질을 고른 뒤 기록한다.
     model.fieldDraft ? fieldPanel(model.fieldDraft, actions.field) : null,
     model.playFielding ? playFieldingPopup(model.playFielding, actions.playFielding) : null,
+    model.batterDraft ? batterPopup(model.batterDraft, actions.batter) : null,
   ]);
 }

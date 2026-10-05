@@ -12,6 +12,8 @@ import {
   DOUBLE_PLAY_BUTTON,
   DOWNLOAD_LABEL,
   FIELD_BUTTON_LABEL,
+  BATTER_HAND_LABEL,
+  BATTER_INFO_LABEL,
   OUT_TYPE_LABEL,
   FIELDING_CREDIT_LABEL,
   FIELDING_POSITION_LABEL,
@@ -71,6 +73,8 @@ describe('도움말이 화면과 맞는지', () => {
     expect(missing(Object.values(BATTED_BALL_STRENGTH_LABEL))).toEqual([]);
     expect(missing(Object.values(FIELD_BUTTON_LABEL))).toEqual([]);
     expect(missing(Object.values(OUT_TYPE_LABEL))).toEqual([]);
+    expect(missing(Object.values(BATTER_HAND_LABEL))).toEqual([]);
+    expect(missing(Object.values(BATTER_INFO_LABEL))).toEqual([]);
     expect(missing(Object.values(PITCH_TYPE_LABEL))).toEqual([]);
     expect(missing([PITCH_DETAIL_LABEL])).toEqual([]);
     expect(missing(Object.values(DOWNLOAD_LABEL))).toEqual([]);

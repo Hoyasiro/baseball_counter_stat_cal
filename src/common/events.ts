@@ -236,6 +236,22 @@ export interface AppearanceEvent extends EventBase {
   readonly position?: Position;
 }
 
+/** 타자가 서는 쪽: 오른쪽 타석(우타) / 왼쪽 타석(좌타) */
+export type BatterHand = 'right' | 'left';
+
+export const BATTER_HANDS: readonly BatterHand[] = ['right', 'left'];
+
+/** 학년으로 고를 수 있는 범위 (초등 1~6, 중·고 1~3을 함께 쓴다) */
+export const GRADE_MIN = 1;
+export const GRADE_MAX = 6;
+
+/** 지금 타석에 선 타자 정보 (상대 타자). 고른 것만 남기고, 모르면 비운다. 다음 타자에게는 이어지지 않는다. */
+export interface BatterEvent extends EventBase {
+  readonly kind: 'batter';
+  readonly hand?: BatterHand;
+  readonly grade?: number;
+}
+
 /** 우리 아이가 교체되어 빠짐. 지금 장면의 기록을 끝낸다. */
 export interface ExitEvent extends EventBase {
   readonly kind: 'exit';
@@ -276,12 +292,13 @@ export type LogEvent =
   | AdjustEvent
   | AppearanceEvent
   | ExitEvent
+  | BatterEvent
   | ScoreEvent
   | GameInfoEvent
   | VoidEvent;
 
 /** 경기 진행에 영향을 주는 이벤트 */
-export type PlayLogEvent = PitchEvent | PlayEvent | AdjustEvent | AppearanceEvent | ExitEvent;
+export type PlayLogEvent = PitchEvent | PlayEvent | AdjustEvent | AppearanceEvent | ExitEvent | BatterEvent;
 
 /** 취소할 수 있는 이벤트 */
 export type UndoableEvent = PlayLogEvent | ScoreEvent;
@@ -386,6 +403,11 @@ export function isLogEvent(value: unknown): value is LogEvent {
       );
     case 'exit':
       return true;
+    case 'batter':
+      return (
+        (value.hand === undefined || BATTER_HANDS.includes(value.hand as BatterHand)) &&
+        (value.grade === undefined || isCount(value.grade, GRADE_MIN, GRADE_MAX))
+      );
     case 'score':
       return (
         (value.team === 'us' || value.team === 'them') &&

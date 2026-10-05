@@ -2551,3 +2551,90 @@ input[type='file'].visually-hidden {
   min-width: 0;
   width: 100%;
 }
+
+/* 존 그림 양옆 타석 · 홈플레이트 (포수 쪽에서 본 모습) */
+.batter-box {
+  fill: none;
+  stroke: var(--board-dot);
+  stroke-width: 0.6;
+  stroke-dasharray: 2 1.5;
+}
+
+.batter-box.on {
+  fill: rgba(79, 182, 242, 0.18);
+  stroke: var(--child);
+  stroke-dasharray: none;
+}
+
+.batter-label {
+  fill: var(--board-dot);
+  font-size: 4.6px;
+  font-weight: 700;
+  writing-mode: vertical-rl;
+  user-select: none;
+  pointer-events: none;
+}
+
+.batter-label.on {
+  fill: var(--child);
+}
+
+.zone-plate {
+  fill: var(--chalk);
+  opacity: 0.85;
+}
+
+/* 상대 타자 정보 */
+.batter-pill {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px dashed var(--board-dot);
+  background: transparent;
+  color: var(--on-color);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.batter-pill.set {
+  border: 1px solid var(--child);
+  color: var(--child);
+}
+
+.batter-row {
+  display: grid;
+  gap: 6px;
+}
+
+.batter-row-label {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.batter-choices {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 6px;
+}
+
+.batter-choices button {
+  min-height: 48px;
+  padding: 0 2px;
+  white-space: nowrap;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.batter-choices button.active {
+  background: var(--bar);
+  border-color: var(--bar);
+  color: var(--on-color);
+}
+
+.batter-popup .help {
+  margin: 0;
+}
