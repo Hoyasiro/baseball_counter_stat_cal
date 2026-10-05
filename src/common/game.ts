@@ -1,6 +1,9 @@
 import {
   BaseIndex,
   Bases,
+  BattedBall,
+  PitchType,
+  ZonePoint,
   GameInfoEvent,
   GameType,
   HitType,
@@ -72,8 +75,19 @@ export function setGameInfo(game: Game, info: GameInfo): Game {
   return append(game, { kind: 'gameInfo', ...base(), ...info });
 }
 
-export function addPitch(game: Game, result: PitchResult, hitType?: HitType): Game {
-  return append(game, { kind: 'pitch', ...base(), result, ...(hitType ? { hitType } : {}) });
+/** 투구에 함께 남기는 선택 정보 */
+export interface PitchDetails {
+  readonly hitType?: HitType;
+  readonly pitchType?: PitchType;
+  readonly zone?: ZonePoint;
+  readonly speed?: number;
+  readonly battedBall?: BattedBall;
+}
+
+export function addPitch(game: Game, result: PitchResult, details: PitchDetails = {}): Game {
+  // 값이 없는 항목은 저장하지 않는다.
+  const extra = Object.fromEntries(Object.entries(details).filter(([, v]) => v !== undefined));
+  return append(game, { kind: 'pitch', ...base(), result, ...extra });
 }
 
 export function addPlay(game: Game, play: PlayKind, baseIndex?: BaseIndex): Game {

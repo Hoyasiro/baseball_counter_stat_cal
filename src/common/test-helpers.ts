@@ -34,6 +34,11 @@ export function pitches(...results: PitchResult[]): PitchEvent[] {
   return results.map((result) => ({ kind: 'pitch', ...base(), result }));
 }
 
+/** 구종·존·구속·타구 등 상세가 있는 투구 */
+export function pitchWith(result: PitchResult, details: Omit<PitchEvent, 'kind' | 'id' | 'createdAt' | 'author' | 'result'>): PitchEvent {
+  return { kind: 'pitch', ...base(), result, ...details };
+}
+
 export function hit(hitType: HitType): PitchEvent {
   return { kind: 'pitch', ...base(), result: 'hit', hitType };
 }

@@ -3,24 +3,34 @@
 
 import { Calculation, safeDivide, tally, term } from '../common/calculation';
 import { Count, OUTS_PER_INNING, countLabel } from '../common/count';
-import { PitchResult } from '../common/events';
+import { PITCH_TYPES, PitchResult, PitchType } from '../common/events';
 import { formatInningsFromOuts, formatPercent } from '../common/format';
 import {
   END_COUNT_BASIS,
   GameForStats,
   ScopedPlateAppearance,
   averageOf,
+  battedBallShares,
+  battedBallsOf,
+  ChartPoint,
   completed,
   endCountsOf,
   inCount,
+  maxSpeed,
+  meanSpeed,
   pitchSources,
   platesOf,
   playSources,
   ref,
   repeatedSources,
+  shareOf,
   sluggingOf,
+  speedsOf,
+  sprayPoints,
   withOutcome,
+  zonePoints,
 } from '../common/stat-base';
+import { PITCH_TYPE_LABEL } from '../common/labels';
 
 export { END_COUNT_BASIS };
 export type { GameForStats };
@@ -167,6 +177,59 @@ export function pitchesByInning(games: readonly GameForStats[]): Calculation[] {
   });
 }
 
+/** 평균 구속·최고 구속 (구속을 잰 공만) */
+export function averageSpeed(games: readonly GameForStats[]): Calculation {
+  return meanSpeed('평균 구속', speedsOf(faced(games)));
+}
+
+export function topSpeed(games: readonly GameForStats[]): Calculation {
+  return maxSpeed('최고 구속', speedsOf(faced(games)));
+}
+
+export interface PitchTypeRow {
+  readonly pitchType: PitchType;
+  readonly pitches: Calculation;
+  readonly share: Calculation;
+  readonly strikeRate: Calculation;
+  readonly speed: Calculation;
+}
+
+/** 구종별: 투구 수, 비율(구종을 기록한 공 중), 스트라이크 비율, 평균 구속 */
+export function byPitchType(games: readonly GameForStats[]): PitchTypeRow[] {
+  const pas = faced(games);
+  const typed = pas.flatMap((s) => s.pa.pitches.filter((p) => p.pitchType).map(() => ref(s)));
+  return PITCH_TYPES.map((pitchType) => {
+    const label = PITCH_TYPE_LABEL[pitchType];
+    const mine = pas.flatMap((s) => s.pa.pitches.filter((p) => p.pitchType === pitchType).map((p) => ({ s, p })));
+    const sources = mine.map(({ s }) => ref(s));
+    const strikes = mine.filter(({ p }) => STRIKE_LIKE.has(p.result)).map(({ s }) => ref(s));
+    return {
+      pitchType,
+      pitches: tally(`${label} 투구 수`, `${label}로 기록한 공 수`, sources),
+      share: shareOf(`${label} 비율`, { label, sources }, { label: '구종을 기록한 공', sources: typed }),
+      strikeRate: shareOf(`${label} 스트라이크 비율`, { label: `${label} 스트라이크`, sources: strikes }, { label: `${label} 투구 수`, sources }),
+      speed: meanSpeed(`${label} 평균 구속`, speedsOf(pas, (p) => p.pitchType === pitchType)),
+    };
+  }).filter((row) => row.pitches.value !== 0);
+}
+
+/** 맞은 타구의 종류 비율 */
+export function battedBallTypes(games: readonly GameForStats[]): Calculation[] {
+  return battedBallShares(battedBallsOf(faced(games)), '맞은 타구');
+}
+
+export interface PitcherCharts {
+  /** 아이가 던진 공의 존 통과 지점 */
+  readonly zone: readonly ChartPoint[];
+  /** 상대 타자가 친 공의 낙구 지점 */
+  readonly spray: readonly ChartPoint[];
+}
+
+export function charts(games: readonly GameForStats[]): PitcherCharts {
+  const pas = faced(games);
+  return { zone: zonePoints(pas), spray: sprayPoints(battedBallsOf(pas)) };
+}
+
 export interface CountRow {
   readonly count: Count;
   readonly plateAppearances: Calculation;
@@ -196,12 +259,14 @@ export interface PitcherSummary {
   readonly byCount: readonly CountRow[];
   /** 한 경기만 볼 때 이닝별 투구 수 */
   readonly byInning: readonly Calculation[];
+  readonly byPitchType: readonly PitchTypeRow[];
+  readonly charts: PitcherCharts;
 }
 
 export function summarize(games: readonly GameForStats[]): PitcherSummary {
   return {
     sections: [
-      { title: '던진 공', items: [pitchCount(games), strikeRate(games), inningsPitched(games)] },
+      { title: '던진 공', items: [pitchCount(games), strikeRate(games), inningsPitched(games), averageSpeed(games), topSpeed(games)] },
       {
         title: '타자 상대',
         items: [
@@ -228,9 +293,12 @@ export function summarize(games: readonly GameForStats[]): PitcherSummary {
           errorsBehind(games),
         ],
       },
+      { title: '맞은 타구', items: battedBallTypes(games) },
     ],
     byCount: byEndCount(games),
     byInning: games.length === 1 ? pitchesByInning(games) : [],
+    byPitchType: byPitchType(games),
+    charts: charts(games),
   };
 }
 

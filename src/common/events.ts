@@ -60,6 +60,45 @@ export const PLAY_KINDS: readonly PlayKind[] = [
   'caughtStealingSecond',
 ];
 
+/** 구종 */
+export type PitchType = 'fastball' | 'curveball' | 'slider' | 'changeup' | 'splitter' | 'other';
+
+export const PITCH_TYPES: readonly PitchType[] = ['fastball', 'curveball', 'slider', 'changeup', 'splitter', 'other'];
+
+/**
+ * 공이 지나간 곳. 스트라이크 존 그림 안의 위치를 0~1로 저장한다.
+ * 그림 전체 중 x·y 모두 ZONE_MIN~ZONE_MAX 사이가 스트라이크 존이다. (y는 위가 0)
+ */
+export interface ZonePoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+export const ZONE_MIN = 0.2;
+export const ZONE_MAX = 0.8;
+
+/** 구속으로 받을 수 있는 범위 (km/h, 입력 실수 방지) */
+export const SPEED_MIN = 30;
+export const SPEED_MAX = 180;
+
+/** 타구 종류 */
+export type BattedBallType = 'ground' | 'line' | 'fly' | 'popup';
+
+export const BATTED_BALL_TYPES: readonly BattedBallType[] = ['ground', 'line', 'fly', 'popup'];
+
+/** 타구 세기 */
+export type BattedBallStrength = 'soft' | 'medium' | 'hard';
+
+export const BATTED_BALL_STRENGTHS: readonly BattedBallStrength[] = ['soft', 'medium', 'hard'];
+
+/** 친 공. 낙구 지점은 야구장 그림 안의 위치를 0~1로 저장한다. (홈플레이트가 아래 가운데) */
+export interface BattedBall {
+  readonly x: number | null;
+  readonly y: number | null;
+  readonly type: BattedBallType | null;
+  readonly strength: BattedBallStrength | null;
+}
+
 /** 0: 1루, 1: 2루, 2: 3루 */
 export type BaseIndex = 0 | 1 | 2;
 
@@ -115,6 +154,12 @@ export interface PitchEvent extends EventBase {
   readonly result: PitchResult;
   /** result가 'hit'일 때 안타 종류 */
   readonly hitType?: HitType;
+  /** 투구 상세 (켜 두었을 때만): 구종, 존 통과 지점, 구속(km/h) */
+  readonly pitchType?: PitchType;
+  readonly zone?: ZonePoint;
+  readonly speed?: number;
+  /** 친 공(안타·아웃·실책 출루)의 낙구 지점과 질 */
+  readonly battedBall?: BattedBall;
 }
 
 export interface PlayEvent extends EventBase {
@@ -227,6 +272,24 @@ function isBases(value: unknown): boolean {
   return Array.isArray(value) && value.length === 3 && value.every((v) => typeof v === 'boolean');
 }
 
+function isUnit(value: unknown): boolean {
+  return typeof value === 'number' && value >= 0 && value <= 1;
+}
+
+function isUnitPoint(value: unknown): boolean {
+  return isObject(value) && isUnit(value.x) && isUnit(value.y);
+}
+
+function isBattedBall(value: unknown): boolean {
+  return (
+    isObject(value) &&
+    (value.x === null || isUnit(value.x)) &&
+    (value.y === null || isUnit(value.y)) &&
+    (value.type === null || BATTED_BALL_TYPES.includes(value.type as BattedBallType)) &&
+    (value.strength === null || BATTED_BALL_STRENGTHS.includes(value.strength as BattedBallStrength))
+  );
+}
+
 function isChildPosition(value: unknown): boolean {
   return value === 'scored' || value === 'out' || isCount(value, 0, 2);
 }
@@ -242,7 +305,11 @@ export function isLogEvent(value: unknown): value is LogEvent {
     case 'pitch':
       return (
         PITCH_RESULTS.includes(value.result as PitchResult) &&
-        (value.hitType === undefined || HIT_TYPES.includes(value.hitType as HitType))
+        (value.hitType === undefined || HIT_TYPES.includes(value.hitType as HitType)) &&
+        (value.pitchType === undefined || PITCH_TYPES.includes(value.pitchType as PitchType)) &&
+        (value.zone === undefined || isUnitPoint(value.zone)) &&
+        (value.speed === undefined || isCount(value.speed, SPEED_MIN, SPEED_MAX)) &&
+        (value.battedBall === undefined || isBattedBall(value.battedBall))
       );
     case 'play':
       return (

@@ -12,6 +12,9 @@ import {
   ScopedPlateAppearance,
   atBats,
   averageOf,
+  battedBallShares,
+  battedBallsOf,
+  ChartPoint,
   completed,
   endCountsOf,
   inCount,
@@ -19,7 +22,9 @@ import {
   platesOf,
   ref,
   sluggingOf,
+  sprayPoints,
   withOutcome,
+  zonePoints,
 } from '../common/stat-base';
 
 export { END_COUNT_BASIS };
@@ -158,6 +163,23 @@ export function leftOnBase(games: readonly GameForStats[]): Calculation {
   return tally('잔루', '이닝이 끝날 때 베이스에 남은 횟수', runnerSources(games, ['stranded']));
 }
 
+/** 아이가 친 타구의 종류 비율 */
+export function battedBallTypes(games: readonly GameForStats[]): Calculation[] {
+  return battedBallShares(battedBallsOf(batted(games)), '친 타구');
+}
+
+export interface BatterCharts {
+  /** 아이가 본 공의 존 통과 지점 */
+  readonly zone: readonly ChartPoint[];
+  /** 아이가 친 공의 낙구 지점 */
+  readonly spray: readonly ChartPoint[];
+}
+
+export function charts(games: readonly GameForStats[]): BatterCharts {
+  const pas = batted(games);
+  return { zone: zonePoints(pas), spray: sprayPoints(battedBallsOf(pas)) };
+}
+
 export interface CountRow {
   readonly count: Count;
   readonly plateAppearances: Calculation;
@@ -185,6 +207,7 @@ export interface StatSection {
 export interface BatterSummary {
   readonly sections: readonly StatSection[];
   readonly byCount: readonly CountRow[];
+  readonly charts: BatterCharts;
 }
 
 export function summarize(games: readonly GameForStats[]): BatterSummary {
@@ -216,7 +239,9 @@ export function summarize(games: readonly GameForStats[]): BatterSummary {
           leftOnBase(games),
         ],
       },
+      { title: '친 타구', items: battedBallTypes(games) },
     ],
     byCount: byEndCount(games),
+    charts: charts(games),
   };
 }

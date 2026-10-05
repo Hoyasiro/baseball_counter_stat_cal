@@ -2,9 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { formatSources } from '../common/calculation';
 import { PlayLogEvent } from '../common/events';
 import { replayGame } from '../common/replay';
-import { appear, hit, pitches, play, settings } from '../common/test-helpers';
+import { appear, hit, pitchWith, pitches, play, settings } from '../common/test-helpers';
 import {
   GameForStats,
+  averageSpeed,
+  battedBallTypes,
+  byPitchType,
+  charts,
+  topSpeed,
   battingAverageAgainst,
   byEndCount,
   caughtStealing,
@@ -141,5 +146,50 @@ describe('여러 경기 합계', () => {
 
   it('던진 이닝: 3아웃 + 1아웃 = 1 1/3', () => {
     expect(inningsPitched([game, second]).display).toBe('1 1/3');
+  });
+});
+
+describe('구종·구속·맞은 타구', () => {
+  const g = asGame('x', [
+    appear('pitcher'),
+    pitchWith('strike', { pitchType: 'fastball', speed: 100, zone: { x: 0.5, y: 0.5 } }),
+    pitchWith('ball', { pitchType: 'fastball', speed: 104, zone: { x: 0.1, y: 0.5 } }),
+    pitchWith('strike', { pitchType: 'curveball', speed: 80 }),
+    pitchWith('out', { battedBall: { x: 0.4, y: 0.8, type: 'ground', strength: 'soft' } }),
+    pitchWith('hit', { hitType: 'single', battedBall: { x: 0.5, y: 0.5, type: 'line', strength: 'hard' } }),
+    pitchWith('out', { battedBall: { x: null, y: null, type: null, strength: null } }),
+  ]);
+
+  it('평균 구속 = (100 + 104 + 80) ÷ 3 = 94.7 km/h, 최고 104', () => {
+    expect(averageSpeed([g]).expression).toBe('284 ÷ 3');
+    expect(averageSpeed([g]).display).toBe('94.7 km/h');
+    expect(topSpeed([g]).display).toBe('104 km/h');
+  });
+
+  it('구종별: 직구 2개(비율 2 ÷ 3), 스트라이크 비율 1 ÷ 2, 평균 102 km/h / 커브 1개', () => {
+    const rows = byPitchType([g]);
+    expect(rows.map((r) => r.pitchType)).toEqual(['fastball', 'curveball']);
+    expect(rows[0].share.expression).toBe('2 ÷ 3');
+    expect(rows[0].strikeRate.display).toBe('50.0%');
+    expect(rows[0].speed.display).toBe('102.0 km/h');
+  });
+
+  it('맞은 타구: 종류를 기록한 2개 중 땅볼 1, 라인드라이브 1, 세게 1 (건너뛴 타구는 빼고)', () => {
+    const [ground, line, fly, hard] = battedBallTypes([g]);
+    expect(ground.expression).toBe('1 ÷ 2');
+    expect(line.display).toBe('50.0%');
+    expect(fly.expression).toBe('0 ÷ 2');
+    expect(hard.expression).toBe('1 ÷ 2');
+  });
+
+  it('그림 점: 존은 위치를 찍은 2개, 낙구는 위치를 찍은 2개 (아웃·안타)', () => {
+    const c = charts([g]);
+    expect(c.zone.map((p) => p.kind)).toEqual(['strike', 'ball']);
+    expect(c.spray.map((p) => p.kind)).toEqual(['out', 'hit']);
+  });
+
+  it('구속을 잰 공이 없으면 계산 불가', () => {
+    expect(averageSpeed([game]).display).toBe('-');
+    expect(averageSpeed([game]).note).toContain('계산할 수 없음');
   });
 });

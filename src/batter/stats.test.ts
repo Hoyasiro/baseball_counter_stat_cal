@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { PlayLogEvent } from '../common/events';
 import { replayGame } from '../common/replay';
 import { GameForStats } from '../common/stat-base';
-import { adjust, appear, hit, pitches, play, settings } from '../common/test-helpers';
+import { adjust, appear, hit, pitchWith, pitches, play, settings } from '../common/test-helpers';
 import {
+  battedBallTypes,
+  charts,
   battingAverage,
   byEndCount,
   caughtStealing,
@@ -91,5 +93,25 @@ describe('타자 통계', () => {
     const empty = asGame([appear('runner', { childBase: 0 }), adjust(1, 0, [false, false, false], 1, 'scored')]);
     expect(battingAverage([empty]).display).toBe('-');
     expect(runsScored([empty]).value).toBe(1);
+  });
+});
+
+describe('아이가 친 타구', () => {
+  const g = asGame([
+    appear('batter'),
+    pitchWith('ball', { zone: { x: 0.9, y: 0.5 } }),
+    pitchWith('hit', { hitType: 'double', zone: { x: 0.5, y: 0.6 }, battedBall: { x: 0.2, y: 0.5, type: 'fly', strength: 'hard' } }),
+  ]);
+
+  it('뜬공 1 ÷ 1, 세게 맞은 타구 1 ÷ 1', () => {
+    const [, , fly, hard] = battedBallTypes([g]);
+    expect(fly.display).toBe('100.0%');
+    expect(hard.expression).toBe('1 ÷ 1');
+  });
+
+  it('본 공의 존 점 2개, 낙구 점 1개(안타)', () => {
+    const c = charts([g]);
+    expect(c.zone.map((p) => p.kind)).toEqual(['ball', 'inPlay']);
+    expect(c.spray).toEqual([{ x: 0.2, y: 0.5, kind: 'hit' }]);
   });
 });

@@ -1,7 +1,18 @@
 // 화면에 보이는 쉬운 말 (CLAUDE.md 0.4). 입력은 상황 기준 하나이므로 투수·타자가 같은 말을 쓴다.
 
 import { BASE_NAMES, STEAL_NAMES, basesLabel } from './bases';
-import { HitType, PitchEvent, PitchResult, PlayEvent, Position, Role, UndoableEvent } from './events';
+import {
+  BattedBallStrength,
+  BattedBallType,
+  HitType,
+  PitchEvent,
+  PitchResult,
+  PitchType,
+  PlayEvent,
+  Position,
+  Role,
+  UndoableEvent,
+} from './events';
 import { halfInningLabel } from './innings';
 import { Actor, PlateAppearance, PlateAppearanceOutcome, RunnerEventKind } from './replay';
 
@@ -69,6 +80,45 @@ export const HIT_BUTTONS: readonly { hitType: HitType; label: string; hint: stri
   { hitType: 'triple', label: '3루타', hint: '3루까지' },
   { hitType: 'homeRun', label: '홈런', hint: '홈까지' },
 ];
+
+export const PITCH_TYPE_LABEL: Record<PitchType, string> = {
+  fastball: '직구',
+  curveball: '커브',
+  slider: '슬라이더',
+  changeup: '체인지업',
+  splitter: '포크',
+  other: '기타 구종',
+};
+
+export const BATTED_BALL_TYPE_LABEL: Record<BattedBallType, string> = {
+  ground: '땅볼',
+  line: '라인드라이브',
+  fly: '뜬공',
+  popup: '팝플라이',
+};
+
+/** 타구 종류 버튼 아래 쉬운 설명 */
+export const BATTED_BALL_TYPE_HINT: Record<BattedBallType, string> = {
+  ground: '굴러감',
+  line: '낮고 곧게',
+  fly: '높이 멀리',
+  popup: '높이 가까이',
+};
+
+export const BATTED_BALL_STRENGTH_LABEL: Record<BattedBallStrength, string> = {
+  soft: '약하게',
+  medium: '보통',
+  hard: '세게',
+};
+
+/** 타구 기록 화면 버튼 */
+export const FIELD_BUTTON_LABEL = { skip: '타구 기록 건너뛰기', save: '이 타구로 기록' } as const;
+
+/** 투구 상세 스위치 */
+export const PITCH_DETAIL_LABEL = '투구 상세';
+
+/** 데이터 내려받기 버튼 */
+export const DOWNLOAD_LABEL = { json: '백업 파일 (JSON)', csv: '표 파일 (CSV, 엑셀)' } as const;
 
 export const HIT_TYPE_LABEL: Record<HitType, string> = {
   single: '1루타',
