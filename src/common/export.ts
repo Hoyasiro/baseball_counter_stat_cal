@@ -111,7 +111,9 @@ export function pitchesCsv(games: readonly Game[], replayOf: (g: Game) => GameRe
 }
 
 /** 파일 이름에 쓸 날짜. 예: 2026-10-05 */
-export function exportFileName(kind: 'backup' | 'pitches', today: string): string {
+export function exportFileName(kind: 'backup' | 'backupText' | 'pitches', today: string): string {
   // 한글 파일 이름은 일부 브라우저가 버리고 "download"로 바꿔 확장자가 없어지므로 영문으로 짓는다.
-  return kind === 'backup' ? `baseball-backup-${today}.json` : `baseball-pitches-${today}.csv`;
+  // backupText: 내용은 백업(JSON)과 같다. 휴대폰 공유 창이 .json 파일을 받지 않을 때 .txt로 보낸다.
+  if (kind === 'backup') return `baseball-backup-${today}.json`;
+  return kind === 'backupText' ? `baseball-backup-${today}.txt` : `baseball-pitches-${today}.csv`;
 }

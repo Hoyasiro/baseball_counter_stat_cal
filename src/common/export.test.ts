@@ -56,5 +56,6 @@ describe('백업 파일(JSON)', () => {
   it('파일 이름', () => {
     expect(exportFileName('backup', '2026-10-05')).toBe('baseball-backup-2026-10-05.json');
     expect(exportFileName('pitches', '2026-10-05')).toBe('baseball-pitches-2026-10-05.csv');
+    expect(exportFileName('backupText', '2026-10-05')).toBe('baseball-backup-2026-10-05.txt');
   });
 });

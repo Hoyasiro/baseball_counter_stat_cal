@@ -47,3 +47,24 @@ export async function downloadFile(filename: string, data: string, mimeType: str
     return code === 'declined' ? 'declined' : 'failed';
   }
 }
+
+export type ShareResult = 'shared' | 'declined' | 'unsupported';
+
+/**
+ * 휴대폰 공유 창(카카오톡·구글 드라이브 등)으로 파일을 보낸다.
+ * 공유 창이 .json을 받지 않으면(안드로이드 Chrome 등) 같은 내용을 .txt로 보낸다.
+ * 공유를 못 쓰는 곳(컴퓨터 브라우저, 미리보기 화면 등)이면 'unsupported'.
+ */
+export async function shareFile(names: { primary: string; fallback: string }, data: string): Promise<ShareResult> {
+  const nav = navigator as Navigator & { canShare?: (data: ShareData) => boolean };
+  if (typeof nav.share !== 'function' || typeof nav.canShare !== 'function') return 'unsupported';
+  const candidates = [new File([data], names.primary, { type: 'application/json' }), new File([data], names.fallback, { type: 'text/plain' })];
+  const file = candidates.find((f) => nav.canShare?.({ files: [f] }));
+  if (!file) return 'unsupported';
+  try {
+    await nav.share({ files: [file], title: file.name });
+    return 'shared';
+  } catch (error) {
+    return (error as { name?: string } | null)?.name === 'AbortError' ? 'declined' : 'unsupported';
+  }
+}
