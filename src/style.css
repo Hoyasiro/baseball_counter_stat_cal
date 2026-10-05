@@ -989,17 +989,28 @@ button {
   font-size: 18px;
 }
 
+/* 가끔 쓰는 공 4개(병살 포함)를 한 줄에 */
 .extra-buttons {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
 }
 
 .pitch.extra {
   min-height: 48px;
-  padding: 6px 2px;
+  padding: 6px 1px;
 }
 
 .pitch.extra strong {
-  font-size: 15px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.pitch.extra small {
+  white-space: nowrap;
+}
+
+.pitch.extra.double-play {
+  background: var(--out);
 }
 
 .pitch.extra small {

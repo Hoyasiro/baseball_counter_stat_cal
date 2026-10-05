@@ -11,6 +11,7 @@ import { halfInningLabel } from './innings';
 import {
   CHILD_RUNNER_BUTTONS,
   CHOOSER_QUESTION,
+  DOUBLE_PLAY_BUTTON,
   ChildRunnerAction,
   EXTRA_PITCH_BUTTONS,
   HIT_BUTTONS,
@@ -41,10 +42,12 @@ export interface SituationDraft {
 }
 
 /** 지금 열려 있는 고르기 화면 */
-export type Chooser = 'hit' | Exclude<RunnerAction, 'error'> | null;
+export type Chooser = 'hit' | 'doublePlay' | Exclude<RunnerAction, 'error'> | null;
 
 export interface InputActions {
   pitch: (result: PitchResult, hitType?: HitType) => void;
+  /** 병살: base는 타자와 함께 아웃된 주자가 있던 베이스 */
+  doublePlay: (base: BaseIndex) => void;
   runner: (action: RunnerAction, base?: BaseIndex) => void;
   childRunner: (action: ChildRunnerAction) => void;
   choose: (chooser: Chooser) => void;
@@ -202,7 +205,21 @@ function pitchButton(b: PitchButton, onClick: () => void, extra = false): HTMLEl
   ]);
 }
 
-function pitchPad(actions: InputActions, chooser: Chooser, title: string | null): HTMLElement {
+/** 병살이 될 수 있는 주자 베이스. 2아웃이면 타자만 잡아도 이닝이 끝나므로 병살이 없다. */
+function doublePlayBases(state: ActiveState): BaseIndex[] {
+  return state.outs < OUTS_PER_INNING - 1 ? occupiedBases(state.bases) : [];
+}
+
+function pitchPad(actions: InputActions, chooser: Chooser, title: string | null, dpBases: readonly BaseIndex[]): HTMLElement {
+  if (chooser === 'doublePlay') {
+    return h('section', { className: 'chooser' }, [
+      h('p', { className: 'section-title', text: '타자와 함께 아웃된 주자는?' }),
+      h('div', { className: 'choice-row' }, [
+        ...dpBases.map((b) => h('button', { className: 'play', text: `${BASE_NAMES[b]} 주자`, onClick: () => actions.doublePlay(b) })),
+        h('button', { className: 'secondary', text: '취소', onClick: () => actions.choose(null) }),
+      ]),
+    ]);
+  }
   if (chooser === 'hit') {
     return h('section', { className: 'chooser' }, [
       h('p', { className: 'section-title', text: '어떤 안타인가요?' }),
@@ -226,7 +243,19 @@ function pitchPad(actions: InputActions, chooser: Chooser, title: string | null)
       { className: 'pitch-buttons' },
       MAIN_PITCH_BUTTONS.map((b) => pitchButton(b, () => (b.result === 'hit' ? actions.choose('hit') : actions.pitch(b.result)))),
     ),
-    h('div', { className: 'extra-buttons' }, EXTRA_PITCH_BUTTONS.map((b) => pitchButton(b, () => actions.pitch(b.result), true))),
+    h('div', { className: 'extra-buttons' }, [
+      ...EXTRA_PITCH_BUTTONS.map((b) => pitchButton(b, () => actions.pitch(b.result), true)),
+      // 주자가 한 명이면 바로, 여럿이면 누가 아웃됐는지 고른다.
+      h(
+        'button',
+        {
+          className: 'pitch out extra double-play',
+          disabled: dpBases.length === 0,
+          onClick: () => (dpBases.length === 1 ? actions.doublePlay(dpBases[0]) : actions.choose('doublePlay')),
+        },
+        [h('strong', { text: DOUBLE_PLAY_BUTTON.label }), h('small', { text: DOUBLE_PLAY_BUTTON.hint })],
+      ),
+    ]),
   ]);
 }
 
@@ -242,7 +271,7 @@ function baseChoiceLabel(action: RunnerAction, base: BaseIndex): string {
 
 /** 투수·타자 장면: 다른 주자들에 대한 기록 */
 function runnerPad(bases: Bases, chooser: Chooser, actions: InputActions, onEdit: () => void): HTMLElement {
-  if (chooser && chooser !== 'hit') {
+  if (chooser && chooser !== 'hit' && chooser !== 'doublePlay') {
     return h('section', { className: 'runner-section' }, [
       h('p', { className: 'section-title', text: CHOOSER_QUESTION[chooser] }),
       h('div', { className: 'choice-row' }, [
@@ -430,14 +459,14 @@ function controls(model: InputModel, actions: InputActions): HTMLElement {
     return h('div', { className: 'controls' }, [
       childRunnerPad(state, actions, openEditor),
       detail,
-      pitchPad(actions, chooser, '지금 타자의 공 (기록하면 아이가 자동으로 진루)'),
+      pitchPad(actions, chooser, '지금 타자의 공 (기록하면 아이가 자동으로 진루)', doublePlayBases(state)),
       undoButton(events, actions),
     ]);
   }
 
   return h('div', { className: 'controls' }, [
     detail,
-    pitchPad(actions, chooser, null),
+    pitchPad(actions, chooser, null, doublePlayBases(state)),
     runnerPad(state.bases, chooser, actions, openEditor),
     undoButton(events, actions),
   ]);

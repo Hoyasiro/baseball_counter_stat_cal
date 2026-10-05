@@ -94,10 +94,13 @@ export const MAIN_PITCH_BUTTONS: readonly PitchButton[] = [
 
 /** 가끔 누르는 공 */
 export const EXTRA_PITCH_BUTTONS: readonly PitchButton[] = [
-  { result: 'buntFoul', label: '번트 파울', hint: '2스트라이크면 삼진' },
-  { result: 'wildPitch', label: '와일드피치', hint: '볼 + 주자 한 칸씩' },
-  { result: 'reachedOnError', label: '실책 출루', hint: '수비 실수로 살아나감' },
+  { result: 'buntFoul', label: '번트 파울', hint: '2스트면 삼진' },
+  { result: 'wildPitch', label: '와일드피치', hint: '볼+주자 한 칸' },
+  { result: 'reachedOnError', label: '실책 출루', hint: '수비 실수 출루' },
 ];
+
+/** 병살: 친 공으로 타자와 주자 한 명이 함께 아웃 */
+export const DOUBLE_PLAY_BUTTON = { label: '병살', hint: '타자+주자 아웃' } as const;
 
 export const HIT_BUTTONS: readonly { hitType: HitType; label: string; hint: string }[] = [
   { hitType: 'single', label: '1루타', hint: '1루까지' },
@@ -177,8 +180,9 @@ const PITCH_LABEL: Record<PitchResult, string> = {
   hitByPitch: '몸에 맞음',
 };
 
-export function pitchLabel(pitch: Pick<PitchEvent, 'result' | 'hitType'>): string {
+export function pitchLabel(pitch: Pick<PitchEvent, 'result' | 'hitType' | 'doublePlay'>): string {
   if (pitch.result === 'hit') return HIT_TYPE_LABEL[pitch.hitType ?? 'single'];
+  if (pitch.result === 'out' && pitch.doublePlay !== undefined) return `병살 (${BASE_NAMES[pitch.doublePlay]} 주자도 아웃)`;
   return PITCH_LABEL[pitch.result];
 }
 
@@ -288,6 +292,7 @@ export function outcomeLabel(pa: PlateAppearance): string {
   if (pa.outcome === 'hit' && pa.hitType) return HIT_TYPE_LABEL[pa.hitType];
   const lastPitch = pa.pitches[pa.pitches.length - 1];
   if (pa.outcome === 'strikeout' && lastPitch?.result === 'buntFoul') return '삼진 (쓰리번트 아웃)';
+  if (pa.outcome === 'out' && lastPitch?.doublePlay !== undefined) return '병살';
   return OUTCOME_LABEL[pa.outcome];
 }
 

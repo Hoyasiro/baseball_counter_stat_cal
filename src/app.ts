@@ -195,7 +195,7 @@ export function mountApp(root: HTMLElement): void {
   /** 공 하나를 기록한다. 투구 상세 창에서 고른 구종·존·구속이 있으면 함께 남긴다. */
   const recordPitch = (
     result: PitchResult,
-    extra: { hitType?: HitType; pitch: PitchDetail; battedBall?: FieldDraft | null; fielding?: readonly FieldingCredit[] | null },
+    extra: { hitType?: HitType; doublePlay?: BaseIndex; pitch: PitchDetail; battedBall?: FieldDraft | null; fielding?: readonly FieldingCredit[] | null },
   ): void => {
     const detail = extra.pitch;
     const ball = extra.battedBall;
@@ -205,6 +205,7 @@ export function mountApp(root: HTMLElement): void {
     updateCurrent((g) =>
       addPitch(g, result, {
         hitType: extra.hitType,
+        doublePlay: extra.doublePlay,
         pitchType: detail.pitchType ?? undefined,
         zone: detail.zone ?? undefined,
         speed: detail.speed ?? undefined,
@@ -226,10 +227,10 @@ export function mountApp(root: HTMLElement): void {
   };
 
   /** 친 공은 야구장 그림에서 낙구 지점과 질(수비 중이면 아이의 수비 기록도)을 고른 뒤 기록한다. 나머지는 바로 기록한다. */
-  const afterPitchDetail = (result: PitchResult, hitType: HitType | undefined, pitch: PitchDetail): void => {
+  const afterPitchDetail = (result: PitchResult, hitType: HitType | undefined, pitch: PitchDetail, doublePlay?: BaseIndex): void => {
     if (isBattedResult(result)) {
       state.pitchSheet = null;
-      state.fieldDraft = { result, hitType, x: null, y: null, type: null, strength: null, pitch, fielding: childIsFielding() ? [] : null };
+      state.fieldDraft = { result, hitType, doublePlay, x: null, y: null, type: null, strength: null, pitch, fielding: childIsFielding() ? [] : null };
       render();
       return;
     }
@@ -266,6 +267,15 @@ export function mountApp(root: HTMLElement): void {
       }
       afterPitchDetail(result, hitType, EMPTY_PITCH_DETAIL);
     },
+    doublePlay: (base: BaseIndex) => {
+      state.chooser = null;
+      if (state.detailMode) {
+        state.pitchSheet = { result: 'out', doublePlay: base, ...EMPTY_PITCH_DETAIL };
+        render();
+        return;
+      }
+      afterPitchDetail('out', undefined, EMPTY_PITCH_DETAIL, base);
+    },
     toggleDetail: () => {
       state.detailMode = !state.detailMode;
       saveDetailMode(state.detailMode);
@@ -279,8 +289,9 @@ export function mountApp(root: HTMLElement): void {
       changeSpeed: (speed: number | null) => {
         if (state.pitchSheet) state.pitchSheet = { ...state.pitchSheet, speed };
       },
-      save: (sheet: PitchSheet) => afterPitchDetail(sheet.result, sheet.hitType, { pitchType: sheet.pitchType, zone: sheet.zone, speed: sheet.speed }),
-      skip: (sheet: PitchSheet) => afterPitchDetail(sheet.result, sheet.hitType, EMPTY_PITCH_DETAIL),
+      save: (sheet: PitchSheet) =>
+        afterPitchDetail(sheet.result, sheet.hitType, { pitchType: sheet.pitchType, zone: sheet.zone, speed: sheet.speed }, sheet.doublePlay),
+      skip: (sheet: PitchSheet) => afterPitchDetail(sheet.result, sheet.hitType, EMPTY_PITCH_DETAIL, sheet.doublePlay),
       cancel: () => {
         state.pitchSheet = null;
         render();
@@ -291,9 +302,10 @@ export function mountApp(root: HTMLElement): void {
         state.fieldDraft = draft;
         render();
       },
-      save: (draft: FieldDraft) => recordPitch(draft.result, { hitType: draft.hitType, pitch: draft.pitch, battedBall: draft, fielding: draft.fielding }),
+      save: (draft: FieldDraft) =>
+        recordPitch(draft.result, { hitType: draft.hitType, doublePlay: draft.doublePlay, pitch: draft.pitch, battedBall: draft, fielding: draft.fielding }),
       // 낙구 지점·질만 건너뛴다. 고른 수비 기록은 남긴다.
-      skip: (draft: FieldDraft) => recordPitch(draft.result, { hitType: draft.hitType, pitch: draft.pitch, fielding: draft.fielding }),
+      skip: (draft: FieldDraft) => recordPitch(draft.result, { hitType: draft.hitType, doublePlay: draft.doublePlay, pitch: draft.pitch, fielding: draft.fielding }),
       cancel: () => {
         state.fieldDraft = null;
         render();

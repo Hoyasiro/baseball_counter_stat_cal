@@ -7,6 +7,7 @@ import {
   BATTED_BALL_STRENGTH_LABEL,
   BATTED_BALL_TYPE_LABEL,
   CHILD_RUNNER_BUTTONS,
+  DOUBLE_PLAY_BUTTON,
   DOWNLOAD_LABEL,
   FIELD_BUTTON_LABEL,
   FIELDING_CREDIT_LABEL,
@@ -37,6 +38,7 @@ describe('도움말이 화면과 맞는지', () => {
   it('공 버튼과 안타 종류가 매뉴얼에 있다', () => {
     expect(missing([...MAIN_PITCH_BUTTONS, ...EXTRA_PITCH_BUTTONS].map((b) => b.label))).toEqual([]);
     expect(missing(HIT_BUTTONS.map((b) => b.label))).toEqual([]);
+    expect(missing([DOUBLE_PLAY_BUTTON.label])).toEqual([]);
   });
 
   it('주자 상황·아이 주루 버튼이 매뉴얼에 있다', () => {

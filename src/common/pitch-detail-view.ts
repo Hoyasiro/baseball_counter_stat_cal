@@ -5,6 +5,7 @@ import {
   BATTED_BALL_STRENGTHS,
   BATTED_BALL_TYPES,
   BattedBallStrength,
+  BaseIndex,
   BattedBallType,
   FieldingCredit,
   HitType,
@@ -20,7 +21,6 @@ import {
   BATTED_BALL_TYPE_HINT,
   BATTED_BALL_TYPE_LABEL,
   FIELD_BUTTON_LABEL,
-  HIT_TYPE_LABEL,
   PITCH_DETAIL_LABEL,
   PITCH_SHEET_LABEL,
   PITCH_TYPE_LABEL,
@@ -43,12 +43,16 @@ export const EMPTY_PITCH_DETAIL: PitchDetail = { pitchType: null, zone: null, sp
 export interface PitchSheet extends PitchDetail {
   readonly result: PitchResult;
   readonly hitType?: HitType;
+  /** 병살이면 함께 아웃된 주자가 있던 베이스 */
+  readonly doublePlay?: BaseIndex;
 }
 
 /** 친 공을 기록하기 전, 낙구 지점·질을 고르는 중 */
 export interface FieldDraft {
   readonly result: PitchResult;
   readonly hitType?: HitType;
+  /** 병살이면 함께 아웃된 주자가 있던 베이스 */
+  readonly doublePlay?: BaseIndex;
   readonly x: number | null;
   readonly y: number | null;
   readonly type: BattedBallType | null;
@@ -145,7 +149,7 @@ export function pitchSheetView(sheet: PitchSheet, speedStart: number, actions: P
 /** 친 공의 낙구 지점·질을 고르는 창(팝업). 야구장 그림은 엄지 쪽, 타구 종류는 반대쪽에 둔다. */
 export function fieldPanel(draft: FieldDraft, actions: FieldActions): HTMLElement {
   const set = (change: Partial<FieldDraft>): void => actions.change({ ...draft, ...change });
-  const what = draft.result === 'hit' ? HIT_TYPE_LABEL[draft.hitType ?? 'single'] : draft.result === 'out' ? '아웃' : '실책 출루';
+  const what = draft.result === 'out' ? (draft.doublePlay !== undefined ? '병살' : '아웃') : pitchLabel(draft);
   const where = draft.x !== null && draft.y !== null ? placementLabel(draft.x, draft.y) : '공이 떨어진 곳을 누르세요';
   return popup('field-panel', '타구 기록', actions.cancel, [
     h('div', { className: 'sheet-head' }, [
