@@ -1,0 +1,10 @@
+{
+  "name": "야구맘기록지",
+  "short_name": "야구맘기록지",
+  "lang": "ko",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f6f3",
+  "theme_color": "#1f5f3f"
+}

@@ -1,0 +1,2454 @@
+:root {
+  --bg: #f4f6f3;
+  --surface: #ffffff;
+  --text: #1d2420;
+  --muted: #5f6b64;
+  --line: #dde3de;
+  --primary: #1f5f3f;
+  --primary-soft: #e3efe7;
+  --on-color: #ffffff;
+  --bar: #1f5f3f;
+  --board: #1d2420;
+  --board-dot: rgba(255, 255, 255, 0.5);
+  --ball: #2f7d4f;
+  --strike: #c9862b;
+  --hit: #c0453a;
+  --out: #4a5a8c;
+  --extra: #6b5a86;
+  --out-light: #e2554a;
+  --ball-light: #4fc27c;
+  --strike-light: #f2b34a;
+  --child: #4fb6f2;
+  --danger: #b3261e;
+  --grass: #4a9a5a;
+  --infield-grass: #5aa86a;
+  --dirt: #c9a46c;
+  --chalk: #ffffff;
+  --warn-bg: #fff4e0;
+  --warn-text: #7a4b00;
+  --radius: 14px;
+  --topbar-h: 52px;
+  --board-pill: rgba(255, 255, 255, 0.12);
+  font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #121714;
+    --surface: #1b221e;
+    --text: #e6ece8;
+    --muted: #9aa8a0;
+    --line: #2c3631;
+    --primary: #5fb488;
+    --primary-soft: #1f3328;
+    --board: #0a0d0b;
+    --bar: #1a4630;
+    --warn-bg: #3a2c12;
+    --warn-text: #f2cf8e;
+    --grass: #2f6b3c;
+    --infield-grass: #3a7a48;
+    --dirt: #8a6a40;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #121714;
+  --surface: #1b221e;
+  --text: #e6ece8;
+  --muted: #9aa8a0;
+  --line: #2c3631;
+  --primary: #5fb488;
+  --primary-soft: #1f3328;
+  --board: #0a0d0b;
+  --bar: #1a4630;
+  --warn-bg: #3a2c12;
+  --warn-text: #f2cf8e;
+  --grass: #2f6b3c;
+  --infield-grass: #3a7a48;
+  --dirt: #8a6a40;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border: none;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+#app {
+  max-width: 480px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.sub {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* 공통 틀 */
+.topbar {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--bar);
+  color: var(--on-color);
+  z-index: 1;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.notice {
+  margin: 8px 16px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  font-size: 14px;
+}
+
+.content {
+  flex: 1;
+  /* 아래 탭 높이(약 47px)만큼 비워 둔다. */
+  padding: 16px 16px calc(56px + env(safe-area-inset-bottom, 0px));
+}
+
+.tabbar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.tabbar button {
+  padding: 14px 0;
+  font-size: 14px;
+  white-space: nowrap;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.tabbar button.active {
+  color: var(--primary);
+  box-shadow: inset 0 3px 0 var(--primary);
+}
+
+/* 기록 입력 */
+.input {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.count-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.dots {
+  display: flex;
+  gap: 8px;
+}
+
+.dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--board-dot);
+}
+
+.ball .dot.on {
+  background: var(--ball-light);
+  border-color: var(--ball-light);
+}
+
+.strike .dot.on {
+  background: var(--strike-light);
+  border-color: var(--strike-light);
+}
+
+.message {
+  margin: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 15px;
+}
+
+.pitch-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.pitch {
+  min-height: 84px;
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  color: var(--on-color);
+  padding: 8px 4px;
+}
+
+.pitch strong {
+  font-size: 19px;
+}
+
+.pitch small {
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+.pitch.ball {
+  background: var(--ball);
+}
+
+.pitch.strike,
+.pitch.foul {
+  background: var(--strike);
+}
+
+.pitch.hit,
+.pitch.hitByPitch {
+  background: var(--hit);
+}
+
+.pitch.out {
+  background: var(--out);
+}
+
+.undo,
+.secondary {
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-weight: 600;
+}
+
+/* 기록 보기 */
+.records {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pa,
+.process,
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.pa h3,
+.process h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+
+.chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--on-color);
+  background: var(--muted);
+}
+
+.chip.ball {
+  background: var(--ball);
+}
+
+.chip.strike,
+.chip.foul {
+  background: var(--strike);
+}
+
+.chip.hit,
+.chip.hitByPitch {
+  background: var(--hit);
+}
+
+.chip.out {
+  background: var(--out);
+}
+
+.empty {
+  color: var(--muted);
+  text-align: center;
+  padding: 24px 0;
+}
+
+/* 경기 분석 */
+.analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.analysis h2 {
+  margin: 12px 0 0;
+  font-size: 17px;
+}
+
+.subtabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--line);
+  border-radius: 999px;
+  padding: 4px;
+}
+
+.subtabs button {
+  padding: 10px 0;
+  border-radius: 999px;
+  background: transparent;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.subtabs button.active {
+  background: var(--surface);
+  color: var(--primary);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card small {
+  color: var(--muted);
+}
+
+.card strong {
+  font-size: 24px;
+}
+
+.basis {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border-radius: var(--radius);
+  overflow: hidden;
+  font-size: 14px;
+}
+
+th,
+td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+th {
+  background: var(--primary-soft);
+}
+
+.process p {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.process ul {
+  margin: 2px 0 6px;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.process small {
+  color: var(--muted);
+}
+
+.note {
+  color: var(--warn-text);
+}
+
+.confirm {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.confirm p {
+  margin: 0;
+  font-size: 15px;
+}
+
+.confirm-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.confirm-buttons .secondary {
+  color: var(--text);
+}
+
+.primary {
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--bar);
+  color: var(--on-color);
+  font-weight: 600;
+}
+
+button:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.game-title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.board-left {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.board-right {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+
+.inning {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.inning strong {
+  font-size: 26px;
+}
+
+.inning span {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.count-row {
+  gap: 12px;
+  font-size: 16px;
+}
+
+.dot {
+  width: 20px;
+  height: 20px;
+}
+
+.out .dot.on {
+  background: var(--out-light);
+  border-color: var(--out-light);
+}
+
+.bases-text {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+/* 다이아몬드 */
+.diamond {
+  position: relative;
+  width: 104px;
+  aspect-ratio: 1;
+  max-width: 100%;
+}
+
+.diamond-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.diamond-line {
+  fill: none;
+  stroke: var(--board-dot);
+  stroke-width: 2;
+}
+
+.diamond-home {
+  fill: var(--board-dot);
+}
+
+.diamond-base {
+  fill: transparent;
+  stroke: var(--board-dot);
+  stroke-width: 2.5;
+}
+
+.diamond-base.on {
+  fill: var(--strike-light);
+  stroke: var(--strike-light);
+}
+
+.situation-editor .diamond {
+  width: 140px;
+  background: var(--board);
+  border-radius: var(--radius);
+}
+
+.diamond-hit {
+  position: absolute;
+  width: 34%;
+  height: 34%;
+  transform: translate(-50%, -50%);
+  background: transparent;
+  border-radius: 50%;
+}
+
+/* 보조 투구 버튼 */
+.extra-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.pitch.extra {
+  min-height: 56px;
+  background: var(--extra);
+}
+
+.pitch.extra strong {
+  font-size: 16px;
+}
+
+/* 주자 상황 */
+.runner-section {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.section-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.section-title small {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.choice-row button {
+  flex: 1 1 30%;
+}
+
+.play {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 6px;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  color: var(--text);
+  border: 1px solid var(--line);
+  font-weight: 600;
+}
+
+.play small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* 상황 고치기 */
+.situation-editor {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 2px solid var(--primary);
+}
+
+.help {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.editor-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.editor-fields {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.stepper,
+.outs-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stepper button,
+.outs-picker button {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  border: 1px solid var(--line);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.outs-picker button.active {
+  background: var(--bar);
+  color: var(--on-color);
+}
+
+.stepper strong {
+  min-width: 44px;
+  text-align: center;
+  font-size: 18px;
+}
+
+/* 기록 보기 */
+.inning-title {
+  margin: 8px 0 0;
+  font-size: 17px;
+}
+
+.pa.current {
+  border-color: var(--primary);
+}
+
+.pa .sub {
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+
+.chip.buntFoul,
+.chip.wildPitch,
+.chip.reachedOnError {
+  background: var(--extra);
+}
+
+.chip.play {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--primary);
+}
+
+.chip.adjust {
+  background: transparent;
+  color: var(--muted);
+  border: 1px dashed var(--muted);
+}
+
+/* 경기 분석 */
+.scope-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.scope-tabs button {
+  padding: 10px 0;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.scope-tabs button.active {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.card strong {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 경기 목록 · 경기 정보 */
+.games {
+  display: grid;
+  gap: 10px;
+}
+
+.game-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.game-card.current {
+  border: 2px solid var(--primary);
+}
+
+.game-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.game-card h3,
+.game-card p {
+  margin: 0;
+}
+
+.opponent {
+  font-weight: 600;
+}
+
+.type-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+.game-form {
+  display: grid;
+  gap: 14px;
+}
+
+.game-form h2 {
+  margin: 0;
+}
+
+.game-form label,
+.field {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.game-form input {
+  font: inherit;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  min-width: 0;
+  width: 100%;
+}
+
+.type-picker {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.type-picker button {
+  padding: 12px 0;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-weight: 600;
+}
+
+.type-picker button.active {
+  background: var(--bar);
+  color: var(--on-color);
+  border-color: var(--bar);
+}
+
+.error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+input:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 1px;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chips {
+  align-items: flex-start;
+}
+
+.chip {
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+/* 버튼이 하나뿐이면 한 줄을 다 쓴다. */
+.confirm-buttons > :only-child {
+  grid-column: 1 / -1;
+}
+
+/* ── 기록 입력: 상황판 고정 + 스크롤 없는 버튼 배치 ── */
+.topbar {
+  min-height: var(--topbar-h);
+}
+
+.board-sticky {
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + var(--topbar-h));
+  z-index: 1;
+  margin: -16px -16px 0;
+  padding: 8px 16px;
+  background: var(--bg);
+}
+
+.board {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--board);
+  color: var(--on-color);
+}
+
+.board p {
+  margin: 0;
+}
+
+.board-game {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  color: var(--on-color);
+  font-size: 13px;
+  opacity: 0.85;
+  text-align: left;
+}
+
+.board-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.board .inning strong {
+  font-size: 22px;
+}
+
+.board .count-row {
+  font-size: 14px;
+}
+
+.board .dot {
+  width: 16px;
+  height: 16px;
+}
+
+.board .diamond {
+  width: 84px;
+}
+
+.board-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--board-pill);
+  color: var(--on-color);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.pill small {
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.board .message {
+  min-height: 0;
+  padding: 6px 10px;
+  border: none;
+  background: var(--board-pill);
+  color: var(--on-color);
+  font-size: 13px;
+}
+
+.controls {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.pitch-pad {
+  display: grid;
+  gap: 8px;
+}
+
+.pitch {
+  min-height: 60px;
+}
+
+.pitch strong {
+  font-size: 18px;
+}
+
+/* 가끔 쓰는 공 4개(병살 포함)를 한 줄에 */
+.extra-buttons {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.pitch.extra {
+  min-height: 48px;
+  padding: 6px 1px;
+}
+
+.pitch.extra strong {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.pitch.extra small {
+  white-space: nowrap;
+}
+
+.pitch.extra.double-play {
+  background: var(--out);
+}
+
+.pitch.extra small {
+  font-size: 10px;
+}
+
+.chooser {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 2px solid var(--hit);
+}
+
+.hit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.runner-section {
+  gap: 6px;
+  padding: 10px;
+}
+
+.play-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.play {
+  padding: 8px 4px;
+  font-size: 14px;
+}
+
+.play small {
+  font-size: 10px;
+}
+
+.play.edit {
+  border: 1px dashed var(--primary);
+  background: var(--surface);
+}
+
+.undo {
+  padding: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 스코어보드 ── */
+.line-score table {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.line-score th,
+.line-score td {
+  padding: 8px 6px;
+  text-align: center;
+  min-width: 26px;
+}
+
+.line-score .team {
+  text-align: left;
+  white-space: nowrap;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.line-score .now {
+  background: var(--primary-soft);
+}
+
+.line-score .total {
+  font-weight: 700;
+  border-left: 1px solid var(--line);
+}
+
+.line-score .help {
+  margin-top: 6px;
+}
+
+.score-editor {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.team-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.team-picker button {
+  padding: 10px 0;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-weight: 600;
+}
+
+.team-picker button.active {
+  background: var(--bar);
+  color: var(--on-color);
+  border-color: var(--bar);
+}
+
+/* ── 가로 화면: 왼쪽 상황판, 오른쪽 버튼 ── */
+@media (orientation: landscape) and (max-height: 560px) {
+  :root {
+    --topbar-h: 40px;
+  }
+
+  #app,
+  .tabbar {
+    max-width: 960px;
+  }
+
+  .topbar {
+    padding: 4px 16px;
+  }
+
+  .content {
+    padding: 8px 16px 60px;
+  }
+
+  .input {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 12px;
+    align-items: start;
+  }
+
+  .board-sticky {
+    margin: 0;
+    padding: 0;
+  }
+
+  .controls {
+    padding-top: 0;
+  }
+
+  /* 가로 화면은 높이가 낮아서 버튼 설명을 숨기고 높이를 줄인다. */
+  .pitch,
+  .pitch.extra {
+    min-height: 40px;
+    padding: 4px;
+  }
+
+  .pitch small,
+  .play small {
+    display: none;
+  }
+
+  .controls,
+  .pitch-pad {
+    gap: 6px;
+  }
+
+  .play {
+    padding: 8px 4px;
+  }
+
+  .runner-section {
+    padding: 8px;
+  }
+
+  .undo {
+    padding: 8px;
+  }
+
+  .tabbar button {
+    padding: 8px 0;
+  }
+}
+
+/* ── 상황 기준 입력: 장면·역할 ── */
+.topbar h1 {
+  font-size: 17px;
+}
+
+.board-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.board-scene {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--board-pill);
+  color: var(--on-color);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.role-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--board-pill);
+  opacity: 1;
+}
+
+.role-badge.pitcher {
+  background: var(--ball);
+}
+
+.role-badge.batter {
+  background: var(--hit);
+}
+
+.role-badge.runner {
+  background: #2d6f99;
+}
+
+.diamond-base.child {
+  fill: var(--child);
+  stroke: var(--child);
+}
+
+.diamond-child-label {
+  fill: var(--child);
+  font-size: 11px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.situation-editor .diamond-child-label,
+.scene-setup .diamond-child-label {
+  fill: var(--child);
+}
+
+.pad-title {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.runner-section.child {
+  border: 2px solid var(--child);
+}
+
+.child-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.child-grid .play {
+  padding: 10px 2px;
+  font-size: 13px;
+}
+
+/* 등장 설정 */
+.scene-setup {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 2px solid var(--primary);
+}
+
+.role-picker {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.role-picker button {
+  display: grid;
+  gap: 2px;
+  padding: 10px 2px;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  border: 1px solid var(--line);
+}
+
+.role-picker button strong {
+  font-size: 16px;
+}
+
+.role-picker button small {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.role-picker button.active {
+  background: var(--bar);
+  border-color: var(--bar);
+  color: var(--on-color);
+}
+
+.role-picker button.active small {
+  color: var(--on-color);
+  opacity: 0.85;
+}
+
+.position-picker,
+.child-base-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.position-picker button,
+.child-base-picker button {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-weight: 600;
+}
+
+.position-picker button.active,
+.child-base-picker button.active {
+  background: var(--bar);
+  border-color: var(--bar);
+  color: var(--on-color);
+}
+
+.diamond-field {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+
+.diamond-field small {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.scene-setup .diamond,
+.situation-editor .diamond {
+  width: 132px;
+  background: var(--board);
+  border-radius: var(--radius);
+}
+
+.secondary.danger {
+  color: var(--danger);
+}
+
+/* 기록 보기: 장면 */
+.scene-block {
+  display: grid;
+  gap: 8px;
+}
+
+.scene-block > .sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pa.child {
+  border-left: 4px solid var(--hit);
+}
+
+.pa.opponent {
+  border-left: 4px solid var(--ball);
+}
+
+.chip.runner {
+  background: #2d6f99;
+}
+
+.chip.appearance,
+.chip.exit {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--muted);
+}
+
+.line-score td.manual {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* 등장 설정은 한 화면에 들어가도록 다이아몬드를 옆에 두고 버튼을 줄인다. */
+.scene-setup .editor-grid {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.scene-setup .editor-fields {
+  flex: 1;
+  gap: 6px;
+}
+
+.scene-setup .stepper,
+.scene-setup .outs-picker {
+  gap: 6px;
+}
+
+.scene-setup .stepper span,
+.scene-setup .outs-picker span {
+  min-width: 64px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.scene-setup .stepper button,
+.scene-setup .outs-picker button {
+  min-width: 38px;
+  min-height: 38px;
+  font-size: 16px;
+}
+
+.scene-setup .stepper strong {
+  min-width: 44px;
+  font-size: 16px;
+}
+
+.scene-setup .diamond {
+  width: 104px;
+}
+
+.scene-setup .role-picker button {
+  padding: 8px 2px;
+}
+
+/* ── 도움말 · 처음 사용 안내 ── */
+.topbar {
+  justify-content: space-between;
+}
+
+.help-button {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--board-pill);
+  color: var(--on-color);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.tutorial-card {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+  padding: 20px 18px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.tutorial-card h2 {
+  margin: 0;
+  font-size: 21px;
+  text-wrap: balance;
+}
+
+.tutorial-card p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.tutorial-step {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.tutorial-sample {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sample-chip {
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.sample-chip.ball {
+  background: var(--ball);
+  color: var(--on-color);
+}
+
+.sample-chip.strike,
+.sample-chip.foul {
+  background: var(--strike);
+  color: var(--on-color);
+}
+
+.sample-chip.hit,
+.sample-chip.hitByPitch {
+  background: var(--hit);
+  color: var(--on-color);
+}
+
+.sample-chip.out {
+  background: var(--out);
+  color: var(--on-color);
+}
+
+.tutorial-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.tutorial-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.tutorial-dots span.on {
+  background: var(--primary);
+}
+
+.manual {
+  display: grid;
+  gap: 12px;
+}
+
+.manual-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.manual-head h2 {
+  margin: 0;
+}
+
+.manual-head .secondary {
+  padding: 8px 16px;
+}
+
+.manual-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.manual-index a {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.manual-section {
+  display: grid;
+  gap: 6px;
+  scroll-margin-top: calc(var(--topbar-h) + 8px);
+}
+
+.manual-section h3 {
+  margin: 8px 0 0;
+  font-size: 17px;
+}
+
+.manual-item {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.manual-item summary {
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.manual-item p {
+  margin: 8px 0 0;
+  line-height: 1.6;
+  font-size: 15px;
+}
+
+/* ── 투구 상세 ── */
+/* 켜고 끄는 단추는 엄지 쪽에 붙인다. 오른손이면 오른쪽, 왼손이면 왼쪽 (data-hand는 app.ts가 단다). */
+.detail-toggle-row {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  gap: 8px;
+}
+
+[data-hand='left'] .detail-toggle-row {
+  flex-direction: row;
+}
+
+.detail-toggle-hint {
+  flex: 1;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+[data-hand='right'] .detail-toggle-hint {
+  text-align: right;
+}
+
+.detail-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.switch {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--surface);
+  transition: left 0.15s;
+}
+
+.detail-toggle.on {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.detail-toggle.on .switch {
+  background: var(--primary);
+}
+
+.detail-toggle.on .switch::after {
+  left: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch::after {
+    transition: none;
+  }
+}
+
+/* 팝업: 어두워진 화면 위에 그보다 작은 창이 뜬다. 상황판이 보이도록 아래쪽에 띄운다. */
+.popup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: rgb(0 0 0 / 0.45);
+}
+
+.popup {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  max-width: 456px;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 12px 14px 14px;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.35);
+  outline: none;
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sheet-head .section-title {
+  margin: 0;
+}
+
+.sheet-head .link-button {
+  white-space: nowrap;
+}
+
+.pitch-type-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.pitch-type-row button,
+.strength-row button {
+  padding: 10px 0;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  border: 1px solid var(--line);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.strength-row button {
+  padding: 7px 0;
+  font-size: 12px;
+}
+
+.pitch-type-row button.active,
+.strength-row button.active,
+.batted-type-row button.active {
+  background: var(--bar);
+  border-color: var(--bar);
+  color: var(--on-color);
+}
+
+/* 존은 크게(세밀하게 찍도록), 오른손이면 오른쪽에 둔다. */
+.sheet-body {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  grid-template-areas: 'wheel zone';
+  gap: 12px;
+  align-items: start;
+}
+
+[data-hand='left'] .sheet-body {
+  grid-template-columns: minmax(0, 1fr) 112px;
+  grid-template-areas: 'zone wheel';
+}
+
+.sheet-zone {
+  grid-area: zone;
+  display: grid;
+  gap: 4px;
+}
+
+.speed-dial {
+  grid-area: wheel;
+}
+
+.zone-pick,
+.field-pick {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.zone-caption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  min-height: 28px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.zone-caption .link-button {
+  padding: 4px 6px;
+}
+
+[data-hand='left'] .sheet-buttons .primary {
+  order: -1;
+}
+
+/* 구속 다이얼: 시계 모양 반원(80~160). 오른손은 오른쪽 반원, 왼손은 왼쪽 반원 */
+.speed-dial {
+  display: grid;
+  gap: 4px;
+}
+
+.speed-readout {
+  margin: 0;
+  min-height: 30px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.speed-readout strong {
+  font-size: 22px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.dial-frame {
+  border-radius: 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.dial-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 110 / 220;
+  /* 바늘을 끄는 동안 화면이 움직이거나 글자가 선택되지 않게 */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+  outline: none;
+}
+
+.dial-svg:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.dial-track {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+
+.dial-progress {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+
+.dial-tick {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+.dial-tick.major {
+  stroke: var(--text);
+  stroke-width: 1.6;
+}
+
+.dial-label {
+  fill: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.dial-needle {
+  stroke: var(--primary);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.dial-knob {
+  fill: var(--primary);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.dial-hub {
+  fill: var(--text);
+}
+
+.speed-dial.unset .dial-needle {
+  stroke: var(--muted);
+  stroke-dasharray: 4 3;
+}
+
+.speed-dial.unset .dial-knob {
+  fill: var(--muted);
+}
+
+.dial-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.4fr;
+  gap: 3px;
+}
+
+.dial-buttons .secondary.small {
+  padding: 7px 0;
+  font-size: 12px;
+}
+
+.secondary.small {
+  padding: 8px;
+  font-size: 13px;
+}
+
+/* ── 타구 기록 창 ── */
+/* 야구장 그림은 엄지 쪽(오른손이면 오른쪽), 타구 종류 단추는 반대쪽 */
+.field-body {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  grid-template-areas: 'types field';
+  gap: 10px;
+  align-items: start;
+}
+
+[data-hand='left'] .field-body {
+  grid-template-columns: minmax(0, 1fr) 84px;
+  grid-template-areas: 'field types';
+}
+
+.field-area {
+  grid-area: field;
+  display: grid;
+  gap: 4px;
+}
+
+.field-panel .confirm-buttons button {
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.batted-type-row {
+  grid-area: types;
+  display: grid;
+  gap: 6px;
+}
+
+.batted-type-row button {
+  display: grid;
+  gap: 2px;
+  min-height: 52px;
+  padding: 6px 2px;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  border: 1px solid var(--line);
+}
+
+.batted-type-row strong {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.batted-type-row small {
+  font-size: 10px;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.batted-type-row button.active small {
+  color: var(--on-color);
+}
+
+.strength-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.link-button {
+  padding: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ── 그림: 야구장 · 스트라이크 존 ── */
+.field-svg,
+.zone-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  max-width: 100%;
+}
+
+/* 담장 위 빈 곳을 잘라 낸 비율 (field-view.ts FIELD_TOP) */
+.field-svg {
+  aspect-ratio: 100 / 84;
+}
+
+.pickable {
+  cursor: crosshair;
+  touch-action: manipulation;
+}
+
+.field-foul-ground {
+  fill: var(--primary-soft);
+}
+
+.field-grass {
+  fill: var(--grass);
+}
+
+.field-dirt {
+  fill: var(--dirt);
+}
+
+.field-infield-grass {
+  fill: var(--infield-grass);
+}
+
+.field-line {
+  stroke: var(--chalk);
+  stroke-width: 0.6;
+}
+
+.field-base {
+  fill: var(--chalk);
+}
+
+.zone-bg {
+  fill: var(--board);
+}
+
+.zone-box {
+  fill: rgba(255, 255, 255, 0.08);
+  stroke: var(--chalk);
+  stroke-width: 1.2;
+}
+
+.zone-grid {
+  stroke: var(--board-dot);
+  stroke-width: 0.5;
+}
+
+.picked-ring {
+  fill: none;
+  stroke: var(--strike-light);
+  stroke-width: 1.5;
+}
+
+.picked-dot {
+  fill: var(--strike-light);
+}
+
+.legend-dot {
+  background: var(--muted);
+}
+
+.chart-dot {
+  stroke: var(--chalk);
+  stroke-width: 0.5;
+  fill: var(--muted);
+}
+
+.chart-dot.hit,
+.legend-dot.hit,
+.chart-dot.inPlay,
+.legend-dot.inPlay {
+  fill: var(--hit);
+  background: var(--hit);
+}
+
+.chart-dot.out,
+.legend-dot.out {
+  fill: var(--out);
+  background: var(--out);
+}
+
+.chart-dot.error,
+.legend-dot.error {
+  fill: var(--extra);
+  background: var(--extra);
+}
+
+.chart-dot.strike,
+.legend-dot.strike {
+  fill: var(--strike-light);
+  background: var(--strike-light);
+}
+
+.chart-dot.ball,
+.legend-dot.ball {
+  fill: var(--ball-light);
+  background: var(--ball-light);
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.chart-card {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  min-width: 0;
+}
+
+.chart-card h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.chart-frame {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 'error' 같은 종류 이름이 다른 화면의 클래스와 겹쳐도 점 모양이 바뀌지 않게 */
+.legend-dot {
+  display: inline-block;
+  flex: none;
+  padding: 0;
+  border-radius: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* ── 데이터 관리 (설정 탭) ── */
+.data-section h4 {
+  margin: 6px 0 0;
+  font-size: 15px;
+}
+
+.data-section .secondary {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+}
+
+.data-section small {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* ── 백업 불러오기 ── */
+/* 입력 칸 공통 스타일(width: 100%)보다 앞서도록 선택자를 구체적으로 쓴다. */
+input[type='file'].visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.import-first {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.import-first .help {
+  margin: 0;
+}
+
+.import-first .secondary,
+.data-section .secondary {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+}
+
+.import-first small {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* ── 설정 ── */
+.settings {
+  display: grid;
+  gap: 12px;
+}
+
+.settings h2,
+.settings h3 {
+  margin: 0;
+}
+
+.settings-item {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.settings-item .help {
+  margin: 0;
+}
+
+.hand-picker {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.hand-picker button {
+  min-height: 56px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.hand-picker button.active {
+  background: var(--bar);
+  border-color: var(--bar);
+  color: var(--on-color);
+}
+
+/* ── 경기 정보 빠른 입력 ── */
+.quick-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: -6px;
+}
+
+.quick-chips button {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 14px;
+}
+
+.quick-chips button.active {
+  border-color: var(--primary);
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.quick-help {
+  margin: -6px 0 0;
+}
+
+/* ── 경기 목록 정렬 · 찾기 ── */
+.list-controls {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 4px;
+}
+
+.list-controls input[type='search'] {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+
+.list-controls .quick-chips {
+  flex-wrap: nowrap;
+  margin-top: 0;
+}
+
+/* 경기 구분 5개가 한 줄에 들어가도록 */
+.list-controls .quick-chips button {
+  flex: 1;
+  padding: 7px 4px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.order-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--primary-soft);
+}
+
+.order-picker button {
+  padding: 8px 2px;
+  border-radius: 9px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.order-picker button.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);
+}
+
+.game-list {
+  display: grid;
+  gap: 12px;
+}
+
+.list-count {
+  margin: 0;
+}
+
+/* ── 수비 기록 ── */
+.fielding-pick {
+  display: grid;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+
+.fielding-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.fielding-title small {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.fielding-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.fielding-row button {
+  display: grid;
+  gap: 2px;
+  min-height: 52px;
+  padding: 6px 2px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.fielding-row strong {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.fielding-row small {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.fielding-row button.active {
+  background: var(--out);
+  border-color: var(--out);
+  color: var(--on-color);
+}
+
+.fielding-row button.credit-error.active {
+  background: var(--hit);
+  border-color: var(--hit);
+}
+
+.fielding-row button.active small {
+  color: var(--on-color);
+}
+
+.chart-grid.single {
+  grid-template-columns: minmax(0, 340px);
+}
+
+/* ── 탭 안의 작은 탭 (경기: 이 경기 기록·경기 목록 / 분석: 투수·타자·수비) ── */
+.games-page,
+.analysis-page {
+  display: grid;
+  gap: 12px;
+}
+
+.kind-tabs {
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--bar);
+}
+
+.kind-tabs button {
+  padding: 10px 0;
+  border-radius: 9px;
+  background: transparent;
+  color: rgb(255 255 255 / 0.75);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.kind-tabs button.active {
+  background: var(--surface);
+  color: var(--primary);
+}
