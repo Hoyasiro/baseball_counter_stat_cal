@@ -30,7 +30,7 @@ import {
   today,
   OPPONENT_MAX_LENGTH,
 } from './common/game';
-import { GameForm, gamesView } from './common/games-view';
+import { GameForm, GameListView, gamesView } from './common/games-view';
 import { Chooser, SituationDraft, inputView } from './common/input-view';
 import { AppTab, ChildRunnerAction, RunnerAction, TAB_LABEL } from './common/labels';
 import { lineScore } from './common/line-score';
@@ -71,6 +71,8 @@ interface State {
   fieldDraft: FieldDraft | null;
   /** 엄지가 닿는 쪽 (설정) */
   hand: Hand;
+  /** 경기 목록 정렬·찾기 */
+  gameList: GameListView;
 }
 
 const DETAIL_MODE_KEY = 'baseball-counter.pitch-detail';
@@ -151,6 +153,7 @@ export function mountApp(root: HTMLElement): void {
     pitchSheet: null,
     fieldDraft: null,
     hand: loadHand(),
+    gameList: { order: 'newest', type: 'all', query: '' },
   };
 
   const currentGame = (): Game | undefined => state.games.find((g) => g.id === state.currentGameId);
@@ -411,41 +414,15 @@ export function mountApp(root: HTMLElement): void {
       const game = state.games.find((g) => g.id === form.gameId);
       if (game) replaceGame(setGameInfo(game, form.info));
     },
-    download: (kind: 'backup' | 'pitches') => {
-      const file =
-        kind === 'backup'
-          ? { name: exportFileName('backup', today()), data: backupJson(state.games, new Date().toISOString()), type: 'application/json' }
-          : { name: exportFileName('pitches', today()), data: pitchesCsv(state.games, replayOf), type: 'text/csv' };
-      void downloadFile(file.name, file.data, file.type).then((result) => {
-        if (result === 'saved') return;
-        state.notice = result === 'declined' ? '내려받기를 취소했습니다.' : '이 화면에서는 파일을 내려받을 수 없습니다. 휴대폰 브라우저에서 앱을 열어 다시 해 보세요.';
-        render();
-      });
+    openSettings: () => {
+      state.form = null;
+      go('settings');
     },
-    importBackup: (file: File) => {
-      void file
-        .text()
-        .then((text) => {
-          const parsed = parseBackup(text);
-          if (!parsed.ok) {
-            state.notice = parsed.message;
-            render();
-            return;
-          }
-          const merged = mergeGames(state.games, parsed.games);
-          state.games = [...merged.games];
-          // 첫 화면(경기가 하나도 없을 때)에서 불러왔다면 새 경기 입력 대신 경기 목록을 보여준다.
-          if (state.form?.gameId === null && merged.games.length > 0) state.form = null;
-          state.currentGameId ??= state.games[state.games.length - 1]?.id ?? null;
-          state.notice = saveGames(STORAGE_KEY, state.games)
-            ? mergeSummary(merged)
-            : '불러온 기록을 저장하지 못했습니다. 저장 공간을 확인하세요. 앱을 닫으면 불러온 기록이 사라집니다.';
-          render();
-        })
-        .catch(() => {
-          state.notice = '파일을 열 수 없습니다. 다시 골라 주세요.';
-          render();
-        });
+    changeList: (list: GameListView) => {
+      // 찾는 말은 목록만 바꿔 그리므로 여기서는 담기만 하고, 정렬·구분이 바뀌면 다시 그린다.
+      const redraw = list.order !== state.gameList.order || list.type !== state.gameList.type;
+      state.gameList = list;
+      if (redraw) render();
     },
   };
 
@@ -494,13 +471,49 @@ export function mountApp(root: HTMLElement): void {
       saveHand(hand);
       render();
     },
+    download: (kind: 'backup' | 'pitches') => {
+      const file =
+        kind === 'backup'
+          ? { name: exportFileName('backup', today()), data: backupJson(state.games, new Date().toISOString()), type: 'application/json' }
+          : { name: exportFileName('pitches', today()), data: pitchesCsv(state.games, replayOf), type: 'text/csv' };
+      void downloadFile(file.name, file.data, file.type).then((result) => {
+        if (result === 'saved') return;
+        state.notice = result === 'declined' ? '내려받기를 취소했습니다.' : '이 화면에서는 파일을 내려받을 수 없습니다. 휴대폰 브라우저에서 앱을 열어 다시 해 보세요.';
+        render();
+      });
+    },
+    importBackup: (file: File) => {
+      void file
+        .text()
+        .then((text) => {
+          const parsed = parseBackup(text);
+          if (!parsed.ok) {
+            state.notice = parsed.message;
+            render();
+            return;
+          }
+          const merged = mergeGames(state.games, parsed.games);
+          state.games = [...merged.games];
+          // 첫 화면(경기가 하나도 없을 때)에서 불러왔다면 새 경기 입력 대신 경기 목록을 보여준다.
+          if (state.form?.gameId === null && merged.games.length > 0) state.form = null;
+          state.currentGameId ??= state.games[state.games.length - 1]?.id ?? null;
+          state.notice = saveGames(STORAGE_KEY, state.games)
+            ? mergeSummary(merged)
+            : '불러온 기록을 저장하지 못했습니다. 저장 공간을 확인하세요. 앱을 닫으면 불러온 기록이 사라집니다.';
+          render();
+        })
+        .catch(() => {
+          state.notice = '파일을 열 수 없습니다. 다시 골라 주세요.';
+          render();
+        });
+    },
   };
 
   const renderBody = (game: Game | undefined): HTMLElement => {
     if (state.helpOpen) return manualView(helpActions);
-    if (state.tab === 'settings') return settingsView(state.hand, settingsActions);
+    if (state.tab === 'settings') return settingsView(state.hand, state.games.length > 0, settingsActions);
     if (state.tab === 'games' || !game) {
-      return gamesView(state.games, state.currentGameId, state.form, gamesActions, replayOf);
+      return gamesView(state.games, state.currentGameId, state.form, state.gameList, gamesActions, replayOf);
     }
     const info = gameInfo(game);
     const replay = replayOf(game);

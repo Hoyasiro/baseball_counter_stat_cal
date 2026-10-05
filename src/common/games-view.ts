@@ -3,7 +3,8 @@
 import { h } from './dom';
 import { GAME_TYPES, GameType, Team } from './events';
 import { GAME_TYPE_LABEL, Game, GameInfo, OPPONENT_MAX_LENGTH, dateLabel, gameInfo, opponentLabel, recentOpponents, shiftDate, today } from './game';
-import { DOWNLOAD_LABEL, IMPORT_LABEL } from './labels';
+import { GAME_ORDER_LABEL, IMPORT_LABEL } from './labels';
+import { GAME_ORDERS, GameOrder, GameTypeFilter, filterGames, sortGames } from './game-list';
 import { GameReplay } from './replay';
 
 export interface GameForm {
@@ -20,8 +21,16 @@ export interface GamesActions {
   changeForm: (form: GameForm) => void;
   cancelForm: () => void;
   saveForm: (form: GameForm) => void;
-  download: (kind: 'backup' | 'pitches') => void;
-  importBackup: (file: File) => void;
+  /** 설정 탭(데이터 관리)으로 가기 */
+  openSettings: () => void;
+  changeList: (list: GameListView) => void;
+}
+
+/** 경기 목록을 어떻게 보여줄지 (정렬·찾기) */
+export interface GameListView {
+  readonly order: GameOrder;
+  readonly type: GameTypeFilter;
+  readonly query: string;
 }
 
 
@@ -117,8 +126,16 @@ function formView(form: GameForm, hasGames: boolean, opponents: readonly string[
       hasGames ? h('button', { className: 'secondary', text: '취소', onClick: actions.cancelForm }) : null,
       h('button', { className: 'primary', text: form.gameId ? '저장' : '경기 시작', onClick: () => actions.saveForm(current) }),
     ]),
-    // 휴대폰을 바꾼 첫 화면에서도 예전 기록을 옮겨 올 수 있게 한다.
-    hasGames ? null : h('div', { className: 'import-first' }, [h('p', { className: 'help', text: '예전에 내려받은 백업 파일이 있나요?' }), importButton(actions)]),
+    // 휴대폰을 바꾼 첫 화면에서도 예전 기록을 옮겨 올 수 있게 데이터 관리로 안내한다.
+    hasGames
+      ? null
+      : h('div', { className: 'import-first' }, [
+          h('p', { className: 'help', text: '예전에 내려받은 백업 파일이 있나요?' }),
+          h('button', { className: 'secondary', onClick: actions.openSettings }, [
+            h('strong', { text: `설정 › 데이터 관리에서 ${IMPORT_LABEL}` }),
+            h('small', { text: '지금 기록은 지우지 않고 합칩니다' }),
+          ]),
+        ]),
   ]);
 }
 
@@ -134,41 +151,6 @@ function quickChips(options: readonly [string, string][], selected: string, onPi
     }),
   );
   return h('div', { className: 'quick-chips' }, buttons);
-}
-
-/** 숨긴 파일 선택 칸을 버튼으로 연다. */
-function importButton(actions: GamesActions): HTMLElement {
-  const input = h('input', { className: 'visually-hidden', attrs: { type: 'file', accept: '.json,application/json', tabindex: '-1', 'aria-hidden': 'true' } });
-  input.addEventListener('change', () => {
-    const file = input.files?.[0];
-    if (file) actions.importBackup(file);
-    input.value = '';
-  });
-  return h('div', {}, [
-    input,
-    h('button', { className: 'secondary', onClick: () => input.click() }, [
-      h('strong', { text: IMPORT_LABEL }),
-      h('small', { text: '지금 기록은 지우지 않고 합칩니다' }),
-    ]),
-  ]);
-}
-
-function downloadSection(actions: GamesActions): HTMLElement {
-  return h('section', { className: 'download-section' }, [
-    h('h2', { text: '데이터 내려받기' }),
-    h('p', { className: 'help', text: '모든 경기 기록을 파일로 저장합니다. 휴대폰을 바꾸거나 브라우저 데이터를 지우기 전에 백업해 두세요.' }),
-    h('button', { className: 'secondary', onClick: () => actions.download('backup') }, [
-      h('strong', { text: DOWNLOAD_LABEL.json }),
-      h('small', { text: '모든 기록을 그대로 저장 (보관·옮기기용)' }),
-    ]),
-    h('button', { className: 'secondary', onClick: () => actions.download('pitches') }, [
-      h('strong', { text: DOWNLOAD_LABEL.csv }),
-      h('small', { text: '공 하나당 한 줄 · 엑셀·구글 시트에서 열기' }),
-    ]),
-    h('h2', { text: '백업 불러오기' }),
-    h('p', { className: 'help', text: '내려받아 둔 백업 파일(JSON)에서 기록을 가져옵니다. 이미 있는 경기는 늘어난 기록만 덧붙입니다.' }),
-    importButton(actions),
-  ]);
 }
 
 function gameCard(game: Game, isCurrent: boolean, replay: GameReplay, actions: GamesActions): HTMLElement {
@@ -191,18 +173,71 @@ function gameCard(game: Game, isCurrent: boolean, replay: GameReplay, actions: G
   ]);
 }
 
+/** 찾는 말은 칠 때마다 다시 그리면 키보드가 닫히므로, 목록 부분만 바꿔 그린다. */
+function listControls(list: GameListView, onQuery: (query: string) => void, actions: GamesActions): HTMLElement {
+  const search = h('input', {
+    attrs: {
+      id: 'game-search',
+      type: 'search',
+      value: list.query,
+      placeholder: '상대팀 · 날짜(예: 10월) · 경기 구분',
+      autocomplete: 'off',
+      enterkeyhint: 'search',
+      'aria-label': '경기 찾기',
+    },
+  });
+  search.addEventListener('input', () => onQuery(search.value));
+  const types: [GameTypeFilter, string][] = [['all', '전체'], ...GAME_TYPES.map((t): [GameTypeFilter, string] => [t, GAME_TYPE_LABEL[t]])];
+  return h('div', { className: 'list-controls' }, [
+    search,
+    h(
+      'div',
+      { className: 'quick-chips', attrs: { role: 'group', 'aria-label': '경기 구분으로 거르기' } },
+      types.map(([value, label]) =>
+        h('button', { className: list.type === value ? 'active' : '', text: label, onClick: () => actions.changeList({ ...list, type: value }) }),
+      ),
+    ),
+    h(
+      'div',
+      { className: 'order-picker', attrs: { role: 'group', 'aria-label': '정렬' } },
+      GAME_ORDERS.map((order) =>
+        h('button', { className: list.order === order ? 'active' : '', text: GAME_ORDER_LABEL[order], onClick: () => actions.changeList({ ...list, order }) }),
+      ),
+    ),
+  ]);
+}
+
 export function gamesView(
   games: readonly Game[],
   currentGameId: string | null,
   form: GameForm | null,
+  list: GameListView,
   actions: GamesActions,
   replayOf: (g: Game) => GameReplay,
 ): HTMLElement {
   if (form) return formView(form, games.length > 0, recentOpponents(games), actions);
-  const sorted = [...games].sort((a, b) => gameInfo(b).date.localeCompare(gameInfo(a).date) || b.createdAt.localeCompare(a.createdAt));
+  const cards = h('div', { className: 'game-list', attrs: { 'aria-live': 'polite' } });
+  const showList = (query: string): void => {
+    const shown = sortGames(filterGames(games, query, list.type), list.order);
+    cards.replaceChildren(
+      h('p', { className: 'help list-count', text: shown.length === games.length ? `경기 ${games.length}개` : `경기 ${games.length}개 중 ${shown.length}개` }),
+      ...shown.map((g) => gameCard(g, g.id === currentGameId, replayOf(g), actions)),
+    );
+    if (shown.length === 0 && games.length > 0) cards.append(h('p', { className: 'empty', text: '찾는 경기가 없어요. 찾는 말이나 경기 구분을 바꿔 보세요.' }));
+  };
+  showList(list.query);
   return h('section', { className: 'games' }, [
     h('button', { className: 'primary new-game', text: '+ 새 경기', onClick: actions.openNew }),
-    ...sorted.map((g) => gameCard(g, g.id === currentGameId, replayOf(g), actions)),
-    games.length > 0 ? downloadSection(actions) : null,
+    games.length > 0
+      ? listControls(
+          list,
+          (query) => {
+            actions.changeList({ ...list, query });
+            showList(query);
+          },
+          actions,
+        )
+      : null,
+    cards,
   ]);
 }

@@ -1683,28 +1683,30 @@ button {
   }
 }
 
-/* 투구 상세 창: 상황판이 보이도록 아래에서 올라온다. */
-.sheet-backdrop {
+/* 팝업: 어두워진 화면 위에 그보다 작은 창이 뜬다. 상황판이 보이도록 아래쪽에 띄운다. */
+.popup-backdrop {
   position: fixed;
   inset: 0;
   z-index: 20;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: rgb(0 0 0 / 0.3);
+  padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: rgb(0 0 0 / 0.45);
 }
 
-.pitch-sheet {
+.popup {
   display: grid;
   gap: 10px;
   width: 100%;
-  max-width: 480px;
+  max-width: 456px;
   max-height: 100%;
   overflow-y: auto;
-  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
-  border-radius: 18px 18px 0 0;
+  padding: 12px 14px 14px;
+  border-radius: 18px;
   background: var(--surface);
-  box-shadow: 0 -4px 20px rgb(0 0 0 / 0.2);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.35);
+  outline: none;
 }
 
 .sheet-head {
@@ -1884,29 +1886,25 @@ button {
   font-size: 13px;
 }
 
-/* ── 타구 기록 ── */
-.field-panel {
+/* ── 타구 기록 창 ── */
+/* 야구장 그림은 엄지 쪽(오른손이면 오른쪽), 타구 종류 단추는 반대쪽 */
+.field-body {
   display: grid;
-  gap: 6px;
-  padding: 8px 10px;
-  border-radius: var(--radius);
-  background: var(--surface);
-  border: 2px solid var(--hit);
+  grid-template-columns: 84px minmax(0, 1fr);
+  grid-template-areas: 'types field';
+  gap: 10px;
+  align-items: start;
 }
 
-.field-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
+[data-hand='left'] .field-body {
+  grid-template-columns: minmax(0, 1fr) 84px;
+  grid-template-areas: 'field types';
 }
 
-.field-head .section-title {
-  margin: 0;
-}
-
-.field-head .link-button {
-  white-space: nowrap;
+.field-area {
+  grid-area: field;
+  display: grid;
+  gap: 4px;
 }
 
 .field-panel .confirm-buttons button {
@@ -1914,29 +1912,24 @@ button {
   white-space: nowrap;
 }
 
-.field-pick {
-  max-width: 270px;
-  width: 100%;
-  justify-self: center;
-}
-
 .batted-type-row {
+  grid-area: types;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 4px;
+  gap: 6px;
 }
 
 .batted-type-row button {
   display: grid;
-  gap: 1px;
-  padding: 6px 1px;
-  border-radius: 8px;
+  gap: 2px;
+  min-height: 52px;
+  padding: 6px 2px;
+  border-radius: 10px;
   background: var(--primary-soft);
   border: 1px solid var(--line);
 }
 
 .batted-type-row strong {
-  font-size: 12px;
+  font-size: 13px;
   white-space: nowrap;
 }
 
@@ -1953,7 +1946,7 @@ button {
 .strength-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
+  gap: 6px;
 }
 
 .link-button {
@@ -2126,25 +2119,19 @@ button {
   border-radius: 50%;
 }
 
-/* ── 데이터 내려받기 ── */
-.download-section {
-  display: grid;
-  gap: 8px;
-  margin-top: 12px;
+/* ── 데이터 관리 (설정 탭) ── */
+.data-section h4 {
+  margin: 6px 0 0;
+  font-size: 15px;
 }
 
-.download-section h2 {
-  margin: 0;
-  font-size: 17px;
-}
-
-.download-section .secondary {
+.data-section .secondary {
   display: grid;
   gap: 2px;
   text-align: left;
 }
 
-.download-section small {
+.data-section small {
   color: var(--muted);
   font-weight: 400;
 }
@@ -2175,7 +2162,7 @@ input[type='file'].visually-hidden {
 }
 
 .import-first .secondary,
-.download-section .secondary {
+.data-section .secondary {
   display: grid;
   gap: 2px;
   width: 100%;
@@ -2256,4 +2243,68 @@ input[type='file'].visually-hidden {
 
 .quick-help {
   margin: -6px 0 0;
+}
+
+/* ── 경기 목록 정렬 · 찾기 ── */
+.list-controls {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 4px;
+}
+
+.list-controls input[type='search'] {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+
+.list-controls .quick-chips {
+  flex-wrap: nowrap;
+  margin-top: 0;
+}
+
+/* 경기 구분 5개가 한 줄에 들어가도록 */
+.list-controls .quick-chips button {
+  flex: 1;
+  padding: 7px 4px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.order-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--primary-soft);
+}
+
+.order-picker button {
+  padding: 8px 2px;
+  border-radius: 9px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.order-picker button.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);
+}
+
+.game-list {
+  display: grid;
+  gap: 12px;
+}
+
+.list-count {
+  margin: 0;
 }

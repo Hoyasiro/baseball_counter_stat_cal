@@ -86,11 +86,26 @@ export function pitchDetailToggle(on: boolean, toggle: () => void): HTMLElement 
   ]);
 }
 
+/**
+ * 화면 위에 뜨는 작은 창(팝업). 뒤 화면은 어둡게 깔리고, 창 바깥을 누르면 기록하지 않고 닫는다.
+ * 위쪽 상황판이 보이도록 창은 아래쪽에 띄운다.
+ */
+function popup(className: string, label: string, onCancel: () => void, children: HTMLElement[]): HTMLElement {
+  const dialog = h('section', { className: `popup ${className}`, attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-label': label, tabindex: '-1' } }, children);
+  const backdrop = h('div', { className: 'popup-backdrop' }, [dialog]);
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop) onCancel();
+  });
+  // 화면 읽기 프로그램·키보드 사용자를 위해 창으로 초점을 옮긴다. 다시 그릴 때 화면이 튀지 않게 스크롤은 하지 않는다.
+  requestAnimationFrame(() => dialog.focus({ preventScroll: true }));
+  return backdrop;
+}
+
 function sheetResultLabel(sheet: PitchSheet): string {
   return pitchLabel(sheet);
 }
 
-/** 결과 버튼을 누른 뒤 뜨는 투구 상세 창. 상황판은 가리지 않도록 아래에서 올라온다. */
+/** 결과 버튼을 누른 뒤 뜨는 투구 상세 창(팝업) */
 export function pitchSheetView(sheet: PitchSheet, speedStart: number, actions: PitchSheetActions): HTMLElement {
   // 다이얼 값은 다시 그리지 않고 담기만 하므로, 다른 값을 고르거나 기록할 때 최신 구속을 함께 넘긴다.
   let speed = sheet.speed;
@@ -102,8 +117,7 @@ export function pitchSheetView(sheet: PitchSheet, speedStart: number, actions: P
   const set = (change: Partial<PitchSheet>): void => actions.change(latest(change));
   const zoneText = sheet.zone ? (isInZone(sheet.zone) ? '존 안' : '존 밖') : '공이 지나간 곳을 누르세요';
   const batted = isBattedResult(sheet.result);
-  const backdrop = h('div', { className: 'sheet-backdrop' }, [
-    h('section', { className: 'pitch-sheet', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-label': PITCH_DETAIL_LABEL } }, [
+  return popup('pitch-sheet', PITCH_DETAIL_LABEL, actions.cancel, [
       h('div', { className: 'sheet-head' }, [
         h('p', { className: 'section-title' }, [`${PITCH_DETAIL_LABEL} · ${sheetResultLabel(sheet)}`]),
         h('button', { className: 'link-button', text: '← 돌아가기', attrs: { 'aria-label': '돌아가기 (기록하지 않음)' }, onClick: actions.cancel }),
@@ -135,44 +149,44 @@ export function pitchSheetView(sheet: PitchSheet, speedStart: number, actions: P
         h('button', { className: 'secondary', text: PITCH_SHEET_LABEL.skip, onClick: () => actions.skip(latest()) }),
         h('button', { className: 'primary', text: batted ? PITCH_SHEET_LABEL.next : PITCH_SHEET_LABEL.save, onClick: () => actions.save(latest()) }),
       ]),
-    ]),
   ]);
-  // 창 바깥(어두운 곳)을 누르면 기록하지 않고 닫는다.
-  backdrop.addEventListener('click', (e) => {
-    if (e.target === backdrop) actions.cancel();
-  });
-  return backdrop;
 }
 
+/** 친 공의 낙구 지점·질을 고르는 창(팝업). 야구장 그림은 엄지 쪽, 타구 종류는 반대쪽에 둔다. */
 export function fieldPanel(draft: FieldDraft, actions: FieldActions): HTMLElement {
   const set = (change: Partial<FieldDraft>): void => actions.change({ ...draft, ...change });
   const what = draft.result === 'hit' ? HIT_TYPE_LABEL[draft.hitType ?? 'single'] : draft.result === 'out' ? '아웃' : '실책 출루';
   const where = draft.x !== null && draft.y !== null ? placementLabel(draft.x, draft.y) : '공이 떨어진 곳을 누르세요';
-  return h('section', { className: 'field-panel' }, [
-    h('div', { className: 'field-head' }, [
-      h('p', { className: 'section-title' }, [`타구 기록 · ${what}`, h('small', { text: ` · ${where}` })]),
+  return popup('field-panel', '타구 기록', actions.cancel, [
+    h('div', { className: 'sheet-head' }, [
+      h('p', { className: 'section-title' }, [`타구 기록 · ${what}`]),
       h('button', { className: 'link-button', text: '← 돌아가기', attrs: { 'aria-label': '돌아가기 (기록하지 않음)' }, onClick: actions.cancel }),
     ]),
-    h('div', { className: 'field-pick' }, [
-      fieldSvg({
-        picked: draft.x !== null && draft.y !== null ? { x: draft.x, y: draft.y } : null,
-        onPick: (x, y) => set({ x, y }),
-        label: '야구장. 공이 떨어진 곳을 누르세요',
-      }),
+    h('div', { className: 'field-body' }, [
+      h('div', { className: 'field-area' }, [
+        h('div', { className: 'field-pick' }, [
+          fieldSvg({
+            picked: draft.x !== null && draft.y !== null ? { x: draft.x, y: draft.y } : null,
+            onPick: (x, y) => set({ x, y }),
+            label: '야구장. 공이 떨어진 곳을 누르세요',
+          }),
+        ]),
+        h('p', { className: 'zone-caption field-where', text: where }),
+      ]),
+      h(
+        'div',
+        { className: 'batted-type-row', attrs: { role: 'group', 'aria-label': '타구 종류' } },
+        BATTED_BALL_TYPES.map((t) =>
+          h('button', { className: draft.type === t ? 'active' : '', onClick: () => set({ type: draft.type === t ? null : t }) }, [
+            h('strong', { text: BATTED_BALL_TYPE_LABEL[t] }),
+            h('small', { text: BATTED_BALL_TYPE_HINT[t] }),
+          ]),
+        ),
+      ),
     ]),
     h(
       'div',
-      { className: 'batted-type-row' },
-      BATTED_BALL_TYPES.map((t) =>
-        h('button', { className: draft.type === t ? 'active' : '', onClick: () => set({ type: draft.type === t ? null : t }) }, [
-          h('strong', { text: BATTED_BALL_TYPE_LABEL[t] }),
-          h('small', { text: BATTED_BALL_TYPE_HINT[t] }),
-        ]),
-      ),
-    ),
-    h(
-      'div',
-      { className: 'strength-row' },
+      { className: 'strength-row', attrs: { role: 'group', 'aria-label': '타구 세기' } },
       BATTED_BALL_STRENGTHS.map((st) =>
         h('button', {
           className: draft.strength === st ? 'active' : '',
@@ -181,7 +195,7 @@ export function fieldPanel(draft: FieldDraft, actions: FieldActions): HTMLElemen
         }),
       ),
     ),
-    h('div', { className: 'confirm-buttons' }, [
+    h('div', { className: 'confirm-buttons sheet-buttons' }, [
       h('button', { className: 'secondary', text: FIELD_BUTTON_LABEL.skip, onClick: () => actions.skip(draft) }),
       h('button', { className: 'primary', text: FIELD_BUTTON_LABEL.save, onClick: () => actions.save(draft) }),
     ]),

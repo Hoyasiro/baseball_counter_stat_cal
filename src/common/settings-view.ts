@@ -1,16 +1,17 @@
 // 설정 화면: 이 휴대폰에서 쓰는 편의 설정
 
+import { DataActions, dataSection } from './data-section';
 import { h } from './dom';
 import { HAND_LABEL, PITCH_DETAIL_LABEL } from './labels';
 import { Hand } from './settings';
 
-export interface SettingsActions {
+export interface SettingsActions extends DataActions {
   hand: (hand: Hand) => void;
 }
 
 const HANDS: readonly Hand[] = ['right', 'left'];
 
-export function settingsView(hand: Hand, actions: SettingsActions): HTMLElement {
+export function settingsView(hand: Hand, hasGames: boolean, actions: SettingsActions): HTMLElement {
   return h('section', { className: 'settings' }, [
     h('h2', { text: '설정' }),
     h('div', { className: 'settings-item' }, [
@@ -29,6 +30,7 @@ export function settingsView(hand: Hand, actions: SettingsActions): HTMLElement 
         ),
       ),
     ]),
-    h('p', { className: 'help', text: '설정은 이 휴대폰에만 저장됩니다. 기록에는 영향이 없습니다.' }),
+    h('p', { className: 'help', text: '손 설정은 이 휴대폰에만 저장됩니다. 기록에는 영향이 없습니다.' }),
+    dataSection(hasGames, actions),
   ]);
 }

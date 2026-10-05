@@ -9,6 +9,7 @@ import {
   CHILD_RUNNER_BUTTONS,
   DOWNLOAD_LABEL,
   FIELD_BUTTON_LABEL,
+  GAME_ORDER_LABEL,
   HAND_LABEL,
   PITCH_SHEET_LABEL,
   IMPORT_LABEL,
@@ -57,6 +58,7 @@ describe('도움말이 화면과 맞는지', () => {
     expect(missing([IMPORT_LABEL])).toEqual([]);
     expect(missing(Object.values(PITCH_SHEET_LABEL))).toEqual([]);
     expect(missing(Object.values(HAND_LABEL))).toEqual([]);
+    expect(missing(Object.values(GAME_ORDER_LABEL))).toEqual([]);
   });
 
   it('튜토리얼은 단계마다 제목과 설명이 있다', () => {

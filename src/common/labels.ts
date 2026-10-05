@@ -1,5 +1,6 @@
 // 화면에 보이는 쉬운 말 (CLAUDE.md 0.4). 입력은 상황 기준 하나이므로 투수·타자가 같은 말을 쓴다.
 
+import { GameOrder } from './game-list';
 import { Hand } from './settings';
 import { BASE_NAMES, STEAL_NAMES, basesLabel } from './bases';
 import {
@@ -128,6 +129,12 @@ export const HAND_LABEL: Record<Hand, string> = { right: '오른손', left: '왼
 export const DOWNLOAD_LABEL = { json: '백업 파일 (JSON)', csv: '표 파일 (CSV, 엑셀)' } as const;
 
 export const IMPORT_LABEL = '백업 파일 불러오기';
+
+export const GAME_ORDER_LABEL: Record<GameOrder, string> = {
+  newest: '최근 경기 먼저',
+  oldest: '오래된 경기 먼저',
+  opponent: '상대팀 가나다순',
+};
 
 export const HIT_TYPE_LABEL: Record<HitType, string> = {
   single: '1루타',

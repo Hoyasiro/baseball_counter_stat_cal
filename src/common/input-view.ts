@@ -402,8 +402,6 @@ function controls(model: InputModel, actions: InputActions): HTMLElement {
 
   if (draft) return h('div', { className: 'controls' }, [situationEditor(draft, actions)]);
 
-  // 친 공은 야구장 그림에서 낙구 지점과 질을 고른 뒤 기록한다.
-  if (model.fieldDraft) return h('div', { className: 'controls' }, [fieldPanel(model.fieldDraft, actions.field)]);
 
   const detail = pitchDetailToggle(model.detailMode, actions.toggleDetail);
 
@@ -439,5 +437,7 @@ export function inputView(model: InputModel, actions: InputActions): HTMLElement
     h('div', { className: 'board-sticky' }, [board(model, actions)]),
     controls(model, actions),
     model.pitchSheet ? pitchSheetView(model.pitchSheet, model.speedStart, actions.sheet) : null,
+    // 친 공은 야구장 그림 창에서 낙구 지점과 질을 고른 뒤 기록한다.
+    model.fieldDraft ? fieldPanel(model.fieldDraft, actions.field) : null,
   ]);
 }
