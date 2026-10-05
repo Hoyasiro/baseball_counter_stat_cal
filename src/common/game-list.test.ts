@@ -4,7 +4,7 @@ import { Game, createGame, gameInfo } from './game';
 import { filterGames, sortGames } from './game-list';
 
 function game(date: string, opponent: string, gameType: GameType = 'practice'): Game {
-  return createGame({ date, opponent, gameType, battingFirst: 'them' });
+  return createGame({ date, opponent, gameType, battingFirst: 'them', venue: 'home', ourTeam: '' });
 }
 
 const a = game('2026-09-01', '서울 가초', 'tournament');

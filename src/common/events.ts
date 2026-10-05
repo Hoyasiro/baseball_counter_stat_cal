@@ -119,6 +119,12 @@ export const GAME_TYPES: readonly GameType[] = ['practice', 'tournament', 'leagu
 
 export type Team = 'us' | 'them';
 
+/** 우리 팀이 홈인지 원정인지. 아마추어는 동전 던지기로 선후공을 정하기도 해서 선공/후공과 따로 둔다. */
+export type Venue = 'home' | 'away';
+
+/** 우리 팀 이름 최대 글자 수 */
+export const TEAM_NAME_MAX_LENGTH = 30;
+
 /** 초(top) / 말(bottom) */
 export type Half = 'top' | 'bottom';
 
@@ -253,6 +259,10 @@ export interface GameInfoEvent extends EventBase {
   readonly startInning?: number;
   /** 우리 팀이 먼저 공격(초)인지. 없으면 후공으로 본다. */
   readonly battingFirst?: Team;
+  /** 홈 / 원정. 없으면 선공은 원정, 후공은 홈으로 본다. */
+  readonly venue?: Venue;
+  /** 우리 팀 이름. 없거나 비어 있으면 "우리 팀" */
+  readonly ourTeam?: string;
 }
 
 export interface VoidEvent extends EventBase {
@@ -388,7 +398,9 @@ export function isLogEvent(value: unknown): value is LogEvent {
         typeof value.opponent === 'string' &&
         GAME_TYPES.includes(value.gameType as GameType) &&
         (value.startInning === undefined || isCount(value.startInning, 1, MAX_INNING)) &&
-        (value.battingFirst === undefined || value.battingFirst === 'us' || value.battingFirst === 'them')
+        (value.battingFirst === undefined || value.battingFirst === 'us' || value.battingFirst === 'them') &&
+        (value.venue === undefined || value.venue === 'home' || value.venue === 'away') &&
+        (value.ourTeam === undefined || (typeof value.ourTeam === 'string' && value.ourTeam.length <= TEAM_NAME_MAX_LENGTH))
       );
     case 'void':
       return typeof value.targetId === 'string';

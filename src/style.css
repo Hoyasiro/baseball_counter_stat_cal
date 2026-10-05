@@ -47,6 +47,7 @@
     --bar: #1a4630;
     --warn-bg: #3a2c12;
     --warn-text: #f2cf8e;
+    --danger: #f2b8b5;
     --grass: #2f6b3c;
     --infield-grass: #3a7a48;
     --dirt: #8a6a40;
@@ -66,6 +67,7 @@
   --bar: #1a4630;
   --warn-bg: #3a2c12;
   --warn-text: #f2cf8e;
+  --danger: #f2b8b5;
   --grass: #2f6b3c;
   --infield-grass: #3a7a48;
   --dirt: #8a6a40;
@@ -999,15 +1001,15 @@ input:focus-visible {
 
 .line-score th,
 .line-score td {
-  padding: 8px 6px;
+  padding: 8px 3px;
   text-align: center;
-  min-width: 26px;
+  min-width: 22px;
 }
 
 .line-score .team {
   text-align: left;
   white-space: nowrap;
-  max-width: 96px;
+  max-width: 64px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -1025,34 +1027,6 @@ input:focus-visible {
   margin-top: 6px;
 }
 
-.score-editor {
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  border-radius: var(--radius);
-  background: var(--surface);
-  border: 1px solid var(--line);
-}
-
-.team-picker {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.team-picker button {
-  padding: 10px 0;
-  border-radius: 10px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  font-weight: 600;
-}
-
-.team-picker button.active {
-  background: var(--bar);
-  color: var(--on-color);
-  border-color: var(--bar);
-}
 
 /* ── 가로 화면: 왼쪽 상황판, 오른쪽 버튼 ── */
 @media (orientation: landscape) and (max-height: 560px) {
@@ -2439,4 +2413,141 @@ input[type='file'].visually-hidden {
   font-size: 11px;
   font-weight: 700;
   line-height: 18px;
+}
+
+/* ── 경기 카드 단추 · 경기 결과 ── */
+.game-card-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.game-card-buttons button {
+  padding: 11px 6px;
+}
+
+.game-card-buttons .secondary {
+  color: var(--text);
+}
+
+.game-card-buttons .secondary.danger {
+  color: var(--danger);
+}
+
+/* 흰 글씨가 잘 읽히도록 어두운 화면에서도 진한 빨강을 쓴다. */
+.primary.danger {
+  background: var(--hit);
+}
+
+.back-button {
+  justify-self: start;
+  padding: 6px 0;
+  font-size: 15px;
+}
+
+.scoreboard-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.scoreboard-head .inning-title {
+  margin: 0;
+}
+
+.view-toggle {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.view-toggle.on {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.line-score.editable td:not(.total) {
+  padding: 0;
+}
+
+.score-cell {
+  width: 100%;
+  min-width: 22px;
+  padding: 8px 2px;
+  background: transparent;
+  font: inherit;
+  text-decoration: inherit;
+  text-underline-offset: 3px;
+}
+
+.child-record {
+  margin-top: 4px;
+}
+
+.score-cell-value {
+  display: grid;
+  grid-template-columns: 56px 1fr 56px;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.score-cell-value strong {
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-cell-value button,
+.score-keypad button {
+  min-height: 48px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.score-keypad {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.score-keypad button.active {
+  background: var(--bar);
+  border-color: var(--bar);
+  color: var(--on-color);
+}
+
+.delete-popup p {
+  margin: 0;
+}
+
+/* 분석: 볼 경기 고르기 */
+.game-picker {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.game-picker select,
+.settings input {
+  font: inherit;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  min-width: 0;
+  width: 100%;
 }

@@ -21,7 +21,6 @@ import {
 import { halfInningLabel } from './innings';
 import { Actor, PlateAppearance, PlateAppearanceOutcome, RunnerEventKind } from './replay';
 
-/** 아래 탭 이름 */
 /** 앱 이름. 화면 제목·도움말에 쓴다. (index.html 제목, manifest 이름도 같게 맞춘다) */
 export const APP_NAME = '야구맘기록지';
 
@@ -35,10 +34,27 @@ export const TAB_LABEL: Record<AppTab, string> = {
   settings: '설정',
 };
 
-/** "경기" 탭 안: 지금 경기의 기록(스코어보드·장면) / 경기 목록 */
-export type GamesPane = 'current' | 'list';
+/** "경기" 탭 경기 카드의 단추 */
+export const GAME_CARD_LABEL = {
+  result: '결과',
+  resume: '이어서 기록',
+  record: '이 경기 기록하기',
+  edit: '정보 고치기',
+  delete: '삭제',
+} as const;
 
-export const GAMES_PANE_LABEL: Record<GamesPane, string> = { current: '이 경기 기록', list: '경기 목록' };
+/** 경기 결과 화면 */
+export const GAME_RESULT_LABEL = {
+  back: '← 경기 목록',
+  scoreboard: '스코어보드',
+  childRecord: '내 아이 기록 보기',
+} as const;
+
+/** 스코어보드 칸 고치기 창 */
+export const SCORE_CELL_LABEL = { save: '이 점수로', reset: '기록대로 되돌리기' } as const;
+
+/** 분석 범위 */
+export const ANALYSIS_SCOPE_LABEL = { game: '선택한 경기', all: '전체' } as const;
 
 /** "분석" 탭 안: 투수 / 타자 / 수비 (계산은 src/pitcher, src/batter, src/fielder로 나뉜다) */
 export type AnalysisKind = 'pitcher' | 'batter' | 'fielder';

@@ -29,7 +29,10 @@ import {
   ROLE_LABEL,
   RUNNER_BUTTONS,
   TAB_LABEL,
-  GAMES_PANE_LABEL,
+  GAME_CARD_LABEL,
+  GAME_RESULT_LABEL,
+  SCORE_CELL_LABEL,
+  ANALYSIS_SCOPE_LABEL,
   ANALYSIS_KIND_LABEL,
 } from './labels';
 
@@ -56,7 +59,10 @@ describe('도움말이 화면과 맞는지', () => {
     expect(missing(Object.values(POSITION_LABEL))).toEqual([]);
     expect(missing(Object.values(GAME_TYPE_LABEL))).toEqual([]);
     expect(missing(Object.values(TAB_LABEL))).toEqual([]);
-    expect(missing(Object.values(GAMES_PANE_LABEL))).toEqual([]);
+    expect(missing(Object.values(GAME_CARD_LABEL))).toEqual([]);
+    expect(missing(Object.values(GAME_RESULT_LABEL))).toEqual([]);
+    expect(missing(Object.values(SCORE_CELL_LABEL))).toEqual([]);
+    expect(missing(Object.values(ANALYSIS_SCOPE_LABEL))).toEqual([]);
     expect(missing(Object.values(ANALYSIS_KIND_LABEL))).toEqual([]);
   });
 
