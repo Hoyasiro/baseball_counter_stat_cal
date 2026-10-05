@@ -60,6 +60,9 @@ export const GAMES_VIEW_LABEL = { list: '목록', calendar: '달력' } as const;
 /** 달력 보기 단추 */
 export const CALENDAR_LABEL = { year: '연도 보기', month: '달 보기' } as const;
 
+/** 설정: 화면 방향 */
+export const ORIENTATION_LABEL = { portrait: '세로로 고정', any: '돌려서 쓰기' } as const;
+
 /** 분석 범위 */
 export const ANALYSIS_SCOPE_LABEL = { game: '선택한 경기', all: '전체' } as const;
 

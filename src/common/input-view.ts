@@ -6,7 +6,8 @@ import { MAX_BALLS_IN_COUNT, MAX_STRIKES_IN_COUNT, OUTS_PER_INNING } from './cou
 import { diamond } from './diamond';
 import { h } from './dom';
 import { BaseIndex, Bases, ChildPosition, HitType, MAX_INNING, MAX_RUNS, PitchResult, UndoableEvent } from './events';
-import { Game, GameInfo, dateLabel, opponentLabel } from './game';
+import { Game, GameInfo, dateLabel, opponentLabel, ourTeamLabel } from './game';
+import { lineScoreTable } from './line-score-view';
 import { halfInningLabel } from './innings';
 import {
   CHILD_RUNNER_BUTTONS,
@@ -202,6 +203,22 @@ function board(model: InputModel, actions: InputActions): HTMLElement {
     ]),
     h('div', { className: 'board-stats' }, [workloadPill(replay, state), scorePill]),
     h('p', { className: 'message', text: message(replay), attrs: { 'aria-live': 'polite' } }),
+    boardMore(model),
+  ]);
+}
+
+/**
+ * 가로 화면에서만 보이는 상황판 덧붙임: 이번 타석에 던진 공과 스코어보드.
+ * 세로 화면은 스크롤 없이 한 화면에 들어가야 해서 CSS로 숨긴다.
+ */
+function boardMore(model: InputModel): HTMLElement {
+  const { replay, info, score } = model;
+  const last = replay.plateAppearances[replay.plateAppearances.length - 1];
+  const current = last && last.outcome === null ? last : null;
+  return h('div', { className: 'board-more', attrs: { 'aria-hidden': 'true' } }, [
+    h('p', { className: 'board-more-title', text: current ? `이번 타석 공 ${current.pitches.length}개` : '이번 타석: 아직 공 없음' }),
+    current ? h('p', { className: 'chips' }, current.pitches.map((p) => h('span', { className: `chip ${p.result}`, text: eventLabel(p) }))) : null,
+    lineScoreTable(score, { us: ourTeamLabel(info), them: opponentLabel(info.opponent) }, replay.state?.inning ?? null),
   ]);
 }
 

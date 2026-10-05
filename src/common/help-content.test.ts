@@ -36,6 +36,7 @@ import {
   SCORE_CELL_LABEL,
   ANALYSIS_SCOPE_LABEL,
   GAMES_VIEW_LABEL,
+  ORIENTATION_LABEL,
   CALENDAR_LABEL,
   ANALYSIS_KIND_LABEL,
 } from './labels';
@@ -68,6 +69,7 @@ describe('도움말이 화면과 맞는지', () => {
     expect(missing(Object.values(SCORE_CELL_LABEL))).toEqual([]);
     expect(missing(Object.values(ANALYSIS_SCOPE_LABEL))).toEqual([]);
     expect(missing(Object.values(GAMES_VIEW_LABEL))).toEqual([]);
+    expect(missing(Object.values(ORIENTATION_LABEL))).toEqual([]);
     expect(missing(Object.values(CALENDAR_LABEL))).toEqual([]);
     expect(missing(Object.values(ANALYSIS_KIND_LABEL))).toEqual([]);
   });

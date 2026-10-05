@@ -4,17 +4,18 @@ import { DataActions, dataSection } from './data-section';
 import { h } from './dom';
 import { TEAM_NAME_MAX_LENGTH } from './events';
 import { DEFAULT_TEAM_NAME } from './game';
-import { HAND_LABEL, PITCH_DETAIL_LABEL } from './labels';
-import { Hand } from './settings';
+import { HAND_LABEL, ORIENTATION_LABEL, PITCH_DETAIL_LABEL } from './labels';
+import { Hand, OrientationMode } from './settings';
 
 export interface SettingsActions extends DataActions {
   hand: (hand: Hand) => void;
+  orientation: (mode: OrientationMode) => void;
   teamName: (name: string) => void;
 }
 
 const HANDS: readonly Hand[] = ['right', 'left'];
 
-export function settingsView(hand: Hand, teamName: string, hasGames: boolean, lastBackupAt: string | null, actions: SettingsActions): HTMLElement {
+export function settingsView(hand: Hand, orientation: OrientationMode, teamName: string, hasGames: boolean, lastBackupAt: string | null, actions: SettingsActions): HTMLElement {
   const teamInput = h('input', {
     attrs: {
       id: 'team-name',
@@ -49,6 +50,26 @@ export function settingsView(hand: Hand, teamName: string, hasGames: boolean, la
           }),
         ),
       ),
+    ]),
+    h('div', { className: 'settings-item' }, [
+      h('h3', { text: '화면 방향' }),
+      h('p', {
+        className: 'help',
+        text: '중계 화면을 보면서 기록하려면 "돌려서 쓰기"를 고르세요. 가로로 돌리면 왼쪽 상황판에 이번 타석 공과 스코어보드가 더 나오고, 화면 분할(두 앱 같이 보기)에서는 상황판이 작아집니다.',
+      }),
+      h(
+        'div',
+        { className: 'hand-picker' },
+        (['portrait', 'any'] as const).map((option) =>
+          h('button', {
+            className: option === orientation ? 'active' : '',
+            text: ORIENTATION_LABEL[option],
+            attrs: { 'aria-pressed': option === orientation ? 'true' : 'false' },
+            onClick: () => actions.orientation(option),
+          }),
+        ),
+      ),
+      h('p', { className: 'help', text: '세로 고정은 홈 화면에 설치한 앱(안드로이드)에서 됩니다. 브라우저나 아이폰에서는 휴대폰의 "화면 자동 회전" 설정을 따릅니다.' }),
     ]),
     h('p', { className: 'help', text: '팀 이름과 손 설정은 이 휴대폰에만 저장됩니다. 기록에는 영향이 없습니다.' }),
     dataSection(hasGames, lastBackupAt, actions),

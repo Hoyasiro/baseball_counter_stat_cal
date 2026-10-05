@@ -13,7 +13,19 @@ import { gamesChangedSince, loadLastBackup, saveLastBackup } from './common/back
 import { downloadFile, shareFile } from './common/download';
 import { backupJson, exportFileName, pitchesCsv } from './common/export';
 import { EMPTY_PITCH_DETAIL, FieldDraft, PitchDetail, PitchSheet, isBattedResult } from './common/pitch-detail-view';
-import { Hand, loadHand, loadShowScoreboard, loadTeamName, saveHand, saveShowScoreboard, saveTeamName } from './common/settings';
+import {
+  Hand,
+  OrientationMode,
+  loadHand,
+  loadOrientation,
+  loadShowScoreboard,
+  loadTeamName,
+  saveHand,
+  saveOrientation,
+  saveShowScoreboard,
+  saveTeamName,
+} from './common/settings';
+import { applyOrientation } from './common/orientation';
 import { FIELDING_PLAYS, PlayFieldingDraft } from './common/fielding-view';
 import { BatterDraft } from './common/batter-info-view';
 import { settingsView } from './common/settings-view';
@@ -116,6 +128,8 @@ interface State {
   showScoreboard: boolean;
   /** 새 경기에 넣을 우리 팀 이름 (설정, 이 휴대폰에 기억) */
   teamName: string;
+  /** 화면 방향 (설정, 이 휴대폰에 기억) */
+  orientation: OrientationMode;
   /** "분석" 탭에서 보고 있는 것 */
   analysisKind: AnalysisKind;
   /** 마지막으로 백업한 시각 (이 휴대폰에 기억) */
@@ -236,6 +250,7 @@ export function mountApp(root: HTMLElement): void {
     analysisGameId: null,
     showScoreboard: loadShowScoreboard(),
     teamName,
+    orientation: loadOrientation(),
     analysisKind: 'pitcher',
     lastBackupAt: loadLastBackup(),
   };
@@ -722,6 +737,12 @@ export function mountApp(root: HTMLElement): void {
       saveHand(hand);
       render();
     },
+    orientation: (mode: OrientationMode) => {
+      state.orientation = mode;
+      saveOrientation(mode);
+      applyOrientation(mode);
+      render();
+    },
     // 칠 때마다 다시 그리면 키보드가 닫히므로 기억만 한다.
     teamName: (name: string) => {
       state.teamName = name;
@@ -788,7 +809,7 @@ export function mountApp(root: HTMLElement): void {
 
   const renderBody = (game: Game | undefined): HTMLElement => {
     if (state.helpOpen) return manualView(helpActions);
-    if (state.tab === 'settings') return settingsView(state.hand, state.teamName, state.games.length > 0, state.lastBackupAt, settingsActions);
+    if (state.tab === 'settings') return settingsView(state.hand, state.orientation, state.teamName, state.games.length > 0, state.lastBackupAt, settingsActions);
     const shown = resultGame();
     if (state.tab === 'games' && shown && !state.form) {
       const shownReplay = replayOf(shown);
@@ -911,5 +932,6 @@ export function mountApp(root: HTMLElement): void {
     root.replaceChildren(...children.filter((c): c is Node => c !== null));
   };
 
+  applyOrientation(state.orientation);
   render();
 }

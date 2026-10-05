@@ -64,3 +64,28 @@ export function saveShowScoreboard(on: boolean): void {
     // 기억하지 못해도 이번에는 그대로 쓴다.
   }
 }
+
+/** 화면 방향: 세로로 고정 / 돌려서 쓰기(가로 화면 · 분할 화면) */
+export type OrientationMode = 'portrait' | 'any';
+
+const ORIENTATION_KEY = 'baseball-counter.orientation';
+
+export function parseOrientation(raw: string | null): OrientationMode {
+  return raw === 'any' ? 'any' : 'portrait';
+}
+
+export function loadOrientation(): OrientationMode {
+  try {
+    return parseOrientation(localStorage.getItem(ORIENTATION_KEY));
+  } catch {
+    return 'portrait';
+  }
+}
+
+export function saveOrientation(mode: OrientationMode): void {
+  try {
+    localStorage.setItem(ORIENTATION_KEY, mode);
+  } catch {
+    // 기억하지 못해도 이번에는 고른 방향으로 쓴다.
+  }
+}
