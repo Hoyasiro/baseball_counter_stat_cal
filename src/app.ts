@@ -34,6 +34,7 @@ import { GameForm, GameListView, gamesView } from './common/games-view';
 import { Chooser, SituationDraft, inputView } from './common/input-view';
 import {
   ANALYSIS_KIND_LABEL,
+  APP_NAME,
   AnalysisKind,
   AppTab,
   ChildRunnerAction,
@@ -665,7 +666,7 @@ export function mountApp(root: HTMLElement): void {
     const game = currentGame();
     const children: Node[] = [
       h('header', { className: 'topbar' }, [
-        h('h1', { text: '우리 아이 야구 기록' }),
+        h('h1', { text: APP_NAME }),
         h('button', {
           className: 'help-button',
           text: '도움말',

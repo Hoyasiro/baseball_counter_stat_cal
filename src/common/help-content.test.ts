@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { GAME_TYPE_LABEL } from './game';
 import { MANUAL_SECTIONS, TUTORIAL_STEPS } from './help-content';
 import {
+  APP_NAME,
   BATTED_BALL_STRENGTH_LABEL,
   BATTED_BALL_TYPE_LABEL,
   CHILD_RUNNER_BUTTONS,
@@ -74,6 +75,10 @@ describe('도움말이 화면과 맞는지', () => {
     expect(missing(Object.values(FIELDING_CREDIT_LABEL))).toEqual([]);
     expect(missing(Object.values(PLAY_FIELDING_LABEL))).toEqual([]);
     expect(missing(Object.values(FIELDING_POSITION_LABEL))).toEqual([]);
+  });
+
+  it('도움말에 앱 이름이 나온다', () => {
+    expect(missing([APP_NAME])).toEqual([]);
   });
 
   it('튜토리얼은 단계마다 제목과 설명이 있다', () => {

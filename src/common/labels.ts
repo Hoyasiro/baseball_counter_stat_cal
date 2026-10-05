@@ -21,6 +21,9 @@ import { halfInningLabel } from './innings';
 import { Actor, PlateAppearance, PlateAppearanceOutcome, RunnerEventKind } from './replay';
 
 /** 아래 탭 이름 */
+/** 앱 이름. 화면 제목·도움말에 쓴다. (index.html 제목, manifest 이름도 같게 맞춘다) */
+export const APP_NAME = '야구맘기록지';
+
 export type AppTab = 'input' | 'games' | 'analysis' | 'settings';
 
 /** 아래 탭. 자주 쓰는 것만 두어 한 칸을 넉넉하게 쓴다. */

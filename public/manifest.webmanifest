@@ -1,6 +1,6 @@
 {
-  "name": "우리 아이 야구 기록",
-  "short_name": "야구 기록",
+  "name": "야구맘기록지",
+  "short_name": "야구맘기록지",
   "lang": "ko",
   "start_url": "/",
   "display": "standalone",
