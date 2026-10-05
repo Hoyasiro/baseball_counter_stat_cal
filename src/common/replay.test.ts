@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { activeEvents, LogEvent, PlayLogEvent } from './events';
 import { replayGame } from './replay';
-import { adjust, appear, exit, hit, pitches, play, settings } from './test-helpers';
+import { adjust, appear, exit, hit, pitchWith, pitches, play, settings } from './test-helpers';
 
 /** 1회 선발 투수로 등장한 뒤의 기록 */
 const asPitcher = (...events: PlayLogEvent[]) => replayGame([appear('pitcher'), ...events], settings());
@@ -216,5 +216,36 @@ describe('취소', () => {
     const events: LogEvent[] = [a, b, { kind: 'void', id: 'v1', createdAt: b.createdAt, author: '테스트', targetId: b.id }];
     expect(activeEvents(events)).toEqual([a]);
     expect(events).toHaveLength(3);
+  });
+});
+
+describe('병살 (타자 + 주자 한 명 아웃)', () => {
+  it('1루 주자, 0아웃에서 병살: 2아웃, 주자 없음, 이 타석이 잡은 아웃 2개', () => {
+    const r = replayGame([appear('pitcher', { bases: [true, false, false] }), pitchWith('out', { doublePlay: 0 })], settings());
+    expect(r.state).toMatchObject({ outs: 2, bases: [false, false, false] });
+    expect(r.plateAppearances[0]).toMatchObject({ outcome: 'out', outsRecorded: 2 });
+  });
+
+  it('1·3루, 1아웃에서 병살이면 3아웃 → 다음 이닝 (3루 주자는 들어오지 않는다)', () => {
+    const r = replayGame([appear('pitcher', { outs: 1, bases: [true, false, true] }), pitchWith('out', { doublePlay: 0 })], settings());
+    expect(r.state).toMatchObject({ inning: 2, outs: 0, bases: [false, false, false] });
+    expect(r.halves.get('1T')?.runs ?? 0).toBe(0);
+  });
+
+  it('다른 주자는 그대로: 1·2루에서 2루 주자 병살이면 1루 주자는 남는다', () => {
+    const r = replayGame([appear('pitcher', { bases: [true, true, false] }), pitchWith('out', { doublePlay: 1 })], settings());
+    expect(r.state).toMatchObject({ outs: 2, bases: [true, false, false] });
+  });
+
+  it('그 베이스에 주자가 없으면 타자 아웃 하나만', () => {
+    const r = replayGame([appear('pitcher'), pitchWith('out', { doublePlay: 0 })], settings());
+    expect(r.state?.outs).toBe(1);
+    expect(r.plateAppearances[0].outsRecorded).toBe(1);
+  });
+
+  it('주자인 우리 아이가 병살로 아웃되면 주루 기록에 아웃이 남고 장면이 끝난다', () => {
+    const r = replayGame([appear('runner', { childBase: 0 }), pitchWith('out', { doublePlay: 0 })], settings());
+    expect(r.runnerEvents.map((e) => e.kind)).toEqual(['out']);
+    expect(r.scenes[0].endedBy).toBe('childDone');
   });
 });

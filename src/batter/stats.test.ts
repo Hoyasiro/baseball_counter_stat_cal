@@ -115,3 +115,10 @@ describe('아이가 친 타구', () => {
     expect(c.spray).toEqual([{ x: 0.2, y: 0.5, kind: 'hit' }]);
   });
 });
+
+describe('병살타', () => {
+  it('아이가 친 병살은 타수 1, 안타 0 → 타율 0 ÷ 1', () => {
+    const g = asGame([appear('batter', { bases: [true, false, false] }), pitchWith('out', { doublePlay: 0 })]);
+    expect(battingAverage([g]).expression).toBe('0 ÷ 1');
+  });
+});

@@ -112,6 +112,7 @@ export interface PitchDetails {
   readonly speed?: number;
   readonly battedBall?: BattedBall;
   readonly fielding?: readonly FieldingCredit[];
+  readonly doublePlay?: BaseIndex;
 }
 
 export function addPitch(game: Game, result: PitchResult, details: PitchDetails = {}): Game {

@@ -445,11 +445,21 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
       default:
         s.outs += 1;
         pa.outsRecorded += 1;
+        if (event.doublePlay !== undefined) doubledUp(s, pa, event.doublePlay);
     }
     if (batterIsChild) s.childBatting = false;
     closePa(s, applied.outcome, pa.count);
     endHalfIfOver(s);
     endIfChildDone(s);
+  };
+
+  /** 병살의 두 번째 아웃: 그 베이스의 주자를 아웃시킨다. 다른 주자는 그대로 두고, 더 간 경우는 사용자가 고친다. */
+  const doubledUp = (s: OpenScene, pa: OpenPlateAppearance, base: BaseIndex): void => {
+    if (s.outs >= OUTS_PER_INNING || !toBases(s.runners)[base]) return;
+    if (childBaseOf(s.runners) === base) childEvent(s, 'out', base);
+    s.runners = removeRunner(s.runners, base).runners;
+    s.outs += 1;
+    pa.outsRecorded += 1;
   };
 
   const onPlay = (s: OpenScene, pa: OpenPlateAppearance, event: PlayEvent): void => {

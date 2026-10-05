@@ -200,3 +200,12 @@ describe('구종·구속·맞은 타구', () => {
     expect(averageSpeed([game]).note).toContain('계산할 수 없음');
   });
 });
+
+describe('병살', () => {
+  it('병살로 잡은 아웃 2개 → 던진 이닝 2/3, 상대 타자 1명', () => {
+    const g = asGame('x', [appear('pitcher', { bases: [true, false, false] }), pitchWith('out', { doublePlay: 0 })]);
+    expect(inningsPitched([g]).expression).toBe('2 ÷ 3');
+    expect(inningsPitched([g]).display).toBe('2/3');
+    expect(battersFaced([g]).value).toBe(1);
+  });
+});

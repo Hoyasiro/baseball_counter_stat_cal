@@ -179,6 +179,8 @@ export interface PitchEvent extends EventBase {
   readonly battedBall?: BattedBall;
   /** 수비 중인 우리 아이가 이 타구에서 받은 기록 (고른 것만) */
   readonly fielding?: readonly FieldingCredit[];
+  /** 병살: result가 'out'일 때 타자와 함께 아웃된 주자가 있던 베이스 */
+  readonly doublePlay?: BaseIndex;
 }
 
 export interface PlayEvent extends EventBase {
@@ -331,7 +333,8 @@ export function isLogEvent(value: unknown): value is LogEvent {
         (value.zone === undefined || isUnitPoint(value.zone)) &&
         (value.speed === undefined || isCount(value.speed, SPEED_MIN, SPEED_MAX)) &&
         (value.battedBall === undefined || isBattedBall(value.battedBall)) &&
-        (value.fielding === undefined || isFieldingCredits(value.fielding))
+        (value.fielding === undefined || isFieldingCredits(value.fielding)) &&
+        (value.doublePlay === undefined || (value.result === 'out' && isCount(value.doublePlay, 0, 2)))
       );
     case 'play':
       return (
