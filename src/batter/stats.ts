@@ -68,6 +68,12 @@ export function strikeouts(games: readonly GameForStats[]): Calculation {
   return tally('삼진', '삼진으로 끝난 타석 수 (쓰리번트 아웃 포함)', withOutcome(batted(games), 'strikeout'));
 }
 
+/** 병살타: 아이가 친 공으로 아이와 주자 한 명이 함께 아웃된 타석 (타수에는 들어간다) */
+export function groundedIntoDoublePlays(games: readonly GameForStats[]): Calculation {
+  const pas = completed(batted(games)).filter((s) => s.pa.outcome === 'out' && s.pa.pitches[s.pa.pitches.length - 1]?.doublePlay !== undefined);
+  return tally('병살타', '병살로 끝난 타석 수 (아이 + 주자 한 명 아웃)', pas.map(ref));
+}
+
 /** 타율 = 안타 ÷ 타수 */
 export function battingAverage(games: readonly GameForStats[]): Calculation {
   return averageOf(batted(games), { title: '타율', hits: '안타', atBats: AT_BATS_LABEL });
@@ -225,6 +231,7 @@ export function summarize(games: readonly GameForStats[]): BatterSummary {
           walks(games),
           hitByPitches(games),
           strikeouts(games),
+          groundedIntoDoublePlays(games),
           pitchesSeen(games),
         ],
       },

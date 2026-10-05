@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { formatSources } from '../common/calculation';
 import { PlayLogEvent } from '../common/events';
 import { replayGame } from '../common/replay';
 import { GameForStats } from '../common/stat-base';
@@ -7,6 +8,7 @@ import {
   battedBallTypes,
   charts,
   battingAverage,
+  groundedIntoDoublePlays,
   byEndCount,
   caughtStealing,
   leftOnBase,
@@ -120,5 +122,23 @@ describe('병살타', () => {
   it('아이가 친 병살은 타수 1, 안타 0 → 타율 0 ÷ 1', () => {
     const g = asGame([appear('batter', { bases: [true, false, false] }), pitchWith('out', { doublePlay: 0 })]);
     expect(battingAverage([g]).expression).toBe('0 ÷ 1');
+  });
+
+  it('병살타는 아이 타석만 센다: 아이 병살 1, 일반 아웃·다른 타자 병살은 빼고', () => {
+    const g = asGame([
+      appear('batter', { bases: [true, false, false] }),
+      pitchWith('out', { doublePlay: 0 }),
+      appear('batter', { inning: 2, bases: [true, false, false] }),
+      ...pitches('out'),
+      appear('runner', { inning: 3, childBase: 0 }),
+      pitchWith('out', { doublePlay: 0 }),
+    ]);
+    const gidp = groundedIntoDoublePlays([g]);
+    expect(gidp.value).toBe(1);
+    expect(formatSources(gidp.terms[0].sources)).toBe('1회 1번째 타석');
+  });
+
+  it('병살타가 없으면 0', () => {
+    expect(groundedIntoDoublePlays([asGame([appear('batter'), hit('single')])]).value).toBe(0);
   });
 });
