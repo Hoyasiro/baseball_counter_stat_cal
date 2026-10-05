@@ -7,6 +7,8 @@ import {
   BattedBallStrength,
   BattedBallType,
   HitType,
+  FieldingCredit,
+  FieldingPosition,
   PitchEvent,
   PitchResult,
   PitchType,
@@ -19,13 +21,14 @@ import { halfInningLabel } from './innings';
 import { Actor, PlateAppearance, PlateAppearanceOutcome, RunnerEventKind } from './replay';
 
 /** 아래 탭 이름 */
-export type AppTab = 'input' | 'records' | 'pitcher' | 'batter' | 'games' | 'settings';
+export type AppTab = 'input' | 'records' | 'pitcher' | 'batter' | 'fielder' | 'games' | 'settings';
 
 export const TAB_LABEL: Record<AppTab, string> = {
   input: '기록 입력',
   records: '기록 보기',
   pitcher: '투수 분석',
   batter: '타자 분석',
+  fielder: '수비 분석',
   games: '경기',
   settings: '설정',
 };
@@ -46,6 +49,25 @@ export const POSITION_LABEL: Record<Position, string> = {
   leftField: '좌익수',
   centerField: '중견수',
   rightField: '우익수',
+};
+
+/** 수비 자리 (투수 포함) */
+export const FIELDING_POSITION_LABEL: Record<FieldingPosition, string> = { pitcher: '투수', ...POSITION_LABEL };
+
+/** 아이가 수비에서 받은 기록. 쉬운 말 먼저, 공식 용어는 괄호에 */
+export const FIELDING_CREDIT_LABEL: Record<FieldingCredit, string> = {
+  putout: '잡아서 아웃',
+  assist: '던져서 아웃 도움',
+  error: '실책',
+};
+
+/** 수비 중 주자 상황 창의 버튼 */
+export const PLAY_FIELDING_LABEL = { none: '아이는 관여 안 함', save: '이대로 기록' } as const;
+
+export const FIELDING_CREDIT_HINT: Record<FieldingCredit, string> = {
+  putout: '잡기·베이스 밟기·태그 (자살)',
+  assist: '던져서 도움 (보살)',
+  error: '놓침·나쁜 송구',
 };
 
 export const ACTOR_LABEL: Record<Actor, string> = {
@@ -214,12 +236,22 @@ function playLabel(play: PlayEvent): string {
 const CHILD_POSITION_LABEL = { scored: '아이 홈인', out: '아이 아웃' } as const;
 
 /** 기록 한 줄을 쉬운 말로. 기록 보기와 "마지막 기록 취소" 버튼에 쓴다. */
+/** 수비 기록을 붙여 쓴다. 예: " · 아이: 잡아서 아웃" */
+export function fieldingText(fielding: readonly FieldingCredit[] | undefined): string {
+  return fielding && fielding.length > 0 ? fielding.map((c) => FIELDING_CREDIT_LABEL[c]).join('·') : '';
+}
+
+function fieldingSuffix(fielding: readonly FieldingCredit[] | undefined): string {
+  const text = fieldingText(fielding);
+  return text ? ` · 아이: ${text}` : '';
+}
+
 export function eventLabel(event: UndoableEvent): string {
   switch (event.kind) {
     case 'pitch':
-      return pitchLabel(event);
+      return pitchLabel(event) + fieldingSuffix(event.fielding);
     case 'play':
-      return playLabel(event);
+      return playLabel(event) + fieldingSuffix(event.fielding);
     case 'adjust': {
       const runs = event.runs ? ` · ${event.runs}점` : '';
       const child =
