@@ -11,7 +11,7 @@ export interface SettingsActions extends DataActions {
 
 const HANDS: readonly Hand[] = ['right', 'left'];
 
-export function settingsView(hand: Hand, hasGames: boolean, actions: SettingsActions): HTMLElement {
+export function settingsView(hand: Hand, hasGames: boolean, lastBackupAt: string | null, actions: SettingsActions): HTMLElement {
   return h('section', { className: 'settings' }, [
     h('h2', { text: '설정' }),
     h('div', { className: 'settings-item' }, [
@@ -31,6 +31,6 @@ export function settingsView(hand: Hand, hasGames: boolean, actions: SettingsAct
       ),
     ]),
     h('p', { className: 'help', text: '손 설정은 이 휴대폰에만 저장됩니다. 기록에는 영향이 없습니다.' }),
-    dataSection(hasGames, actions),
+    dataSection(hasGames, lastBackupAt, actions),
   ]);
 }
