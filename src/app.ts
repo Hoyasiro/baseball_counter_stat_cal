@@ -57,6 +57,10 @@ import { hasSeenTutorial, loadGames, markTutorialSeen, saveGames } from './commo
 import { manualView, tutorialView } from './common/help-view';
 import { pitcherAnalysisView } from './pitcher/analysis-view';
 import { fielderAnalysisView } from './fielder/analysis-view';
+import { batterLine } from './batter/summary';
+import { pitcherLine } from './pitcher/summary';
+import { fielderLine } from './fielder/summary';
+import { monthOf } from './common/calendar';
 
 const STORAGE_KEY = 'baseball-counter.games.v3';
 const LEGACY_STORAGE_KEYS = ['baseball-counter.pitcher.games.v2', 'baseball-counter.pitcher.games.v1'];
@@ -145,6 +149,17 @@ function childMainRole(replay: GameReplay): AnalysisKind | null {
   return pas.some((pa) => pa.fieldingPosition !== null) ? 'fielder' : null;
 }
 
+/** 경기 묶음에서 아이가 한 것을 한 줄씩 (투수 · 타자 · 수비 계산은 각 폴더에 있다) */
+function childSummary(games: readonly Game[]): string[] {
+  const forStats = games.map((g) => ({ label: gameShortLabel(g), replay: replayOf(g) }));
+  const lines: [string, string | null][] = [
+    ['투수', pitcherLine(forStats)],
+    ['타자', batterLine(forStats)],
+    ['', fielderLine(forStats)],
+  ];
+  return lines.filter(([, line]) => line !== null).map(([role, line]) => (role ? `${role}: ${line}` : (line as string)));
+}
+
 export function replayOf(game: Game): GameReplay {
   const info = gameInfo(game);
   return replayGame(playEvents(activeEvents(game.events)), { battingFirst: info.battingFirst });
@@ -207,7 +222,13 @@ export function mountApp(root: HTMLElement): void {
     pitchSheet: null,
     fieldDraft: null,
     hand: loadHand(),
-    gameList: { order: 'newest', type: 'all', query: '' },
+    gameList: {
+      mode: 'list',
+      order: 'newest',
+      type: 'all',
+      query: '',
+      calendar: { month: monthOf(latest ? gameInfo(latest).date : today()), zoom: 'month', day: null },
+    },
     playFielding: null,
     batterDraft: null,
     resultGameId: null,
@@ -633,8 +654,8 @@ export function mountApp(root: HTMLElement): void {
       go('settings');
     },
     changeList: (list: GameListView) => {
-      // 찾는 말은 목록만 바꿔 그리므로 여기서는 담기만 하고, 정렬·구분이 바뀌면 다시 그린다.
-      const redraw = list.order !== state.gameList.order || list.type !== state.gameList.type;
+      // 찾는 말은 목록만 바꿔 그리므로 여기서는 담기만 하고, 그 밖의 것(정렬·구분·달력)이 바뀌면 다시 그린다.
+      const redraw = list.query === state.gameList.query;
       state.gameList = list;
       if (redraw) render();
     },
@@ -783,7 +804,7 @@ export function mountApp(root: HTMLElement): void {
       );
     }
     if (!game || state.form || state.tab === 'games') {
-      return gamesView(state.games, state.currentGameId, state.form, state.gameList, state.deletingId, gamesActions, replayOf);
+      return gamesView(state.games, state.currentGameId, state.form, state.gameList, state.deletingId, gamesActions, replayOf, childSummary);
     }
     const info = gameInfo(game);
     const replay = replayOf(game);

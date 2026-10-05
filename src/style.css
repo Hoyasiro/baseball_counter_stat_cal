@@ -2638,3 +2638,189 @@ input[type='file'].visually-hidden {
 .batter-popup .help {
   margin: 0;
 }
+
+/* ── 경기 한 줄 요약 · 달력 보기 ── */
+.game-summary {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.calendar {
+  display: grid;
+  gap: 10px;
+}
+
+.calendar-head {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px auto;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.calendar-head strong {
+  font-size: 18px;
+}
+
+.calendar-nav {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.calendar-zoom {
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.calendar-grid {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 3px;
+}
+
+.calendar-grid th {
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 2px 0;
+}
+
+.calendar-grid th:first-child {
+  color: var(--danger);
+}
+
+.calendar-grid td {
+  padding: 0;
+  border: none;
+}
+
+.calendar-day {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 3px;
+  width: 100%;
+  min-height: 46px;
+  padding: 6px 0 4px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-day:disabled {
+  cursor: default;
+}
+
+.calendar-day.has-games {
+  background: var(--primary-soft);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.calendar-day.picked {
+  background: var(--bar);
+  color: var(--on-color);
+}
+
+.calendar-dots {
+  display: flex;
+  gap: 2px;
+}
+
+.calendar-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+.calendar-day.picked .calendar-dot {
+  background: var(--on-color);
+}
+
+.calendar-dot.tournament {
+  background: var(--strike);
+}
+
+.calendar-dot.league {
+  background: var(--out);
+}
+
+.calendar-summary {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.calendar-summary p {
+  margin: 0;
+}
+
+.year-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.year-month {
+  display: grid;
+  gap: 2px;
+  padding: 10px 4px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.year-month small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.year-month.level-1 {
+  background: var(--primary-soft);
+}
+
+.year-month.level-2 {
+  background: var(--ball);
+  color: var(--on-color);
+}
+
+.year-month.level-3 {
+  background: var(--bar);
+  color: var(--on-color);
+}
+
+.year-month.level-2 small,
+.year-month.level-3 small {
+  color: var(--on-color);
+}
+
+.calendar-legend {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+}
+
+.calendar-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

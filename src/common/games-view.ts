@@ -19,8 +19,10 @@ import {
   shiftDate,
   today,
 } from './game';
-import { GAME_CARD_LABEL, GAME_ORDER_LABEL, IMPORT_LABEL } from './labels';
+import { GAME_CARD_LABEL, GAME_ORDER_LABEL, GAMES_VIEW_LABEL, IMPORT_LABEL } from './labels';
 import { popup } from './popup';
+import { CalendarState, calendarView } from './calendar-view';
+import { segmented } from './dom';
 import { GAME_ORDERS, GameOrder, GameTypeFilter, filterGames, sortGames } from './game-list';
 import { GameReplay } from './replay';
 
@@ -47,11 +49,13 @@ export interface GamesActions {
   changeList: (list: GameListView) => void;
 }
 
-/** 경기 목록을 어떻게 보여줄지 (정렬·찾기) */
+/** 경기 목록을 어떻게 보여줄지 (목록·달력, 정렬·찾기) */
 export interface GameListView {
+  readonly mode: 'list' | 'calendar';
   readonly order: GameOrder;
   readonly type: GameTypeFilter;
   readonly query: string;
+  readonly calendar: CalendarState;
 }
 
 
@@ -210,7 +214,7 @@ function quickChips(options: readonly [string, string][], selected: string, onPi
   return h('div', { className: 'quick-chips' }, buttons);
 }
 
-function gameCard(game: Game, isCurrent: boolean, replay: GameReplay, actions: GamesActions): HTMLElement {
+function gameCard(game: Game, isCurrent: boolean, replay: GameReplay, summary: readonly string[], actions: GamesActions): HTMLElement {
   const label = GAME_CARD_LABEL;
   const info = gameInfo(game);
   const pitched = replay.plateAppearances.filter((pa) => pa.fieldingPosition === 'pitcher');
@@ -222,6 +226,7 @@ function gameCard(game: Game, isCurrent: boolean, replay: GameReplay, actions: G
       h('span', { className: `type-chip ${info.gameType}`, text: GAME_TYPE_LABEL[info.gameType] }),
     ]),
     h('p', { className: 'opponent', text: `${ourTeamLabel(info)} vs ${opponentLabel(info.opponent)} · ${orderLabel(info)}` }),
+    summary.length > 0 ? h('p', { className: 'game-summary' }, summary.flatMap((line, i) => (i === 0 ? [line] : [h('br'), line]))) : null,
     h('p', { className: 'sub', text: `장면 ${replay.scenes.length} · 투구 ${pitches}개 · 타석 ${batted}` }),
     game.copiedFrom ? h('p', { className: 'sub', text: '백업에서 불러온 사본 (같은 경기가 다르게 기록되어 있어 따로 만듦)' }) : null,
     h('div', { className: 'game-card-buttons' }, [
@@ -288,21 +293,44 @@ export function gamesView(
   deletingId: string | null,
   actions: GamesActions,
   replayOf: (g: Game) => GameReplay,
+  summaryOf: (games: readonly Game[]) => string[],
 ): HTMLElement {
   const deleting = games.find((g) => g.id === deletingId);
+  const card = (g: Game): HTMLElement => gameCard(g, g.id === currentGameId, replayOf(g), summaryOf([g]), actions);
+  const modeTabs =
+    games.length > 0
+      ? segmented<GameListView['mode']>(
+          [
+            ['list', GAMES_VIEW_LABEL.list],
+            ['calendar', GAMES_VIEW_LABEL.calendar],
+          ],
+          list.mode,
+          (mode) => actions.changeList({ ...list, mode }),
+          'kind-tabs',
+        )
+      : null;
   if (form) return formView(form, games.length > 0, recentOpponents(games), actions);
+  if (list.mode === 'calendar' && games.length > 0) {
+    return h('section', { className: 'games' }, [
+      h('button', { className: 'primary new-game', text: '+ 새 경기', onClick: actions.openNew }),
+      modeTabs,
+      calendarView(games, list.calendar, { change: (calendar) => actions.changeList({ ...list, calendar }) }, summaryOf, card),
+      deleting ? deletePopup(deleting, actions) : null,
+    ]);
+  }
   const cards = h('div', { className: 'game-list', attrs: { 'aria-live': 'polite' } });
   const showList = (query: string): void => {
     const shown = sortGames(filterGames(games, query, list.type), list.order);
     cards.replaceChildren(
       h('p', { className: 'help list-count', text: shown.length === games.length ? `경기 ${games.length}개` : `경기 ${games.length}개 중 ${shown.length}개` }),
-      ...shown.map((g) => gameCard(g, g.id === currentGameId, replayOf(g), actions)),
+      ...shown.map(card),
     );
     if (shown.length === 0 && games.length > 0) cards.append(h('p', { className: 'empty', text: '찾는 경기가 없어요. 찾는 말이나 경기 구분을 바꿔 보세요.' }));
   };
   showList(list.query);
   return h('section', { className: 'games' }, [
     h('button', { className: 'primary new-game', text: '+ 새 경기', onClick: actions.openNew }),
+    modeTabs,
     games.length > 0
       ? listControls(
           list,

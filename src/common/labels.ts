@@ -54,6 +54,12 @@ export const GAME_RESULT_LABEL = {
 /** 스코어보드 칸 고치기 창 */
 export const SCORE_CELL_LABEL = { save: '이 점수로', reset: '기록대로 되돌리기' } as const;
 
+/** 경기 탭 보기 방식 */
+export const GAMES_VIEW_LABEL = { list: '목록', calendar: '달력' } as const;
+
+/** 달력 보기 단추 */
+export const CALENDAR_LABEL = { year: '연도 보기', month: '달 보기' } as const;
+
 /** 분석 범위 */
 export const ANALYSIS_SCOPE_LABEL = { game: '선택한 경기', all: '전체' } as const;
 
