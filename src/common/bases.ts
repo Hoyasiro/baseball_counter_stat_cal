@@ -4,8 +4,6 @@
 
 import { BaseIndex, Bases } from './events';
 
-export const EMPTY_BASES: Bases = [false, false, false];
-
 /** 3루 다음은 홈 */
 const HOME = 3;
 const FIRST_BASE: BaseIndex = 0;

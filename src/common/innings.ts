@@ -18,11 +18,6 @@ export function halfForRole(role: Role, battingFirst: Team): Half {
   return isOffenseRole(role) ? offensiveHalf(battingFirst) : defensiveHalf(battingFirst);
 }
 
-/** 그 초·말에 공격하는 팀 */
-export function battingTeam(half: Half, battingFirst: Team): Team {
-  return half === offensiveHalf(battingFirst) ? 'us' : 'them';
-}
-
 /** 화면용. 예: "4회말" */
 export function halfInningLabel(inning: number, half: Half): string {
   return `${inning}회${half === 'top' ? '초' : '말'}`;
