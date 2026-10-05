@@ -59,6 +59,32 @@ export function today(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/** YYYY-MM-DD 날짜를 days일 옮긴다. (예: 어제 = -1) 달력 계산은 그 날 정오 기준으로 해서 시간대 영향을 피한다. */
+export function shiftDate(date: string, days: number): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const moved = new Date(y, m - 1, d + days, 12);
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${moved.getFullYear()}-${pad(moved.getMonth() + 1)}-${pad(moved.getDate())}`;
+}
+
+/** 상대팀 이름 최대 글자 수. 화면 카드·표 파일에서 한 줄로 읽히는 길이 */
+export const OPPONENT_MAX_LENGTH = 30;
+
+/** 상대팀 빠른 선택에 보여줄 최대 개수 */
+export const RECENT_OPPONENT_LIMIT = 6;
+
+/** 예전에 입력한 상대팀 이름. 최근 경기 먼저, 같은 이름은 한 번만 */
+export function recentOpponents(games: readonly Game[], limit = RECENT_OPPONENT_LIMIT): string[] {
+  const infos = games.map(gameInfo).sort((a, b) => b.date.localeCompare(a.date));
+  const names: string[] = [];
+  for (const info of infos) {
+    const name = info.opponent.trim();
+    if (name && !names.includes(name)) names.push(name);
+    if (names.length >= limit) break;
+  }
+  return names;
+}
+
 function base(): { id: string; createdAt: string; author: string } {
   return { id: createId(), createdAt: now(), author: DEMO_AUTHOR };
 }

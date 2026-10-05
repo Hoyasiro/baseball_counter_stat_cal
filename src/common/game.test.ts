@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Game, gameInfo, isGame, upgradeLegacyGame } from './game';
+import { Game, createGame, gameInfo, isGame, recentOpponents, shiftDate, upgradeLegacyGame } from './game';
 import { LogEvent } from './events';
 
 const legacyPitch: LogEvent = { kind: 'pitch', id: 'p1', createdAt: '2026-10-01T00:00:00.000Z', author: '나', result: 'ball' };
@@ -32,5 +32,21 @@ describe('규칙을 바꿔 저장했던 경기', () => {
     const game = { id: 'g', createdAt: 'x', author: '나', events: [info] };
     expect(isGame(game)).toBe(true);
     expect(gameInfo(game as Game)).toEqual({ date: '2026-10-02', opponent: '', gameType: 'practice', battingFirst: 'them' });
+  });
+});
+
+describe('경기 정보 빠른 입력', () => {
+  it('어제·내일 날짜 (달·해가 바뀌는 날 포함)', () => {
+    expect(shiftDate('2026-10-05', -1)).toBe('2026-10-04');
+    expect(shiftDate('2026-03-01', -1)).toBe('2026-02-28');
+    expect(shiftDate('2026-01-01', -1)).toBe('2025-12-31');
+    expect(shiftDate('2026-12-31', 1)).toBe('2027-01-01');
+  });
+
+  it('예전 상대팀: 최근 경기 먼저, 같은 이름·빈 이름은 한 번만/빼고', () => {
+    const game = (date: string, opponent: string) => createGame({ date, opponent, gameType: 'practice', battingFirst: 'them' });
+    const games = [game('2026-09-01', '가팀'), game('2026-10-01', '나팀'), game('2026-09-15', ' 가팀 '), game('2026-10-02', '')];
+    expect(recentOpponents(games)).toEqual(['나팀', '가팀']);
+    expect(recentOpponents(games, 1)).toEqual(['나팀']);
   });
 });
