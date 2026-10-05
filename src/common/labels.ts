@@ -21,17 +21,25 @@ import { halfInningLabel } from './innings';
 import { Actor, PlateAppearance, PlateAppearanceOutcome, RunnerEventKind } from './replay';
 
 /** 아래 탭 이름 */
-export type AppTab = 'input' | 'records' | 'pitcher' | 'batter' | 'fielder' | 'games' | 'settings';
+export type AppTab = 'input' | 'games' | 'analysis' | 'settings';
 
+/** 아래 탭. 자주 쓰는 것만 두어 한 칸을 넉넉하게 쓴다. */
 export const TAB_LABEL: Record<AppTab, string> = {
   input: '기록 입력',
-  records: '기록 보기',
-  pitcher: '투수 분석',
-  batter: '타자 분석',
-  fielder: '수비 분석',
   games: '경기',
+  analysis: '분석',
   settings: '설정',
 };
+
+/** "경기" 탭 안: 지금 경기의 기록(스코어보드·장면) / 경기 목록 */
+export type GamesPane = 'current' | 'list';
+
+export const GAMES_PANE_LABEL: Record<GamesPane, string> = { current: '이 경기 기록', list: '경기 목록' };
+
+/** "분석" 탭 안: 투수 / 타자 / 수비 (계산은 src/pitcher, src/batter, src/fielder로 나뉜다) */
+export type AnalysisKind = 'pitcher' | 'batter' | 'fielder';
+
+export const ANALYSIS_KIND_LABEL: Record<AnalysisKind, string> = { pitcher: '투수', batter: '타자', fielder: '수비' };
 
 export const ROLE_LABEL: Record<Role, string> = {
   pitcher: '투수',

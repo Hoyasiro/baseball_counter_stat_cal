@@ -26,6 +26,8 @@ import {
   ROLE_LABEL,
   RUNNER_BUTTONS,
   TAB_LABEL,
+  GAMES_PANE_LABEL,
+  ANALYSIS_KIND_LABEL,
 } from './labels';
 
 const manualText = MANUAL_SECTIONS.flatMap((s) => [s.title, ...s.items.flatMap((i) => [i.title, ...i.text])]).join('\n');
@@ -51,6 +53,8 @@ describe('도움말이 화면과 맞는지', () => {
     expect(missing(Object.values(POSITION_LABEL))).toEqual([]);
     expect(missing(Object.values(GAME_TYPE_LABEL))).toEqual([]);
     expect(missing(Object.values(TAB_LABEL))).toEqual([]);
+    expect(missing(Object.values(GAMES_PANE_LABEL))).toEqual([]);
+    expect(missing(Object.values(ANALYSIS_KIND_LABEL))).toEqual([]);
   });
 
   it('타구 기록·투구 상세·내려받기 버튼이 매뉴얼에 있다', () => {

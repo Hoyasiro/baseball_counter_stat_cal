@@ -1,8 +1,8 @@
-// 분석 화면 조각 (투수·타자 분석이 함께 쓴다): 범위·탭 고르기, 결과 카드, 계산 과정 카드, 카운트 표
+// 분석 화면 조각 (투수·타자·수비 분석이 함께 쓴다): 범위·탭 고르기, 결과 카드, 계산 과정 카드, 카운트 표
 
 import { Calculation, formatSources } from './calculation';
 import { Count, countLabel } from './count';
-import { h } from './dom';
+import { h, segmented } from './dom';
 import { DrawPoint, LegendItem, chartCard, fieldSvg, zoneSvg } from './field-view';
 
 export type AnalysisTab = 'result' | 'process';
@@ -22,16 +22,6 @@ export interface CountTableRow {
   readonly count: Count;
   readonly plateAppearances: Calculation;
   readonly rate: Calculation;
-}
-
-function segmented<T extends string>(options: readonly [T, string][], selected: T, onSelect: (v: T) => void, className: string): HTMLElement {
-  return h(
-    'div',
-    { className },
-    options.map(([value, label]) =>
-      h('button', { className: value === selected ? 'active' : '', text: label, onClick: () => onSelect(value) }),
-    ),
-  );
 }
 
 export function analysisHeader(totalGames: number, scope: AnalysisScope, tab: AnalysisTab, actions: AnalysisActions): HTMLElement[] {

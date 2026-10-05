@@ -8,6 +8,22 @@ interface Props {
   attrs?: Record<string, string>;
 }
 
+/** 여러 개 중 하나를 고르는 단추 줄 (탭 안의 작은 탭) */
+export function segmented<T extends string>(options: readonly [T, string][], selected: T, onSelect: (v: T) => void, className: string): HTMLElement {
+  return h(
+    'div',
+    { className, attrs: { role: 'tablist' } },
+    options.map(([value, label]) =>
+      h('button', {
+        className: value === selected ? 'active' : '',
+        text: label,
+        attrs: { role: 'tab', 'aria-selected': value === selected ? 'true' : 'false' },
+        onClick: () => onSelect(value),
+      }),
+    ),
+  );
+}
+
 /** 작은 DOM 생성 도우미. 화면 코드를 짧게 유지하기 위해 쓴다. */
 export function h<K extends keyof HTMLElementTagNameMap>(
   tag: K,

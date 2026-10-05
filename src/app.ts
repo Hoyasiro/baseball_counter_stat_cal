@@ -1,10 +1,10 @@
-// 앱 화면: 기록 입력 / 기록 보기 / 투수 분석 / 타자 분석 / 경기 목록
+// 앱 화면: 기록 입력 / 경기(이 경기 기록·경기 목록) / 분석(투수·타자·수비) / 설정
 // 입력은 상황 기준 하나, 분석은 투수·타자로 나눈다. (CLAUDE.md 0.5)
 // 여기서는 상태를 들고 화면을 다시 그리는 일만 한다. 각 화면은 *-view.ts에 있다.
 
 import { batterAnalysisView } from './batter/analysis-view';
 import { AnalysisScope, AnalysisTab } from './common/analysis-ui';
-import { h } from './common/dom';
+import { h, segmented } from './common/dom';
 import { BaseIndex, FieldingCredit, HitType, PitchResult, Role, activeEvents, playEvents } from './common/events';
 import { mergeGames, mergeSummary, parseBackup } from './common/backup-import';
 import { downloadFile } from './common/download';
@@ -33,7 +33,16 @@ import {
 } from './common/game';
 import { GameForm, GameListView, gamesView } from './common/games-view';
 import { Chooser, SituationDraft, inputView } from './common/input-view';
-import { AppTab, ChildRunnerAction, RunnerAction, TAB_LABEL } from './common/labels';
+import {
+  ANALYSIS_KIND_LABEL,
+  AnalysisKind,
+  AppTab,
+  ChildRunnerAction,
+  GAMES_PANE_LABEL,
+  GamesPane,
+  RunnerAction,
+  TAB_LABEL,
+} from './common/labels';
 import { lineScore } from './common/line-score';
 import { ScoreDraft, recordsView } from './common/records-view';
 import { ActiveState, GameReplay, replayGame } from './common/replay';
@@ -49,7 +58,17 @@ const LEGACY_STORAGE_KEYS = ['baseball-counter.pitcher.games.v2', 'baseball-coun
 
 type Tab = AppTab;
 
-const TABS: readonly Tab[] = ['input', 'records', 'pitcher', 'batter', 'fielder', 'games', 'settings'];
+const TABS: readonly Tab[] = ['input', 'games', 'analysis', 'settings'];
+
+const GAMES_PANES: readonly GamesPane[] = ['current', 'list'];
+
+const ANALYSIS_KINDS: readonly AnalysisKind[] = ['pitcher', 'batter', 'fielder'];
+
+/** 분석 종류마다 화면이 따로 있다 (투수·타자·수비 계산을 섞지 않는다. CLAUDE.md 0.5) */
+function analysisView(kind: AnalysisKind): typeof pitcherAnalysisView {
+  if (kind === 'batter') return batterAnalysisView;
+  return kind === 'fielder' ? fielderAnalysisView : pitcherAnalysisView;
+}
 
 interface State {
   games: Game[];
@@ -77,6 +96,10 @@ interface State {
   gameList: GameListView;
   /** 수비 중 주자 상황에서 아이의 수비 기록을 고르는 중 */
   playFielding: PlayFieldingDraft | null;
+  /** "경기" 탭에서 보고 있는 것 */
+  gamesPane: GamesPane;
+  /** "분석" 탭에서 보고 있는 것 */
+  analysisKind: AnalysisKind;
 }
 
 const DETAIL_MODE_KEY = 'baseball-counter.pitch-detail';
@@ -159,6 +182,8 @@ export function mountApp(root: HTMLElement): void {
     hand: loadHand(),
     gameList: { order: 'newest', type: 'all', query: '' },
     playFielding: null,
+    gamesPane: latest ? 'current' : 'list',
+    analysisKind: 'pitcher',
   };
 
   const currentGame = (): Game | undefined => state.games.find((g) => g.id === state.currentGameId);
@@ -379,8 +404,14 @@ export function mountApp(root: HTMLElement): void {
       state.situationDraft = null;
       render();
     },
-    openGames: () => go('games'),
-    openScoreboard: () => go('records'),
+    openGames: () => {
+      state.gamesPane = 'list';
+      go('games');
+    },
+    openScoreboard: () => {
+      state.gamesPane = 'current';
+      go('games');
+    },
     scene: {
       change: (draft: SceneDraft) => {
         state.sceneDraft = draft;
@@ -432,6 +463,7 @@ export function mountApp(root: HTMLElement): void {
   const gamesActions = {
     select: (id: string) => {
       state.currentGameId = id;
+      state.gamesPane = 'current';
       go('input');
     },
     openNew: () => {
@@ -461,6 +493,7 @@ export function mountApp(root: HTMLElement): void {
         const game = createGame(form.info);
         state.games = [...state.games, game];
         state.currentGameId = game.id;
+        state.gamesPane = 'current';
         persist();
         go('input');
         return;
@@ -566,8 +599,8 @@ export function mountApp(root: HTMLElement): void {
   const renderBody = (game: Game | undefined): HTMLElement => {
     if (state.helpOpen) return manualView(helpActions);
     if (state.tab === 'settings') return settingsView(state.hand, state.games.length > 0, settingsActions);
-    if (state.tab === 'games' || !game) {
-      return gamesView(state.games, state.currentGameId, state.form, state.gameList, gamesActions, replayOf);
+    if (!game || state.form || (state.tab === 'games' && state.gamesPane === 'list')) {
+      return withPanes(game, gamesView(state.games, state.currentGameId, state.form, state.gameList, gamesActions, replayOf));
     }
     const info = gameInfo(game);
     const replay = replayOf(game);
@@ -593,15 +626,40 @@ export function mountApp(root: HTMLElement): void {
           },
           inputActions,
         );
-      case 'records':
-        return recordsView(info, replay, score, state.scoreDraft, scoreActions);
-      case 'pitcher':
-        return pitcherAnalysisView(scopedGames(game, replay), state.games.length, state.analysisScope, state.analysisTab, analysisActions);
-      case 'batter':
-        return batterAnalysisView(scopedGames(game, replay), state.games.length, state.analysisScope, state.analysisTab, analysisActions);
-      case 'fielder':
-        return fielderAnalysisView(scopedGames(game, replay), state.games.length, state.analysisScope, state.analysisTab, analysisActions);
+      case 'games':
+        return withPanes(game, recordsView(info, replay, score, state.scoreDraft, scoreActions));
+      case 'analysis':
+        return h('div', { className: 'analysis-page' }, [
+          segmented<AnalysisKind>(
+            ANALYSIS_KINDS.map((k) => [k, ANALYSIS_KIND_LABEL[k]]),
+            state.analysisKind,
+            (k) => {
+              state.analysisKind = k;
+              render();
+            },
+            'kind-tabs',
+          ),
+          analysisView(state.analysisKind)(scopedGames(game, replay), state.games.length, state.analysisScope, state.analysisTab, analysisActions),
+        ]);
     }
+  };
+
+  /** "경기" 탭 위쪽의 작은 탭: 이 경기 기록 / 경기 목록 (경기가 있고 정보 입력 중이 아닐 때) */
+  const withPanes = (game: Game | undefined, body: HTMLElement): HTMLElement => {
+    if (!game || state.form) return body;
+    return h('div', { className: 'games-page' }, [
+      segmented<GamesPane>(
+        GAMES_PANES.map((p) => [p, GAMES_PANE_LABEL[p]]),
+        state.gamesPane,
+        (p) => {
+          state.gamesPane = p;
+          state.scoreDraft = null;
+          render();
+        },
+        'kind-tabs',
+      ),
+      body,
+    ]);
   };
 
   const render = (): void => {
@@ -627,7 +685,7 @@ export function mountApp(root: HTMLElement): void {
           h('button', {
             className: state.tab === tab && !state.helpOpen ? 'active' : '',
             text: TAB_LABEL[tab],
-            disabled: tab !== 'games' && tab !== 'settings' && !game,
+            disabled: (tab === 'input' || tab === 'analysis') && !game,
             onClick: () => go(tab),
           }),
         ),
