@@ -20,8 +20,11 @@ import { GameReplay, applyPitch } from './replay';
 /** 백업 파일 형식 버전. 구조가 바뀌면 올린다. */
 export const BACKUP_FORMAT_VERSION = 1;
 
+/** 백업 파일에 적는 앱 이름. 불러올 때 이 앱의 파일인지 확인한다. */
+export const BACKUP_APP_NAME = 'baseball-counter';
+
 export function backupJson(games: readonly Game[], exportedAt: string): string {
-  return JSON.stringify({ app: 'baseball-counter', formatVersion: BACKUP_FORMAT_VERSION, exportedAt, games }, null, 2);
+  return JSON.stringify({ app: BACKUP_APP_NAME, formatVersion: BACKUP_FORMAT_VERSION, exportedAt, games }, null, 2);
 }
 
 const CSV_HEADER = [

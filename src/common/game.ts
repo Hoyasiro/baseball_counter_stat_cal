@@ -25,6 +25,8 @@ export interface Game {
   readonly createdAt: string;
   readonly author: string;
   readonly events: readonly LogEvent[];
+  /** 백업을 불러올 때 지금 기록과 달라 따로 만든 사본이면, 원래 경기 id */
+  readonly copiedFrom?: string;
 }
 
 export interface GameInfo {
@@ -199,7 +201,8 @@ export function isGame(value: unknown): value is Game {
     typeof v.createdAt === 'string' &&
     typeof v.author === 'string' &&
     Array.isArray(v.events) &&
-    v.events.every(isLogEvent)
+    v.events.every(isLogEvent) &&
+    (v.copiedFrom === undefined || typeof v.copiedFrom === 'string')
   );
 }
 
