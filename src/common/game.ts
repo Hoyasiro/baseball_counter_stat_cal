@@ -2,6 +2,7 @@ import {
   BaseIndex,
   Bases,
   BattedBall,
+  FieldingCredit,
   PitchType,
   ZonePoint,
   GameInfoEvent,
@@ -110,16 +111,25 @@ export interface PitchDetails {
   readonly zone?: ZonePoint;
   readonly speed?: number;
   readonly battedBall?: BattedBall;
+  readonly fielding?: readonly FieldingCredit[];
 }
 
 export function addPitch(game: Game, result: PitchResult, details: PitchDetails = {}): Game {
-  // 값이 없는 항목은 저장하지 않는다.
-  const extra = Object.fromEntries(Object.entries(details).filter(([, v]) => v !== undefined));
+  // 값이 없는 항목(고르지 않은 수비 기록 포함)은 저장하지 않는다.
+  const extra = Object.fromEntries(
+    Object.entries(details).filter(([, v]) => v !== undefined && !(Array.isArray(v) && v.length === 0)),
+  );
   return append(game, { kind: 'pitch', ...base(), result, ...extra });
 }
 
-export function addPlay(game: Game, play: PlayKind, baseIndex?: BaseIndex): Game {
-  return append(game, { kind: 'play', ...base(), play, ...(baseIndex === undefined ? {} : { base: baseIndex }) });
+export function addPlay(game: Game, play: PlayKind, baseIndex?: BaseIndex, fielding: readonly FieldingCredit[] = []): Game {
+  return append(game, {
+    kind: 'play',
+    ...base(),
+    play,
+    ...(baseIndex === undefined ? {} : { base: baseIndex }),
+    ...(fielding.length === 0 ? {} : { fielding }),
+  });
 }
 
 export interface AdjustInput {

@@ -184,10 +184,22 @@ describe('타자·주자 장면 (우리 아이)', () => {
     expect(r.plateAppearances[0]).toMatchObject({ outcome: 'strikeout', startCount: { balls: 1, strikes: 2 } });
   });
 
-  it('수비 장면은 포지션만 남고 투구는 받지 않는다', () => {
-    const r = replayGame([appear('fielder', { position: 'shortstop' }), ...pitches('ball')], settings());
-    expect(r.state).toMatchObject({ role: 'fielder', position: 'shortstop' });
-    expect(r.plateAppearances).toHaveLength(0);
+  it('수비 장면도 상대 타자 타석을 기록하고, 타석마다 아이의 수비 자리를 남긴다', () => {
+    const r = replayGame([appear('fielder', { position: 'shortstop' }), ...pitches('ball', 'out')], settings());
+    expect(r.state).toMatchObject({ role: 'fielder', position: 'shortstop', outs: 1 });
+    expect(r.plateAppearances).toHaveLength(1);
+    expect(r.plateAppearances[0]).toMatchObject({ actor: 'opponent', fieldingPosition: 'shortstop', outcome: 'out', outsRecorded: 1 });
+  });
+
+  it('수비 장면은 투수 장면처럼 3아웃이면 다음 이닝으로 이어진다', () => {
+    const r = replayGame([appear('fielder', { position: 'centerField' }), ...pitches('out', 'out', 'out')], settings());
+    expect(r.state).toMatchObject({ role: 'fielder', inning: 2, outs: 0 });
+    expect(r.scenes[0].endedBy).toBeNull();
+  });
+
+  it('투수 장면의 타석은 수비 자리가 투수, 공격 장면은 없음(null)', () => {
+    const r = replayGame([appear('pitcher'), ...pitches('out'), appear('batter', { inning: 1 }), ...pitches('out')], settings());
+    expect(r.plateAppearances.map((pa) => pa.fieldingPosition)).toEqual(['pitcher', null]);
   });
 
   it('다음 등장이 오면 앞 장면은 끝난다', () => {

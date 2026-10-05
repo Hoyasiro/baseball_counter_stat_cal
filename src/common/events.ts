@@ -140,6 +140,23 @@ export const POSITIONS: readonly Position[] = [
   'rightField',
 ];
 
+/** 수비 중인 아이의 자리. 투수 장면은 'pitcher' */
+export type FieldingPosition = 'pitcher' | Position;
+
+/**
+ * 수비 중인 우리 아이가 그 플레이에서 받은 기록 (공식 기록 규칙의 자살·보살·실책).
+ * - putout(자살): 공을 잡고 직접 아웃시킴 (뜬공 잡기, 베이스 밟기, 태그)
+ * - assist(보살): 던지거나 굴절시켜 아웃을 도움
+ * - error(실책): 놓치거나 잘못 던져 살려 주거나 더 가게 함
+ */
+export type FieldingCredit = 'putout' | 'assist' | 'error';
+
+export const FIELDING_CREDITS: readonly FieldingCredit[] = ['putout', 'assist', 'error'];
+
+function isFieldingCredits(value: unknown): boolean {
+  return Array.isArray(value) && value.every((c) => FIELDING_CREDITS.includes(c as FieldingCredit)) && new Set(value).size === value.length;
+}
+
 /** 주자 역할에서 우리 아이의 위치. 베이스, 득점, 아웃 */
 export type ChildPosition = BaseIndex | 'scored' | 'out';
 
@@ -160,6 +177,8 @@ export interface PitchEvent extends EventBase {
   readonly speed?: number;
   /** 친 공(안타·아웃·실책 출루)의 낙구 지점과 질 */
   readonly battedBall?: BattedBall;
+  /** 수비 중인 우리 아이가 이 타구에서 받은 기록 (고른 것만) */
+  readonly fielding?: readonly FieldingCredit[];
 }
 
 export interface PlayEvent extends EventBase {
@@ -167,6 +186,8 @@ export interface PlayEvent extends EventBase {
   readonly play: PlayKind;
   /** 견제한 베이스, 또는 도루한 주자가 있던 베이스 */
   readonly base?: BaseIndex;
+  /** 수비 중인 우리 아이가 이 플레이에서 받은 기록 (고른 것만) */
+  readonly fielding?: readonly FieldingCredit[];
 }
 
 /** 사용자가 이닝·아웃·주자를 직접 고친 기록 */
@@ -309,11 +330,14 @@ export function isLogEvent(value: unknown): value is LogEvent {
         (value.pitchType === undefined || PITCH_TYPES.includes(value.pitchType as PitchType)) &&
         (value.zone === undefined || isUnitPoint(value.zone)) &&
         (value.speed === undefined || isCount(value.speed, SPEED_MIN, SPEED_MAX)) &&
-        (value.battedBall === undefined || isBattedBall(value.battedBall))
+        (value.battedBall === undefined || isBattedBall(value.battedBall)) &&
+        (value.fielding === undefined || isFieldingCredits(value.fielding))
       );
     case 'play':
       return (
-        PLAY_KINDS.includes(value.play as PlayKind) && (value.base === undefined || isCount(value.base, 0, 2))
+        PLAY_KINDS.includes(value.play as PlayKind) &&
+        (value.base === undefined || isCount(value.base, 0, 2)) &&
+        (value.fielding === undefined || isFieldingCredits(value.fielding))
       );
     case 'adjust':
       return (

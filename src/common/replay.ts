@@ -5,7 +5,8 @@
 // - 투수: 상대 타자들의 타석을 기록한다. 3아웃이면 다음 이닝 같은 쪽(초/말)으로 이어진다.
 // - 타자: 아이의 타석을 기록하고, 살아나가면 그대로 주자로 이어진다.
 // - 주자: 아이가 베이스에 있는 동안. 뒤 타자의 공도 기록하면 아이가 자동으로 진루한다.
-// - 수비: 포지션만 남긴다. (수비 기록은 다음 단계)
+// - 수비: 투수 장면처럼 상대 타자들의 타석을 기록한다(투구는 우리 팀 다른 투수). 아이가 처리한 플레이는
+//   투구·주자 기록에 붙은 수비 기록(자살·보살·실책)으로 남는다.
 // 공격 장면(타자·주자)은 아이가 아웃되거나 득점하거나 3아웃이 되면 끝난다.
 
 import {
@@ -35,6 +36,7 @@ import {
   BaseIndex,
   Bases,
   HIT_BASES,
+  FieldingPosition,
   Half,
   HitType,
   PitchEvent,
@@ -72,6 +74,8 @@ export interface PlateAppearance {
   /** 이 타석을 기록한 장면 (등장 이벤트 id) */
   readonly sceneId: string;
   readonly actor: Actor;
+  /** 이 타석 동안 아이의 수비 자리. 아이가 공격 중이면 null */
+  readonly fieldingPosition: FieldingPosition | null;
   readonly inning: number;
   readonly half: Half;
   readonly outsBefore: number;
@@ -207,6 +211,7 @@ export function applyPitch(count: Count, result: PitchResult): PitchApplied {
 interface OpenPlateAppearance {
   sceneId: string;
   actor: Actor;
+  fieldingPosition: FieldingPosition | null;
   inning: number;
   half: Half;
   outsBefore: number;
@@ -234,7 +239,6 @@ interface OpenScene {
   half: Half;
   outs: number;
   runners: Runners;
-  /** 수비 장면은 타석을 기록하지 않는다. */
   current: OpenPlateAppearance | null;
   childBatting: boolean;
   /** 이 장면에서 닫힌 마지막 타석 */
@@ -263,13 +267,19 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
   };
 
   const actorFor = (s: OpenScene): Actor => {
-    if (s.role === 'pitcher') return 'opponent';
+    if (!isOffenseRole(s.role)) return 'opponent';
     return s.childBatting ? 'child' : 'teammate';
+  };
+
+  const fieldingPositionOf = (s: OpenScene): FieldingPosition | null => {
+    if (s.role === 'pitcher') return 'pitcher';
+    return s.role === 'fielder' ? s.record.position : null;
   };
 
   const openPa = (s: OpenScene, count: Count = FIRST_PITCH_COUNT): OpenPlateAppearance => ({
     sceneId: s.record.id,
     actor: actorFor(s),
+    fieldingPosition: fieldingPositionOf(s),
     inning: s.inning,
     half: s.half,
     outsBefore: s.outs,
@@ -296,6 +306,7 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
     number: pas.length + 1,
     sceneId: pa.sceneId,
     actor: pa.actor,
+    fieldingPosition: pa.fieldingPosition,
     inning: pa.inning,
     half: pa.half,
     outsBefore: pa.outsBefore,
@@ -399,7 +410,7 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
       childBatting: event.role === 'batter',
       lastClosed: null,
     };
-    s.current = event.role === 'fielder' ? null : openPa(s, count);
+    s.current = openPa(s, count);
     scene = s;
   };
 
@@ -531,7 +542,6 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
       onAdjust(s, event);
       continue;
     }
-    // 수비 장면에서는 투구·주자 기록을 받지 않는다.
     if (!s.current) continue;
     if (event.kind === 'pitch') onPitch(s, s.current, event);
     else onPlay(s, s.current, event);

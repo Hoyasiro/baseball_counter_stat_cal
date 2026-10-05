@@ -10,6 +10,7 @@ import {
   PitchResult,
   PlayEvent,
   PlayKind,
+  FieldingCredit,
   Position,
   Role,
   ScoreEvent,
@@ -43,8 +44,8 @@ export function hit(hitType: HitType): PitchEvent {
   return { kind: 'pitch', ...base(), result: 'hit', hitType };
 }
 
-export function play(kind: PlayKind, baseIndex?: BaseIndex): PlayEvent {
-  return { kind: 'play', ...base(), play: kind, ...(baseIndex === undefined ? {} : { base: baseIndex }) };
+export function play(kind: PlayKind, baseIndex?: BaseIndex, fielding?: readonly FieldingCredit[]): PlayEvent {
+  return { kind: 'play', ...base(), play: kind, ...(baseIndex === undefined ? {} : { base: baseIndex }), ...(fielding ? { fielding } : {}) };
 }
 
 export function adjust(inning: number, outs: number, bases: Bases, runs?: number, child?: ChildPosition): AdjustEvent {

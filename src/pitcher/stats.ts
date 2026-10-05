@@ -1,4 +1,5 @@
 // 투수 기준 통계: 우리 아이가 투수로 등장한 장면의 상대 타자 타석만 센다. (CLAUDE.md 0.5)
+// 아이가 다른 자리에서 수비한 장면의 상대 타석(다른 투수가 던짐)은 세지 않는다.
 // 모든 값은 Calculation으로 돌려주어 결과와 계산 과정을 함께 보여준다.
 
 import { Calculation, safeDivide, tally, term } from '../common/calculation';
@@ -41,7 +42,7 @@ const STRIKE_LIKE: ReadonlySet<PitchResult> = new Set(['strike', 'foul', 'buntFo
 const AT_BATS_LABEL = '상대 타수 (끝난 타석에서 볼넷·몸에 맞는 공 제외)';
 
 function faced(games: readonly GameForStats[]): ScopedPlateAppearance[] {
-  return platesOf(games, 'opponent');
+  return platesOf(games, 'opponent').filter((s) => s.pa.fieldingPosition === 'pitcher');
 }
 
 export function pitchCount(games: readonly GameForStats[]): Calculation {

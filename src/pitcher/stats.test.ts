@@ -10,6 +10,7 @@ import {
   byPitchType,
   charts,
   topSpeed,
+  battersFaced,
   battingAverageAgainst,
   byEndCount,
   caughtStealing,
@@ -125,6 +126,12 @@ describe('투수 장면만 센다', () => {
     const g = asGame('x', [appear('pitcher'), ...pitches('out'), appear('batter', { inning: 1 }), hit('single')]);
     expect(pitchCount([g]).value).toBe(1);
     expect(battingAverageAgainst([g]).expression).toBe('0 ÷ 1');
+  });
+
+  it('아이가 다른 자리에서 수비할 때의 상대 타석(다른 투수가 던짐)은 투수 통계에 들어가지 않는다', () => {
+    const g = asGame('x', [appear('pitcher'), ...pitches('strike'), appear('fielder', { inning: 2, position: 'shortstop' }), ...pitches('ball', 'out')]);
+    expect(pitchCount([g]).value).toBe(1);
+    expect(battersFaced([g]).value).toBe(0);
   });
 
   it('중계로 들어와 이어받은 카운트도 아이가 끝낸 타석이면 아이 기록', () => {
