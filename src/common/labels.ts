@@ -166,6 +166,9 @@ export const DOWNLOAD_LABEL = { json: '백업 파일 (JSON)', csv: '표 파일 (
 
 export const IMPORT_LABEL = '백업 파일 불러오기';
 
+/** 한 번 눌러 백업: 휴대폰 공유 창으로 카카오톡·구글 드라이브 등에 보낸다 */
+export const BACKUP_NOW_LABEL = '지금 백업하기';
+
 export const GAME_ORDER_LABEL: Record<GameOrder, string> = {
   newest: '최근 경기 먼저',
   oldest: '오래된 경기 먼저',

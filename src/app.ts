@@ -7,7 +7,9 @@ import { AnalysisScope, AnalysisTab } from './common/analysis-ui';
 import { h, segmented } from './common/dom';
 import { BaseIndex, FieldingCredit, HitType, PitchResult, Role, activeEvents, playEvents } from './common/events';
 import { mergeGames, mergeSummary, parseBackup } from './common/backup-import';
-import { downloadFile } from './common/download';
+import { BACKUP_REMINDER_MIN_GAMES, backupBanner } from './common/backup-banner';
+import { gamesChangedSince, loadLastBackup, saveLastBackup } from './common/backup-reminder';
+import { downloadFile, shareFile } from './common/download';
 import { backupJson, exportFileName, pitchesCsv } from './common/export';
 import { EMPTY_PITCH_DETAIL, FieldDraft, PitchDetail, PitchSheet, isBattedResult } from './common/pitch-detail-view';
 import { Hand, loadHand, saveHand } from './common/settings';
@@ -100,6 +102,8 @@ interface State {
   gamesPane: GamesPane;
   /** "분석" 탭에서 보고 있는 것 */
   analysisKind: AnalysisKind;
+  /** 마지막으로 백업한 시각 (이 휴대폰에 기억) */
+  lastBackupAt: string | null;
 }
 
 const DETAIL_MODE_KEY = 'baseball-counter.pitch-detail';
@@ -184,6 +188,7 @@ export function mountApp(root: HTMLElement): void {
     playFielding: null,
     gamesPane: latest ? 'current' : 'list',
     analysisKind: 'pitcher',
+    lastBackupAt: loadLastBackup(),
   };
 
   const currentGame = (): Game | undefined => state.games.find((g) => g.id === state.currentGameId);
@@ -552,6 +557,15 @@ export function mountApp(root: HTMLElement): void {
     },
   };
 
+  /** 백업을 마쳤다고 기억하고 알린다. */
+  const markBackedUp = (message: string): void => {
+    const now = new Date().toISOString();
+    saveLastBackup(now);
+    state.lastBackupAt = now;
+    state.notice = message;
+    render();
+  };
+
   const settingsActions = {
     hand: (hand: Hand) => {
       state.hand = hand;
@@ -564,9 +578,30 @@ export function mountApp(root: HTMLElement): void {
           ? { name: exportFileName('backup', today()), data: backupJson(state.games, new Date().toISOString()), type: 'application/json' }
           : { name: exportFileName('pitches', today()), data: pitchesCsv(state.games, replayOf), type: 'text/csv' };
       void downloadFile(file.name, file.data, file.type).then((result) => {
-        if (result === 'saved') return;
+        if (result === 'saved') {
+          // 백업 파일을 받았으면 백업한 것으로 본다. (표 파일은 다시 불러올 수 없으므로 백업이 아니다)
+          if (kind === 'backup') markBackedUp('백업 파일을 저장했어요. 휴대폰의 "다운로드" 폴더에 있어요.');
+          return;
+        }
         state.notice = result === 'declined' ? '내려받기를 취소했습니다.' : '이 화면에서는 파일을 내려받을 수 없습니다. 휴대폰 브라우저에서 앱을 열어 다시 해 보세요.';
         render();
+      });
+    },
+    backupNow: () => {
+      const data = backupJson(state.games, new Date().toISOString());
+      const names = { primary: exportFileName('backup', today()), fallback: exportFileName('backupText', today()) };
+      void shareFile(names, data).then((result) => {
+        if (result === 'shared') {
+          markBackedUp('백업 파일을 보냈어요. 보낸 곳(카카오톡·드라이브 등)에 잘 들어갔는지 확인하세요.');
+          return;
+        }
+        if (result === 'declined') {
+          state.notice = '백업을 취소했어요. 기록을 지키려면 꼭 백업해 두세요.';
+          render();
+          return;
+        }
+        // 공유를 못 쓰는 곳이면 파일로 내려받는다.
+        settingsActions.download('backup');
       });
     },
     importBackup: (file: File) => {
@@ -598,7 +633,7 @@ export function mountApp(root: HTMLElement): void {
 
   const renderBody = (game: Game | undefined): HTMLElement => {
     if (state.helpOpen) return manualView(helpActions);
-    if (state.tab === 'settings') return settingsView(state.hand, state.games.length > 0, settingsActions);
+    if (state.tab === 'settings') return settingsView(state.hand, state.games.length > 0, state.lastBackupAt, settingsActions);
     if (!game || state.form || (state.tab === 'games' && state.gamesPane === 'list')) {
       return withPanes(game, gamesView(state.games, state.currentGameId, state.form, state.gameList, gamesActions, replayOf));
     }
@@ -664,7 +699,9 @@ export function mountApp(root: HTMLElement): void {
 
   const render = (): void => {
     const game = currentGame();
-    const children: Node[] = [
+    const unbacked = gamesChangedSince(state.games, state.lastBackupAt).length;
+    const showBackupBanner = unbacked >= BACKUP_REMINDER_MIN_GAMES && state.tab !== 'input' && !state.helpOpen && !state.form;
+    const children: (Node | null)[] = [
       h('header', { className: 'topbar' }, [
         h('h1', { text: APP_NAME }),
         h('button', {
@@ -677,17 +714,27 @@ export function mountApp(root: HTMLElement): void {
           },
         }),
       ]),
+      showBackupBanner ? backupBanner(unbacked, state.lastBackupAt, settingsActions) : null,
       h('main', { className: 'content' }, [renderBody(game)]),
       h(
         'nav',
         { className: 'tabbar' },
         TABS.map((tab) =>
-          h('button', {
-            className: state.tab === tab && !state.helpOpen ? 'active' : '',
-            text: TAB_LABEL[tab],
-            disabled: (tab === 'input' || tab === 'analysis') && !game,
-            onClick: () => go(tab),
-          }),
+          h(
+            'button',
+            {
+              className: state.tab === tab && !state.helpOpen ? 'active' : '',
+              disabled: (tab === 'input' || tab === 'analysis') && !game,
+              onClick: () => go(tab),
+            },
+            [
+              TAB_LABEL[tab],
+              // 기록 입력 화면에는 띠를 못 넣으므로 "경기" 탭에 백업 안 한 경기 수를 붙인다.
+              tab === 'games' && unbacked >= BACKUP_REMINDER_MIN_GAMES
+                ? h('span', { className: 'tab-badge', text: String(unbacked), attrs: { 'aria-label': `백업 안 한 경기 ${unbacked}개` } })
+                : null,
+            ],
+          ),
         ),
       ),
     ];
@@ -701,7 +748,7 @@ export function mountApp(root: HTMLElement): void {
     if (state.tutorialStep !== null) children.push(tutorialView(state.tutorialStep, tutorialActions));
     // 손 설정에 따라 CSS가 자주 누르는 단추를 엄지 쪽으로 옮긴다.
     root.dataset.hand = state.hand;
-    root.replaceChildren(...children);
+    root.replaceChildren(...children.filter((c): c is Node => c !== null));
   };
 
   render();

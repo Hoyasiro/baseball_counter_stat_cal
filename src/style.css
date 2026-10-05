@@ -2452,3 +2452,59 @@ input[type='file'].visually-hidden {
   background: var(--surface);
   color: var(--primary);
 }
+
+/* ── 백업 알림 ── */
+.backup-banner {
+  display: grid;
+  gap: 6px;
+  margin: 8px 16px 0;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--strike);
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.backup-banner p {
+  margin: 0;
+}
+
+.backup-banner small {
+  font-weight: 400;
+}
+
+.backup-banner .help {
+  color: var(--warn-text);
+  font-size: 13px;
+}
+
+.backup-now {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+}
+
+.backup-now small {
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.tabbar button {
+  position: relative;
+}
+
+.tab-badge {
+  position: absolute;
+  top: 6px;
+  margin-left: 2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--hit);
+  color: var(--on-color);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+}

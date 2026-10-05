@@ -1,16 +1,35 @@
 // 데이터 관리(내려받기·불러오기) 화면 조각. 설정 탭에서 쓴다.
 
 import { h } from './dom';
-import { DOWNLOAD_LABEL, IMPORT_LABEL } from './labels';
+import { dateLabel } from './game';
+import { BACKUP_NOW_LABEL, DOWNLOAD_LABEL, IMPORT_LABEL } from './labels';
 
 export interface DataActions {
   download: (kind: 'backup' | 'pitches') => void;
   importBackup: (file: File) => void;
+  /** 공유 창으로 백업 파일 보내기 (안 되면 내려받기) */
+  backupNow: () => void;
+}
+
+/** 백업 알림 띠와 데이터 관리에 함께 쓰는 "마지막 백업" 문구 */
+export function lastBackupText(lastBackupAt: string | null): string {
+  if (lastBackupAt === null) return '아직 백업한 적이 없어요';
+  const d = new Date(lastBackupAt);
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `마지막 백업: ${dateLabel(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** 한 번 눌러 백업하는 단추 */
+export function backupNowButton(actions: DataActions, className = 'primary'): HTMLElement {
+  return h('button', { className: `${className} backup-now`, onClick: actions.backupNow }, [
+    h('strong', { text: BACKUP_NOW_LABEL }),
+    h('small', { text: '카카오톡 나에게 보내기 · 구글 드라이브 등으로 저장' }),
+  ]);
 }
 
 /** 숨긴 파일 선택 칸을 버튼으로 연다. */
 function importButton(actions: DataActions): HTMLElement {
-  const input = h('input', { className: 'visually-hidden', attrs: { type: 'file', accept: '.json,application/json', tabindex: '-1', 'aria-hidden': 'true' } });
+  const input = h('input', { className: 'visually-hidden', attrs: { type: 'file', accept: '.json,.txt,application/json,text/plain', tabindex: '-1', 'aria-hidden': 'true' } });
   input.addEventListener('change', () => {
     const file = input.files?.[0];
     if (file) actions.importBackup(file);
@@ -25,9 +44,11 @@ function importButton(actions: DataActions): HTMLElement {
   ]);
 }
 
-export function dataSection(hasGames: boolean, actions: DataActions): HTMLElement {
+export function dataSection(hasGames: boolean, lastBackupAt: string | null, actions: DataActions): HTMLElement {
   return h('div', { className: 'settings-item data-section' }, [
     h('h3', { text: '데이터 관리' }),
+    h('p', { className: 'help last-backup', text: lastBackupText(lastBackupAt) }),
+    hasGames ? backupNowButton(actions) : null,
     h('h4', { text: '데이터 내려받기' }),
     hasGames
       ? h('p', { className: 'help', text: '모든 경기 기록을 파일로 저장합니다. 휴대폰을 바꾸거나 브라우저 데이터를 지우기 전에 백업해 두세요.' })
