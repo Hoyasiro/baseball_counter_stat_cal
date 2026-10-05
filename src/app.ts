@@ -5,12 +5,13 @@
 import { batterAnalysisView } from './batter/analysis-view';
 import { AnalysisScope, AnalysisTab } from './common/analysis-ui';
 import { h } from './common/dom';
-import { BaseIndex, HitType, PitchResult, Role, activeEvents, playEvents } from './common/events';
+import { BaseIndex, FieldingCredit, HitType, PitchResult, Role, activeEvents, playEvents } from './common/events';
 import { mergeGames, mergeSummary, parseBackup } from './common/backup-import';
 import { downloadFile } from './common/download';
 import { backupJson, exportFileName, pitchesCsv } from './common/export';
 import { EMPTY_PITCH_DETAIL, FieldDraft, PitchDetail, PitchSheet, isBattedResult } from './common/pitch-detail-view';
 import { Hand, loadHand, saveHand } from './common/settings';
+import { FIELDING_PLAYS, PlayFieldingDraft } from './common/fielding-view';
 import { SPEED_WHEEL_START, lastSpeedOf } from './common/speed-wheel';
 import { settingsView } from './common/settings-view';
 import {
@@ -41,13 +42,14 @@ import { GameForStats } from './common/stat-base';
 import { hasSeenTutorial, loadGames, markTutorialSeen, saveGames } from './common/storage';
 import { manualView, tutorialView } from './common/help-view';
 import { pitcherAnalysisView } from './pitcher/analysis-view';
+import { fielderAnalysisView } from './fielder/analysis-view';
 
 const STORAGE_KEY = 'baseball-counter.games.v3';
 const LEGACY_STORAGE_KEYS = ['baseball-counter.pitcher.games.v2', 'baseball-counter.pitcher.games.v1'];
 
 type Tab = AppTab;
 
-const TABS: readonly Tab[] = ['input', 'records', 'pitcher', 'batter', 'games', 'settings'];
+const TABS: readonly Tab[] = ['input', 'records', 'pitcher', 'batter', 'fielder', 'games', 'settings'];
 
 interface State {
   games: Game[];
@@ -73,6 +75,8 @@ interface State {
   hand: Hand;
   /** 경기 목록 정렬·찾기 */
   gameList: GameListView;
+  /** 수비 중 주자 상황에서 아이의 수비 기록을 고르는 중 */
+  playFielding: PlayFieldingDraft | null;
 }
 
 const DETAIL_MODE_KEY = 'baseball-counter.pitch-detail';
@@ -154,6 +158,7 @@ export function mountApp(root: HTMLElement): void {
     fieldDraft: null,
     hand: loadHand(),
     gameList: { order: 'newest', type: 'all', query: '' },
+    playFielding: null,
   };
 
   const currentGame = (): Game | undefined => state.games.find((g) => g.id === state.currentGameId);
@@ -182,12 +187,16 @@ export function mountApp(root: HTMLElement): void {
     state.scoreDraft = null;
     state.fieldDraft = null;
     state.pitchSheet = null;
+    state.playFielding = null;
     render();
     window.scrollTo(0, 0);
   };
 
   /** 공 하나를 기록한다. 투구 상세 창에서 고른 구종·존·구속이 있으면 함께 남긴다. */
-  const recordPitch = (result: PitchResult, extra: { hitType?: HitType; pitch: PitchDetail; battedBall?: FieldDraft | null }): void => {
+  const recordPitch = (
+    result: PitchResult,
+    extra: { hitType?: HitType; pitch: PitchDetail; battedBall?: FieldDraft | null; fielding?: readonly FieldingCredit[] | null },
+  ): void => {
     const detail = extra.pitch;
     const ball = extra.battedBall;
     state.pitchSheet = null;
@@ -200,6 +209,7 @@ export function mountApp(root: HTMLElement): void {
         zone: detail.zone ?? undefined,
         speed: detail.speed ?? undefined,
         battedBall: ball ? { x: ball.x, y: ball.y, type: ball.type, strength: ball.strength } : undefined,
+        fielding: extra.fielding ?? undefined,
       }),
     );
   };
@@ -209,15 +219,40 @@ export function mountApp(root: HTMLElement): void {
     return game ? replayOf(game) : null;
   };
 
-  /** 친 공은 야구장 그림에서 낙구 지점과 질을 고른 뒤 기록한다. 나머지는 바로 기록한다. */
+  /** 아이가 수비 중인지 (투수 또는 수비수 장면) */
+  const childIsFielding = (): boolean => {
+    const role = currentReplay()?.state?.role;
+    return role === 'pitcher' || role === 'fielder';
+  };
+
+  /** 친 공은 야구장 그림에서 낙구 지점과 질(수비 중이면 아이의 수비 기록도)을 고른 뒤 기록한다. 나머지는 바로 기록한다. */
   const afterPitchDetail = (result: PitchResult, hitType: HitType | undefined, pitch: PitchDetail): void => {
     if (isBattedResult(result)) {
       state.pitchSheet = null;
-      state.fieldDraft = { result, hitType, x: null, y: null, type: null, strength: null, pitch };
+      state.fieldDraft = { result, hitType, x: null, y: null, type: null, strength: null, pitch, fielding: childIsFielding() ? [] : null };
       render();
       return;
     }
     recordPitch(result, { hitType, pitch });
+  };
+
+  /** 주자 상황 기록. 실책 뒤에는 바로 상황 고치기를 열어 바뀐 주자·점수를 맞추게 한다. */
+  const recordRunnerPlay = (action: RunnerAction, base: BaseIndex | undefined, fielding: readonly FieldingCredit[]): void => {
+    updateCurrent((g) => addPlay(g, action, base, fielding));
+    if (action === 'error') {
+      // 실책 뒤에는 바로 상황 고치기를 열어 바뀐 주자·점수를 맞추게 한다.
+      const active = currentReplay()?.state;
+      if (!active) return;
+      state.situationDraft = {
+        inning: active.inning,
+        outs: active.outs,
+        bases: active.bases,
+        runs: 0,
+        child: active.role === 'runner' ? active.childBase : null,
+        reason: ERROR_REASON,
+      };
+      render();
+    }
   };
 
   const inputActions = {
@@ -256,8 +291,9 @@ export function mountApp(root: HTMLElement): void {
         state.fieldDraft = draft;
         render();
       },
-      save: (draft: FieldDraft) => recordPitch(draft.result, { hitType: draft.hitType, pitch: draft.pitch, battedBall: draft }),
-      skip: (draft: FieldDraft) => recordPitch(draft.result, { hitType: draft.hitType, pitch: draft.pitch }),
+      save: (draft: FieldDraft) => recordPitch(draft.result, { hitType: draft.hitType, pitch: draft.pitch, battedBall: draft, fielding: draft.fielding }),
+      // 낙구 지점·질만 건너뛴다. 고른 수비 기록은 남긴다.
+      skip: (draft: FieldDraft) => recordPitch(draft.result, { hitType: draft.hitType, pitch: draft.pitch, fielding: draft.fielding }),
       cancel: () => {
         state.fieldDraft = null;
         render();
@@ -265,21 +301,27 @@ export function mountApp(root: HTMLElement): void {
     },
     runner: (action: RunnerAction, base?: BaseIndex) => {
       state.chooser = null;
-      updateCurrent((g) => addPlay(g, action, base));
-      if (action === 'error') {
-        // 실책 뒤에는 바로 상황 고치기를 열어 바뀐 주자·점수를 맞추게 한다.
-        const active = currentReplay()?.state;
-        if (!active) return;
-        state.situationDraft = {
-          inning: active.inning,
-          outs: active.outs,
-          bases: active.bases,
-          runs: 0,
-          child: active.role === 'runner' ? active.childBase : null,
-          reason: ERROR_REASON,
-        };
+      // 수비 중이면 아이가 잡거나 던졌는지(또는 실책인지) 먼저 묻는다.
+      if (childIsFielding() && FIELDING_PLAYS.includes(action)) {
+        state.playFielding = { action, base, fielding: [] };
         render();
+        return;
       }
+      recordRunnerPlay(action, base, []);
+    },
+    playFielding: {
+      change: (draft: PlayFieldingDraft) => {
+        state.playFielding = draft;
+        render();
+      },
+      save: (draft: PlayFieldingDraft) => {
+        state.playFielding = null;
+        recordRunnerPlay(draft.action, draft.base, draft.fielding);
+      },
+      cancel: () => {
+        state.playFielding = null;
+        render();
+      },
     },
     childRunner: (action: ChildRunnerAction) => {
       const active = currentReplay()?.state;
@@ -535,6 +577,7 @@ export function mountApp(root: HTMLElement): void {
             pitchSheet: state.pitchSheet,
             speedStart: lastSpeedOf(events) ?? SPEED_WHEEL_START,
             fieldDraft: state.fieldDraft,
+            playFielding: state.playFielding,
           },
           inputActions,
         );
@@ -544,6 +587,8 @@ export function mountApp(root: HTMLElement): void {
         return pitcherAnalysisView(scopedGames(game, replay), state.games.length, state.analysisScope, state.analysisTab, analysisActions);
       case 'batter':
         return batterAnalysisView(scopedGames(game, replay), state.games.length, state.analysisScope, state.analysisTab, analysisActions);
+      case 'fielder':
+        return fielderAnalysisView(scopedGames(game, replay), state.games.length, state.analysisScope, state.analysisTab, analysisActions);
     }
   };
 

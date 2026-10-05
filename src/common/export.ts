@@ -11,7 +11,9 @@ import {
   ACTOR_LABEL,
   BATTED_BALL_STRENGTH_LABEL,
   BATTED_BALL_TYPE_LABEL,
+  FIELDING_POSITION_LABEL,
   PITCH_TYPE_LABEL,
+  fieldingText,
   outcomeLabel,
   pitchLabel,
 } from './labels';
@@ -48,6 +50,8 @@ const CSV_HEADER = [
   '낙구 지점 Y',
   '타구 방향',
   '타석 결과',
+  '아이 수비 자리',
+  '아이 수비 기록',
 ];
 
 /** 쉼표·따옴표·줄바꿈이 있으면 따옴표로 감싼다. */
@@ -86,6 +90,8 @@ function pitchRow(game: Game, pa: GameReplay['plateAppearances'][number], pitch:
     hasSpot ? String(round(ball.y as number)) : '',
     hasSpot ? placementLabel(ball.x as number, ball.y as number) : '',
     outcomeLabel(pa),
+    pa.fieldingPosition ? FIELDING_POSITION_LABEL[pa.fieldingPosition] : '',
+    fieldingText(pitch.fielding),
   ].map(cell);
 }
 

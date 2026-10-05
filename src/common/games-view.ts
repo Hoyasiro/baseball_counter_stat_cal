@@ -155,7 +155,7 @@ function quickChips(options: readonly [string, string][], selected: string, onPi
 
 function gameCard(game: Game, isCurrent: boolean, replay: GameReplay, actions: GamesActions): HTMLElement {
   const info = gameInfo(game);
-  const pitched = replay.plateAppearances.filter((pa) => pa.actor === 'opponent');
+  const pitched = replay.plateAppearances.filter((pa) => pa.fieldingPosition === 'pitcher');
   const pitches = pitched.reduce((n, pa) => n + pa.pitches.length, 0);
   const batted = replay.plateAppearances.filter((pa) => pa.actor === 'child' && pa.outcome !== null).length;
   return h('article', { className: `game-card${isCurrent ? ' current' : ''}` }, [

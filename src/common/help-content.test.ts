@@ -9,6 +9,9 @@ import {
   CHILD_RUNNER_BUTTONS,
   DOWNLOAD_LABEL,
   FIELD_BUTTON_LABEL,
+  FIELDING_CREDIT_LABEL,
+  FIELDING_POSITION_LABEL,
+  PLAY_FIELDING_LABEL,
   GAME_ORDER_LABEL,
   HAND_LABEL,
   PITCH_SHEET_LABEL,
@@ -59,6 +62,12 @@ describe('도움말이 화면과 맞는지', () => {
     expect(missing(Object.values(PITCH_SHEET_LABEL))).toEqual([]);
     expect(missing(Object.values(HAND_LABEL))).toEqual([]);
     expect(missing(Object.values(GAME_ORDER_LABEL))).toEqual([]);
+  });
+
+  it('수비 기록 버튼과 수비 자리가 매뉴얼에 있다', () => {
+    expect(missing(Object.values(FIELDING_CREDIT_LABEL))).toEqual([]);
+    expect(missing(Object.values(PLAY_FIELDING_LABEL))).toEqual([]);
+    expect(missing(Object.values(FIELDING_POSITION_LABEL))).toEqual([]);
   });
 
   it('튜토리얼은 단계마다 제목과 설명이 있다', () => {

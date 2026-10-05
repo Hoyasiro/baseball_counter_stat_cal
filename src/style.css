@@ -148,7 +148,7 @@ button:disabled {
   width: 100%;
   max-width: 480px;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   background: var(--surface);
   border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom);
@@ -156,8 +156,10 @@ button:disabled {
 
 .tabbar button {
   padding: 14px 0;
-  /* 탭 6개가 한 줄에 들어가도록 */
-  font-size: 12px;
+  /* 탭 7개가 한 줄에 들어가도록 */
+  font-size: 11px;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
   background: transparent;
   color: var(--muted);
   font-weight: 600;
@@ -2307,4 +2309,70 @@ input[type='file'].visually-hidden {
 
 .list-count {
   margin: 0;
+}
+
+/* ── 수비 기록 ── */
+.fielding-pick {
+  display: grid;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+
+.fielding-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.fielding-title small {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.fielding-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.fielding-row button {
+  display: grid;
+  gap: 2px;
+  min-height: 52px;
+  padding: 6px 2px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.fielding-row strong {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.fielding-row small {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.fielding-row button.active {
+  background: var(--out);
+  border-color: var(--out);
+  color: var(--on-color);
+}
+
+.fielding-row button.credit-error.active {
+  background: var(--hit);
+  border-color: var(--hit);
+}
+
+.fielding-row button.active small {
+  color: var(--on-color);
+}
+
+.chart-grid.single {
+  grid-template-columns: minmax(0, 340px);
 }

@@ -6,6 +6,7 @@ import {
   BATTED_BALL_TYPES,
   BattedBallStrength,
   BattedBallType,
+  FieldingCredit,
   HitType,
   PITCH_TYPES,
   PitchResult,
@@ -26,6 +27,8 @@ import {
   pitchLabel,
 } from './labels';
 import { speedWheel } from './speed-wheel';
+import { fieldingChips } from './fielding-view';
+import { popup } from './popup';
 
 /** 공 하나에 함께 남길 투구 상세. 고르지 않은 값은 null */
 export interface PitchDetail {
@@ -52,6 +55,8 @@ export interface FieldDraft {
   readonly strength: BattedBallStrength | null;
   /** 투구 상세 팝업에서 고른 값 (켜져 있을 때) */
   readonly pitch: PitchDetail;
+  /** 아이가 수비 중이면 이 타구에서 받은 기록. 공격 중이면 null (고르는 줄을 숨긴다) */
+  readonly fielding: readonly FieldingCredit[] | null;
 }
 
 export interface PitchSheetActions {
@@ -84,21 +89,6 @@ export function pitchDetailToggle(on: boolean, toggle: () => void): HTMLElement 
     }, [h('span', { className: 'switch' }), `${PITCH_DETAIL_LABEL} ${on ? '켜짐' : '꺼짐'}`]),
     h('small', { className: 'detail-toggle-hint', text: on ? '공 버튼을 누르면 구종·존·구속 창이 열려요' : '' }),
   ]);
-}
-
-/**
- * 화면 위에 뜨는 작은 창(팝업). 뒤 화면은 어둡게 깔리고, 창 바깥을 누르면 기록하지 않고 닫는다.
- * 위쪽 상황판이 보이도록 창은 아래쪽에 띄운다.
- */
-function popup(className: string, label: string, onCancel: () => void, children: HTMLElement[]): HTMLElement {
-  const dialog = h('section', { className: `popup ${className}`, attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-label': label, tabindex: '-1' } }, children);
-  const backdrop = h('div', { className: 'popup-backdrop' }, [dialog]);
-  backdrop.addEventListener('click', (e) => {
-    if (e.target === backdrop) onCancel();
-  });
-  // 화면 읽기 프로그램·키보드 사용자를 위해 창으로 초점을 옮긴다. 다시 그릴 때 화면이 튀지 않게 스크롤은 하지 않는다.
-  requestAnimationFrame(() => dialog.focus({ preventScroll: true }));
-  return backdrop;
 }
 
 function sheetResultLabel(sheet: PitchSheet): string {
@@ -195,6 +185,7 @@ export function fieldPanel(draft: FieldDraft, actions: FieldActions): HTMLElemen
         }),
       ),
     ),
+    draft.fielding ? fieldingChips(draft.fielding, (fielding) => set({ fielding })) : null,
     h('div', { className: 'confirm-buttons sheet-buttons' }, [
       h('button', { className: 'secondary', text: FIELD_BUTTON_LABEL.skip, onClick: () => actions.skip(draft) }),
       h('button', { className: 'primary', text: FIELD_BUTTON_LABEL.save, onClick: () => actions.save(draft) }),

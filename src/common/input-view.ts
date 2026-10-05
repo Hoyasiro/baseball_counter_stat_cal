@@ -26,6 +26,7 @@ import {
 import { LineScore } from './line-score';
 import { ActiveState, GameReplay } from './replay';
 import { SceneDraft, SceneSetupActions, defaultRole, defaultSceneDraft, sceneSetupView } from './scene-setup-view';
+import { PlayFieldingActions, PlayFieldingDraft, playFieldingPopup } from './fielding-view';
 import { FieldActions, FieldDraft, PitchSheet, PitchSheetActions, fieldPanel, pitchDetailToggle, pitchSheetView } from './pitch-detail-view';
 
 export interface SituationDraft {
@@ -55,6 +56,7 @@ export interface InputActions {
   openScoreboard: () => void;
   scene: SceneSetupActions;
   toggleDetail: () => void;
+  playFielding: PlayFieldingActions;
   sheet: PitchSheetActions;
   field: FieldActions;
 }
@@ -76,6 +78,8 @@ export interface InputModel {
   readonly speedStart: number;
   /** 친 공의 낙구 지점·질을 고르는 중이면 그 값 */
   readonly fieldDraft: FieldDraft | null;
+  /** 수비 중 주자 상황에서 아이의 수비 기록을 고르는 중이면 그 값 */
+  readonly playFielding: PlayFieldingDraft | null;
 }
 
 function dots(filled: number, total: number, kind: string, label: string): HTMLElement {
@@ -96,10 +100,17 @@ function roleText(state: ActiveState): string {
 function workloadPill(replay: GameReplay, state: ActiveState): HTMLElement | null {
   const pas = replay.plateAppearances;
   if (state.role === 'pitcher') {
-    const mine = pas.filter((pa) => pa.actor === 'opponent');
+    const mine = pas.filter((pa) => pa.fieldingPosition === 'pitcher');
     const total = mine.reduce((n, pa) => n + pa.pitches.length, 0);
     const inning = mine.filter((pa) => pa.inning === state.inning && pa.half === state.half).reduce((n, pa) => n + pa.pitches.length, 0);
     return h('span', { className: 'pill' }, [h('small', { text: '투구 ' }), `${total}`, h('small', { text: ` (이번 회 ${inning})` })]);
+  }
+  if (state.role === 'fielder') {
+    // 다른 투수가 던지는 동안이라 경기 전체 투구 수는 모른다. 이번 회 기록한 공만 보여준다.
+    const inning = pas
+      .filter((pa) => pa.sceneId === state.sceneId && pa.inning === state.inning && pa.half === state.half)
+      .reduce((n, pa) => n + pa.pitches.length, 0);
+    return h('span', { className: 'pill' }, [h('small', { text: '이번 회 투구 ' }), `${inning}`]);
   }
   if (state.role === 'batter') {
     const current = pas[pas.length - 1];
@@ -384,11 +395,11 @@ function controls(model: InputModel, actions: InputActions): HTMLElement {
   const { replay, events, draft, chooser, sceneDraft, info } = model;
   const state = replay.state;
 
-  // 진행 중인 장면이 없거나 수비 중이면(기록할 것이 없음) 바로 다음 장면 설정을 보여준다.
-  if (sceneDraft || !state || state.role === 'fielder') {
+  // 진행 중인 장면이 없으면 바로 다음 장면 설정을 보여준다.
+  if (sceneDraft || !state) {
     const draftToShow = sceneDraft ?? defaultSceneDraft(replay, defaultRole(replay));
     const current = state ? `${halfInningLabel(state.inning, state.half)} ${roleText(state)} 중` : null;
-    const canClose = sceneDraft !== null && state !== null && state.role !== 'fielder';
+    const canClose = sceneDraft !== null && state !== null;
     const sceneActions: SceneSetupActions = {
       ...actions.scene,
       cancel: canClose ? actions.scene.cancel : null,
@@ -439,5 +450,6 @@ export function inputView(model: InputModel, actions: InputActions): HTMLElement
     model.pitchSheet ? pitchSheetView(model.pitchSheet, model.speedStart, actions.sheet) : null,
     // 친 공은 야구장 그림 창에서 낙구 지점과 질을 고른 뒤 기록한다.
     model.fieldDraft ? fieldPanel(model.fieldDraft, actions.field) : null,
+    model.playFielding ? playFieldingPopup(model.playFielding, actions.playFielding) : null,
   ]);
 }
