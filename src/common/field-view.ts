@@ -123,23 +123,41 @@ export interface FieldOptions {
  */
 const ZONE_VIEW_MARGIN = 5.6;
 
-/** 타격 자세를 잡은 어린이 실루엣 (우타자 기준, 포수 쪽에서 본 모습: 홈플레이트 쪽을 보고 배트는 뒤로 든다) */
+/**
+ * 타격 자세를 잡은 어린이 실루엣. 우타자 기준으로 그리고(포수 쪽에서 본 모습: 홈플레이트 쪽(오른쪽)을 보고 배트는 뒤로 든다),
+ * 좌타자는 좌우를 뒤집는다. 도형 좌표는 가로 36 · 세로 92 칸 안에서 잡았다.
+ */
+const FIGURE_STROKES: readonly { d: string; width: number }[] = [
+  { d: 'M10.5 24 L4.5 10', width: 2.3 }, // 배트 손잡이
+  { d: 'M5.6 12.6 L1.6 3.2', width: 4.6 }, // 배트 굵은 쪽
+  { d: 'M16 27 L7 28.5 L10.5 24', width: 4.4 }, // 뒤쪽 팔 (팔꿈치를 들어 올림)
+  { d: 'M16.5 47 L25 62 L26.5 81', width: 7 }, // 앞다리 (홈플레이트 쪽으로 벌림)
+  { d: 'M14 47 L8 63 L6 81', width: 7 }, // 뒷다리 (무릎을 굽힘)
+  { d: 'M25.5 84.5 L31 84.5', width: 5 }, // 앞발
+  { d: 'M4.5 84.5 L10 84.5', width: 5 }, // 뒷발
+  { d: 'M18.5 25 L15 46', width: 11.5 }, // 몸통 (살짝 앞으로 숙임)
+  { d: 'M21 28 L16.5 35 L10.5 24.5', width: 4.4 }, // 앞쪽 팔
+];
+
+/** 헬멧 쓴 머리: 둥근 머리 + 앞(오른쪽)으로 난 챙 + 귀 덮개 */
+const FIGURE_HEAD = { cx: 21, cy: 13, r: 7.4 };
+const FIGURE_HELMET = ['M13.2 13.4 A8.1 8.1 0 0 1 29 11.6 L33.6 13.6 L28.6 14.6 Z', 'M13.2 13 L13.4 18 L17 18.6 L16.4 13 Z'];
+
+/** 존 옆 여백에 맞게 줄인다. (가로·세로를 같은 비율로 줄여야 선 굵기가 찌그러지지 않는다) */
+const FIGURE_SCALE = 0.76;
+const FIGURE_TOP = 10;
+const FIGURE_SIDE_OFFSET = 6;
+
 function batterFigure(hand: BatterHand, on: boolean): SVGGElement {
-  // 우타자는 왼쪽(3루 쪽), 좌타자는 오른쪽(1루 쪽)에 좌우를 뒤집어 그린다.
-  const transform = hand === 'right' ? 'translate(-4 4)' : `translate(${FIELD_SIZE + 4} 4) scale(-1 1)`;
+  const k = FIGURE_SCALE;
+  const transform =
+    hand === 'right'
+      ? `translate(${-FIGURE_SIDE_OFFSET} ${FIGURE_TOP}) scale(${k})`
+      : `translate(${FIELD_SIZE + FIGURE_SIDE_OFFSET} ${FIGURE_TOP}) scale(${-k} ${k})`;
   const g = svgEl('g', { transform, class: `batter-figure${on ? ' on' : ''}`, 'aria-hidden': 'true' });
-  // 배트: 손에서 뒤쪽 위로
-  g.append(svgEl('line', { x1: 6, y1: 22, x2: 1, y2: 2, class: 'batter-bat' }));
-  // 헬멧 쓴 머리
-  g.append(svgEl('circle', { cx: 11, cy: 13, r: 5.2, class: 'batter-body' }));
-  g.append(svgEl('path', { d: 'M15 12.5 L19 14 L15.5 15.2 Z', class: 'batter-body' }));
-  // 몸통 (살짝 앞으로 숙임)
-  g.append(svgEl('line', { x1: 11, y1: 20, x2: 9, y2: 46, class: 'batter-limb thick' }));
-  // 팔: 어깨에서 뒤쪽 손으로
-  g.append(svgEl('polyline', { points: '12,23 9,25 6,22', class: 'batter-limb' }));
-  // 다리: 앞다리는 홈플레이트 쪽으로 벌리고, 뒷다리는 굽힌다
-  g.append(svgEl('polyline', { points: '10,46 16,64 17,86', class: 'batter-limb' }));
-  g.append(svgEl('polyline', { points: '8,46 4,65 5,86', class: 'batter-limb' }));
+  for (const stroke of FIGURE_STROKES) g.append(svgEl('path', { d: stroke.d, 'stroke-width': stroke.width, class: 'batter-limb' }));
+  g.append(svgEl('circle', { ...FIGURE_HEAD, class: 'batter-body' }));
+  for (const d of FIGURE_HELMET) g.append(svgEl('path', { d, class: 'batter-body' }));
   return g;
 }
 
@@ -155,7 +173,7 @@ function drawBatters(svg: SVGSVGElement, highlight: BatterHand | null): void {
   for (const [hand, x, text] of labels) {
     const on = highlight === hand;
     svg.append(batterFigure(hand, on));
-    const label = svgEl('text', { x, y: FIELD_SIZE + 2.5, class: `batter-label${on ? ' on' : ''}`, 'text-anchor': 'middle' });
+    const label = svgEl('text', { x, y: FIELD_SIZE + 3, class: `batter-label${on ? ' on' : ''}`, 'text-anchor': 'middle' });
     label.textContent = text;
     svg.append(label);
   }

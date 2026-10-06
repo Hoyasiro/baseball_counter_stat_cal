@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { activeEvents, playEvents } from './events';
-import { backupJson, exportFileName, pitchesCsv } from './export';
+import { backupFileName, backupJson, pitchesCsv, pitchesFileName } from './export';
 import { Game, addAppearance, addPitch, createGame, gameInfo } from './game';
 import { replayGame } from './replay';
 
@@ -54,8 +54,15 @@ describe('백업 파일(JSON)', () => {
   });
 
   it('파일 이름', () => {
-    expect(exportFileName('backup', '2026-10-05')).toBe('baseball-backup-2026-10-05.json');
-    expect(exportFileName('pitches', '2026-10-05')).toBe('baseball-pitches-2026-10-05.csv');
-    expect(exportFileName('backupText', '2026-10-05')).toBe('baseball-backup-2026-10-05.txt');
+    expect(pitchesFileName('2026-10-05')).toBe('baseball-pitches-2026-10-05.csv');
+    const make = (date: string, opponent: string, gameType: 'practice' | 'league') =>
+      createGame({ date, opponent, gameType, battingFirst: 'them', venue: 'home', ourTeam: '' });
+    const games = [make('2026-10-01', '가람초', 'league'), make('2026-10-05', '서울 휘문중', 'practice'), make('2026-09-30', '', 'league')];
+    // 가장 최근 경기 기준, 띄어쓰기는 뺀다
+    expect(backupFileName(games, '2026-10-06', 'json')).toBe('서울휘문중_연습_2026-10-05.json');
+    expect(backupFileName(games, '2026-10-06', 'txt')).toBe('서울휘문중_연습_2026-10-05.txt');
+    expect(backupFileName([games[2]], '2026-10-06', 'json')).toBe('상대팀미입력_리그_2026-09-30.json');
+    expect(backupFileName([], '2026-10-06', 'json')).toBe('야구맘기록지_백업_2026-10-06.json');
+    expect(backupFileName([make('2026-10-05', 'A/B:초?', 'practice')], '2026-10-06', 'json')).toBe('AB초_연습_2026-10-05.json');
   });
 });

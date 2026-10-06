@@ -11,7 +11,7 @@ import { mergeGames, mergeSummary, parseBackup } from './common/backup-import';
 import { BACKUP_REMINDER_MIN_GAMES, backupBanner } from './common/backup-banner';
 import { gamesChangedSince, loadLastBackup, saveLastBackup } from './common/backup-reminder';
 import { downloadFile, shareFile } from './common/download';
-import { backupJson, exportFileName, pitchesCsv } from './common/export';
+import { backupFileName, backupJson, pitchesCsv, pitchesFileName } from './common/export';
 import { EMPTY_PITCH_DETAIL, FieldDraft, PitchDetail, PitchSheet, isBattedResult } from './common/pitch-detail-view';
 import {
   Hand,
@@ -823,8 +823,8 @@ export function mountApp(root: HTMLElement): void {
     download: (kind: 'backup' | 'pitches') => {
       const file =
         kind === 'backup'
-          ? { name: exportFileName('backup', today()), data: backupJson(state.games, new Date().toISOString()), type: 'application/json' }
-          : { name: exportFileName('pitches', today()), data: pitchesCsv(state.games, replayOf), type: 'text/csv' };
+          ? { name: backupFileName(state.games, today(), 'json'), data: backupJson(state.games, new Date().toISOString()), type: 'application/json' }
+          : { name: pitchesFileName(today()), data: pitchesCsv(state.games, replayOf), type: 'text/csv' };
       void downloadFile(file.name, file.data, file.type).then((result) => {
         if (result === 'saved') {
           // 백업 파일을 받았으면 백업한 것으로 본다. (표 파일은 다시 불러올 수 없으므로 백업이 아니다)
@@ -837,7 +837,7 @@ export function mountApp(root: HTMLElement): void {
     },
     backupNow: () => {
       const data = backupJson(state.games, new Date().toISOString());
-      const names = { primary: exportFileName('backup', today()), fallback: exportFileName('backupText', today()) };
+      const names = { primary: backupFileName(state.games, today(), 'json'), fallback: backupFileName(state.games, today(), 'txt') };
       void shareFile(names, data).then((result) => {
         if (result === 'shared') {
           markBackedUp('백업 파일을 보냈어요. 보낸 곳(카카오톡·드라이브 등)에 잘 들어갔는지 확인하세요.');

@@ -4,7 +4,8 @@ import { DataActions, dataSection } from './data-section';
 import { h } from './dom';
 import { BATTER_HANDS, BatterHand, TEAM_NAME_MAX_LENGTH } from './events';
 import { DEFAULT_TEAM_NAME } from './game';
-import { BATTER_HAND_LABEL, HAND_LABEL, ORIENTATION_LABEL, PITCH_DETAIL_LABEL } from './labels';
+import { APP_NAME, BATTER_HAND_LABEL, HAND_LABEL, ORIENTATION_LABEL, PITCH_DETAIL_LABEL } from './labels';
+import { APP_VERSION } from './version';
 import { Hand, OrientationMode } from './settings';
 
 export interface SettingsActions extends DataActions {
@@ -90,5 +91,6 @@ export function settingsView(hand: Hand, orientation: OrientationMode, childHand
     ]),
     h('p', { className: 'help', text: '팀 이름 · 아이 타석 · 화면 방향 · 손 설정은 이 휴대폰에만 저장됩니다. 기록에는 영향이 없습니다.' }),
     dataSection(hasGames, lastBackupAt, actions),
+    h('p', { className: 'app-version', text: `${APP_NAME} ${APP_VERSION}` }),
   ]);
 }
