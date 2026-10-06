@@ -1298,7 +1298,7 @@ input:focus-visible {
   border: 1px solid var(--muted);
 }
 
-.line-score td.manual {
+.line-score td.typed {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
