@@ -830,6 +830,18 @@ button:focus-visible {
   border-color: var(--bar);
 }
 
+/* 경기 구분 4개를 한 줄에 (칸을 좁혀서) */
+.type-picker.one-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.type-picker.one-row button {
+  padding: 10px 0;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
 .error {
   margin: 0;
   padding: 10px 12px;
@@ -1298,7 +1310,7 @@ input:focus-visible {
   border: 1px solid var(--muted);
 }
 
-.line-score td.manual {
+.line-score td.typed {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -3246,4 +3258,10 @@ input[type='file'].visually-hidden {
   text-align: center;
   font-size: 11px;
   color: var(--muted);
+}
+
+/* 기록 고치기 창의 투구 상세 */
+.edit-detail {
+  display: grid;
+  gap: 8px;
 }

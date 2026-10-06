@@ -36,38 +36,59 @@ function clampUnit(value: number): number {
 }
 
 /**
- * 그림을 누르거나 끌면 고른 점이 손가락을 따라오고, 손을 떼면 그 자리로 정한다.
- * 끄는 동안은 다시 그리지 않고 점만 옮긴다. (다시 그리면 손가락을 놓친다)
+ * 손가락으로 끌 때 점을 손가락 옆에 둔다(약 3mm). 손가락 끝에 가려 점이 안 보이는 일을 막는다.
+ * 휴대폰 화면은 1인치에 약 160 CSS 픽셀이라 3mm ≈ 19픽셀로 잡는다.
+ */
+const FINGER_OFFSET_PX = 19;
+/** 이만큼 움직여야 "끌기"로 본다. 그냥 누르면 누른 자리에 점을 찍는다. */
+const DRAG_START_PX = 6;
+
+/** 오른손이면 손가락 왼쪽, 왼손이면 오른쪽에 점을 둔다. (설정의 손 방향은 화면 루트의 data-hand) */
+function fingerOffset(svg: SVGSVGElement): number {
+  const hand = svg.closest<HTMLElement>('[data-hand]')?.dataset.hand;
+  return hand === 'left' ? FINGER_OFFSET_PX : -FINGER_OFFSET_PX;
+}
+
+/**
+ * 그림을 누르면 그 자리에 점을 찍고, 누른 채 끌면 점이 따라오다가 손을 뗀 곳으로 정한다.
+ * 손가락으로 끌 때는 점을 손가락 옆에 둔다. 끄는 동안은 다시 그리지 않고 점만 옮긴다. (다시 그리면 손가락을 놓친다)
  */
 function pickHandler(svg: SVGSVGElement, onPick: (x: number, y: number) => void, view: ViewArea): void {
-  const toUnit = (e: PointerEvent): { x: number; y: number } => {
+  const toUnit = (clientX: number, clientY: number): { x: number; y: number } => {
     const rect = svg.getBoundingClientRect();
-    const x = view.left + ((e.clientX - rect.left) / rect.width) * view.width;
-    const y = view.top + ((e.clientY - rect.top) / rect.height) * view.height;
+    const x = view.left + ((clientX - rect.left) / rect.width) * view.width;
+    const y = view.top + ((clientY - rect.top) / rect.height) * view.height;
     return { x: clampUnit(x / FIELD_SIZE), y: clampUnit(y / FIELD_SIZE) };
   };
-  let dragging = false;
-  const follow = (e: PointerEvent): void => {
-    const p = toUnit(e);
-    movePicked(svg, p.x, p.y);
-  };
+  let pressed = false;
+  let start = { x: 0, y: 0 };
+  let shift = 0;
+  const pointAt = (e: PointerEvent): { x: number; y: number } => toUnit(e.clientX + shift, e.clientY);
   svg.addEventListener('pointerdown', (e) => {
-    dragging = true;
+    pressed = true;
+    shift = 0;
+    start = { x: e.clientX, y: e.clientY };
     svg.setPointerCapture(e.pointerId);
-    follow(e);
+    const p = pointAt(e);
+    movePicked(svg, p.x, p.y);
   });
   svg.addEventListener('pointermove', (e) => {
-    if (dragging) follow(e);
+    if (!pressed) return;
+    // 손가락으로 끌기 시작하면 그때부터 점을 손가락 옆으로 옮긴다. (마우스는 가리지 않으므로 그대로)
+    if (shift === 0 && e.pointerType === 'touch' && Math.hypot(e.clientX - start.x, e.clientY - start.y) > DRAG_START_PX) {
+      shift = fingerOffset(svg);
+    }
+    const p = pointAt(e);
+    movePicked(svg, p.x, p.y);
   });
-  const finish = (e: PointerEvent): void => {
-    if (!dragging) return;
-    dragging = false;
-    const p = toUnit(e);
+  svg.addEventListener('pointerup', (e) => {
+    if (!pressed) return;
+    pressed = false;
+    const p = pointAt(e);
     onPick(p.x, p.y);
-  };
-  svg.addEventListener('pointerup', finish);
+  });
   svg.addEventListener('pointercancel', () => {
-    dragging = false;
+    pressed = false;
   });
 }
 

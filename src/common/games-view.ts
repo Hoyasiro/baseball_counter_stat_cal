@@ -144,6 +144,7 @@ function formView(form: GameForm, hasGames: boolean, opponents: readonly string[
     [
       [todayText, '오늘'],
       [shiftDate(todayText, -1), '어제'],
+      [shiftDate(todayText, -2), '그제'],
     ],
     form.info.date,
     (date) => {
@@ -173,7 +174,7 @@ function formView(form: GameForm, hasGames: boolean, opponents: readonly string[
     opponentChips,
     h('div', { className: 'field' }, [
       h('span', { text: '경기 구분' }),
-      picker<GameType>(GAME_TYPES.map((t) => [t, GAME_TYPE_LABEL[t]]), form.info.gameType, (t) => update({ gameType: t }), 'type-picker').element,
+      picker<GameType>(GAME_TYPES.map((t) => [t, GAME_TYPE_LABEL[t]]), form.info.gameType, (t) => update({ gameType: t }), 'type-picker one-row').element,
     ]),
     h('div', { className: 'field' }, [h('span', { text: '우리 팀 공격 순서' }), orderPicker.element]),
     h('div', { className: 'field' }, [

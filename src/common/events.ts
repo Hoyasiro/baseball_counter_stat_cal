@@ -307,14 +307,19 @@ export interface VoidEvent extends EventBase {
 }
 
 /**
- * 지난 공의 결과를 고친 기록. 원래 공은 그대로 두고 이 기록을 덧붙인다. (CLAUDE.md 5.3)
- * 다시 계산할 때 원래 공 대신 고친 결과를 쓴다. 같은 공을 여러 번 고치면 마지막 것을 쓴다.
+ * 지난 공을 고친 기록. 원래 공은 그대로 두고 이 기록을 덧붙인다. (CLAUDE.md 5.3)
+ * 다시 계산할 때 원래 공에 고친 기록을 순서대로 겹쳐 쓴다.
+ * - result(·hitType): 결과를 고침. 없으면 결과는 그대로
+ * - pitchType · zone · speed: 투구 상세를 고침. 없으면 그대로, null이면 지움
  */
 export interface EditEvent extends EventBase {
   readonly kind: 'edit';
   readonly targetId: string;
-  readonly result: PitchResult;
+  readonly result?: PitchResult;
   readonly hitType?: HitType;
+  readonly pitchType?: PitchType | null;
+  readonly zone?: ZonePoint | null;
+  readonly speed?: number | null;
 }
 
 export type LogEvent =
@@ -337,8 +342,25 @@ export type PlayLogEvent = PitchEvent | PlayEvent | AdjustEvent | AppearanceEven
 /** 취소할 수 있는 이벤트 */
 export type UndoableEvent = PlayLogEvent | ScoreEvent | TeamTotalEvent;
 
+/** 투구 상세 고침: 넣은 값은 바꾸고, null은 지우고, 없는 항목은 그대로 둔다. */
+function applyDetailEdit(pitch: PitchEvent, edit: EditEvent): PitchEvent {
+  const next: Record<string, unknown> = { ...pitch };
+  for (const key of ['pitchType', 'zone', 'speed'] as const) {
+    const value = edit[key];
+    if (value === null) delete next[key];
+    else if (value !== undefined) next[key] = value;
+  }
+  return next as unknown as PitchEvent;
+}
+
 /** 고친 공: 결과·안타 종류를 바꾸고, 바뀐 결과와 맞지 않는 정보(병살·아웃 종류·타구)는 뺀다. */
 function applyEdit(pitch: PitchEvent, edit: EditEvent): PitchEvent {
+  const detailed = applyDetailEdit(pitch, edit);
+  if (edit.result === undefined) return detailed;
+  return applyResultEdit(detailed, { ...edit, result: edit.result });
+}
+
+function applyResultEdit(pitch: PitchEvent, edit: EditEvent & { result: PitchResult }): PitchEvent {
   const { hitType: _hit, doublePlay, outType, battedBall, ...rest } = pitch;
   const stillOut = edit.result === 'out' && pitch.result === 'out';
   const batted = edit.result === 'hit' || edit.result === 'out' || edit.result === 'reachedOnError';
@@ -357,14 +379,12 @@ export function activeEvents(events: readonly LogEvent[]): UndoableEvent[] {
   const voided = new Set(
     events.filter((e): e is VoidEvent => e.kind === 'void').map((e) => e.targetId),
   );
-  const edits = new Map<string, EditEvent>();
-  for (const e of events) if (e.kind === 'edit' && !voided.has(e.id)) edits.set(e.targetId, e);
+  // 같은 공을 여러 번 고치면(결과 · 상세 따로) 입력 순서대로 겹쳐 쓴다.
+  const edits = new Map<string, EditEvent[]>();
+  for (const e of events) if (e.kind === 'edit' && !voided.has(e.id)) edits.set(e.targetId, [...(edits.get(e.targetId) ?? []), e]);
   return events
     .filter((e): e is UndoableEvent => e.kind !== 'gameInfo' && e.kind !== 'void' && e.kind !== 'edit' && !voided.has(e.id))
-    .map((e) => {
-      const edit = e.kind === 'pitch' ? edits.get(e.id) : undefined;
-      return edit && e.kind === 'pitch' ? applyEdit(e, edit) : e;
-    });
+    .map((e) => (e.kind === 'pitch' ? (edits.get(e.id) ?? []).reduce(applyEdit, e) : e));
 }
 
 export function playEvents(events: readonly UndoableEvent[]): PlayLogEvent[] {
@@ -490,8 +510,11 @@ export function isLogEvent(value: unknown): value is LogEvent {
     case 'edit':
       return (
         typeof value.targetId === 'string' &&
-        PITCH_RESULTS.includes(value.result as PitchResult) &&
-        (value.hitType === undefined || (value.result === 'hit' && HIT_TYPES.includes(value.hitType as HitType)))
+        (value.result === undefined || PITCH_RESULTS.includes(value.result as PitchResult)) &&
+        (value.hitType === undefined || (value.result === 'hit' && HIT_TYPES.includes(value.hitType as HitType))) &&
+        (value.pitchType === undefined || value.pitchType === null || PITCH_TYPES.includes(value.pitchType as PitchType)) &&
+        (value.zone === undefined || value.zone === null || isUnitPoint(value.zone)) &&
+        (value.speed === undefined || value.speed === null || isCount(value.speed, SPEED_MIN, SPEED_MAX))
       );
     default:
       return false;

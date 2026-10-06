@@ -15,7 +15,8 @@ export interface TeamNames {
 
 /** 기록이 없는 칸도 0으로 보여준다. 아이 기록이 먼저라 점수는 대충 넣어도 되고, 0이 아닌 칸만 눌러 고치면 된다. */
 function cell(value: number | null, manual: boolean, current: boolean, onTap: (() => void) | null, label: string, extraClass = ''): HTMLElement {
-  const classes = [manual ? 'manual' : '', current ? 'now' : '', extraClass].filter(Boolean).join(' ');
+  // 'manual'은 도움말 화면 클래스와 겹쳐 표 칸이 격자로 바뀌므로 다른 이름을 쓴다.
+  const classes = [manual ? 'typed' : '', current ? 'now' : '', extraClass].filter(Boolean).join(' ');
   const text = String(value ?? 0);
   if (!onTap) return h('td', { text, className: classes });
   return h('td', { className: classes }, [h('button', { className: 'score-cell', text, attrs: { 'aria-label': `${label} ${text}점, 눌러서 고치기` }, onClick: onTap })]);
