@@ -3254,3 +3254,11 @@ input[type='file'].visually-hidden {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* 설정 맨 아래 앱 버전 (저작권 표시처럼 작게) */
+.app-version {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+}
