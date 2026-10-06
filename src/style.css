@@ -3017,3 +3017,38 @@ input[type='file'].visually-hidden {
 .tip-popup p {
   margin: 0;
 }
+
+/* 지난 기록 고치기 */
+.chip.editable {
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+.edit-results {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.edit-results button {
+  min-height: 44px;
+  padding: 4px 2px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.edit-results button.active {
+  background: var(--bar);
+  border-color: var(--bar);
+  color: var(--on-color);
+  opacity: 1;
+}
+
+.edit-popup p {
+  margin: 0;
+}

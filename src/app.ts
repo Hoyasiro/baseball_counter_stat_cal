@@ -5,7 +5,7 @@
 import { batterAnalysisView } from './batter/analysis-view';
 import { AnalysisScope, AnalysisTab } from './common/analysis-ui';
 import { h, segmented } from './common/dom';
-import { BaseIndex, FieldingCredit, HitType, OutType, PitchResult, Role, TEAM_NAME_MAX_LENGTH, activeEvents, playEvents } from './common/events';
+import { BaseIndex, FieldingCredit, HitType, OutType, PitchResult, Role, TEAM_NAME_MAX_LENGTH, UndoableEvent, activeEvents, playEvents } from './common/events';
 import { outTypeOptions } from './common/bases';
 import { mergeGames, mergeSummary, parseBackup } from './common/backup-import';
 import { BACKUP_REMINDER_MIN_GAMES, backupBanner } from './common/backup-banner';
@@ -43,6 +43,7 @@ import {
   addPlay,
   addScore,
   addVoid,
+  addEdit,
   createGame,
   defaultVenue,
   gameInfo,
@@ -104,6 +105,8 @@ interface State {
   sceneDraft: SceneDraft | null;
   /** 경기 결과에서 고치고 있는 스코어보드 칸 */
   cellDraft: ScoreCellDraft | null;
+  /** 경기 결과의 장면별 기록에서 고치고 있는 기록 */
+  editingEvent: UndoableEvent | null;
   form: GameForm | null;
   /** 도움말(사용 설명서)을 보고 있는지 */
   helpOpen: boolean;
@@ -234,6 +237,7 @@ export function mountApp(root: HTMLElement): void {
     chooser: null,
     sceneDraft: null,
     cellDraft: null,
+    editingEvent: null,
     form: latest ? null : newGameForm(teamName),
     helpOpen: false,
     tutorialStep: hasSeenTutorial() ? null : 0,
@@ -285,6 +289,7 @@ export function mountApp(root: HTMLElement): void {
     state.chooser = null;
     state.sceneDraft = null;
     state.cellDraft = null;
+    state.editingEvent = null;
     state.deletingId = null;
     state.fieldDraft = null;
     state.pitchSheet = null;
@@ -630,6 +635,26 @@ export function mountApp(root: HTMLElement): void {
       state.cellDraft = null;
       updateResultGame((g) => scoreEventIds(activeEvents(g.events), draft.team, draft.inning).reduce(addVoid, g));
     },
+    editEvent: (event: UndoableEvent | null) => {
+      state.editingEvent = event;
+      render();
+    },
+    eventEdit: {
+      close: () => {
+        state.editingEvent = null;
+        render();
+      },
+      saveResult: (targetId: string, result: PitchResult, hitType?: HitType) => {
+        state.editingEvent = null;
+        state.notice = '고쳤어요. 뒤 기록의 카운트·주자·점수도 다시 계산했어요.';
+        updateResultGame((g) => addEdit(g, targetId, result, hitType));
+      },
+      remove: (targetId: string) => {
+        state.editingEvent = null;
+        state.notice = '지웠어요. 원래 기록은 이력으로 남아요.';
+        updateResultGame((g) => addVoid(g, targetId));
+      },
+    },
     openChildRecord: () => {
       const game = resultGame();
       if (!game) return;
@@ -854,6 +879,7 @@ export function mountApp(root: HTMLElement): void {
           score: lineScore(shownReplay, activeEvents(shown.events)),
           showScoreboard: state.showScoreboard,
           cellDraft: state.cellDraft,
+          editing: state.editingEvent,
         },
         resultActions,
       );

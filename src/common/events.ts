@@ -294,6 +294,17 @@ export interface VoidEvent extends EventBase {
   readonly targetId: string;
 }
 
+/**
+ * 지난 공의 결과를 고친 기록. 원래 공은 그대로 두고 이 기록을 덧붙인다. (CLAUDE.md 5.3)
+ * 다시 계산할 때 원래 공 대신 고친 결과를 쓴다. 같은 공을 여러 번 고치면 마지막 것을 쓴다.
+ */
+export interface EditEvent extends EventBase {
+  readonly kind: 'edit';
+  readonly targetId: string;
+  readonly result: PitchResult;
+  readonly hitType?: HitType;
+}
+
 export type LogEvent =
   | PitchEvent
   | PlayEvent
@@ -304,7 +315,8 @@ export type LogEvent =
   | GameEndEvent
   | ScoreEvent
   | GameInfoEvent
-  | VoidEvent;
+  | VoidEvent
+  | EditEvent;
 
 /** 경기 진행에 영향을 주는 이벤트 */
 export type PlayLogEvent = PitchEvent | PlayEvent | AdjustEvent | AppearanceEvent | ExitEvent | BatterEvent | GameEndEvent;
@@ -312,14 +324,34 @@ export type PlayLogEvent = PitchEvent | PlayEvent | AdjustEvent | AppearanceEven
 /** 취소할 수 있는 이벤트 */
 export type UndoableEvent = PlayLogEvent | ScoreEvent;
 
-/** 취소되지 않은 이벤트(경기 정보 제외)만 입력 순서대로 돌려준다. */
+/** 고친 공: 결과·안타 종류를 바꾸고, 바뀐 결과와 맞지 않는 정보(병살·아웃 종류·타구)는 뺀다. */
+function applyEdit(pitch: PitchEvent, edit: EditEvent): PitchEvent {
+  const { hitType: _hit, doublePlay, outType, battedBall, ...rest } = pitch;
+  const stillOut = edit.result === 'out' && pitch.result === 'out';
+  const batted = edit.result === 'hit' || edit.result === 'out' || edit.result === 'reachedOnError';
+  return {
+    ...rest,
+    result: edit.result,
+    ...(edit.result === 'hit' ? { hitType: edit.hitType ?? 'single' } : {}),
+    ...(stillOut && doublePlay !== undefined ? { doublePlay } : {}),
+    ...(stillOut && outType !== undefined ? { outType } : {}),
+    ...(batted && battedBall !== undefined ? { battedBall } : {}),
+  };
+}
+
+/** 취소되지 않은 이벤트(경기 정보·취소·고침 제외)만 입력 순서대로 돌려준다. 고친 공은 고친 결과로 바꿔 준다. */
 export function activeEvents(events: readonly LogEvent[]): UndoableEvent[] {
   const voided = new Set(
     events.filter((e): e is VoidEvent => e.kind === 'void').map((e) => e.targetId),
   );
-  return events.filter(
-    (e): e is UndoableEvent => e.kind !== 'gameInfo' && e.kind !== 'void' && !voided.has(e.id),
-  );
+  const edits = new Map<string, EditEvent>();
+  for (const e of events) if (e.kind === 'edit' && !voided.has(e.id)) edits.set(e.targetId, e);
+  return events
+    .filter((e): e is UndoableEvent => e.kind !== 'gameInfo' && e.kind !== 'void' && e.kind !== 'edit' && !voided.has(e.id))
+    .map((e) => {
+      const edit = e.kind === 'pitch' ? edits.get(e.id) : undefined;
+      return edit && e.kind === 'pitch' ? applyEdit(e, edit) : e;
+    });
 }
 
 export function playEvents(events: readonly UndoableEvent[]): PlayLogEvent[] {
@@ -436,6 +468,12 @@ export function isLogEvent(value: unknown): value is LogEvent {
       );
     case 'void':
       return typeof value.targetId === 'string';
+    case 'edit':
+      return (
+        typeof value.targetId === 'string' &&
+        PITCH_RESULTS.includes(value.result as PitchResult) &&
+        (value.hitType === undefined || (value.result === 'hit' && HIT_TYPES.includes(value.hitType as HitType)))
+      );
     default:
       return false;
   }

@@ -7,6 +7,7 @@ import { MAX_RUNS, Team, UndoableEvent } from './events';
 import { GAME_TYPE_LABEL, GameInfo, dateLabel, opponentLabel, orderLabel, ourTeamLabel } from './game';
 import { ACTOR_LABEL, GAME_RESULT_LABEL, RUNNER_EVENT_LABEL, SCORE_CELL_LABEL, eventLabel, outcomeLabel, sceneTitle } from './labels';
 import { popup } from './popup';
+import { EventEditActions, eventEditPopup } from './event-edit-view';
 import { LineScore } from './line-score';
 import { lineScoreTable } from './line-score-view';
 import { GameReplay, PlateAppearance, Scene, SceneEnd } from './replay';
@@ -19,22 +20,23 @@ const END_LABEL: Record<SceneEnd, string> = {
   halfOver: '3아웃',
 };
 
-function chip(event: UndoableEvent): HTMLElement {
+/** 누르면 그 기록을 고치는 창이 뜬다. */
+function chip(event: UndoableEvent, onEdit: (event: UndoableEvent) => void): HTMLElement {
   const kindClass = event.kind === 'pitch' ? event.result : event.kind;
-  return h('span', { className: `chip ${kindClass}`, text: eventLabel(event) });
+  return h('button', { className: `chip editable ${kindClass}`, text: eventLabel(event), attrs: { 'aria-label': `${eventLabel(event)}, 눌러서 고치기` }, onClick: () => onEdit(event) });
 }
 
-function paCard(pa: PlateAppearance): HTMLElement {
+function paCard(pa: PlateAppearance, onEdit: (event: UndoableEvent) => void): HTMLElement {
   const runs = pa.runs > 0 ? ` · ${pa.runs}점` : '';
   return h('article', { className: `pa ${pa.actor}${pa.outcome === null ? ' current' : ''}` }, [
     h('h3', { text: `${pa.number}번째 타석 · ${ACTOR_LABEL[pa.actor]} · ${outcomeLabel(pa)}${runs}` }),
     h('p', { className: 'sub', text: `${pa.inning}회 시작: ${basesLabel(pa.basesBefore)} · ${pa.outsBefore}아웃 · 투구 ${pa.pitches.length}` }),
     pa.endCount ? h('p', { className: 'sub', text: `${countLabel(pa.endCount)}에서 끝남` }) : null,
-    h('p', { className: 'chips' }, pa.timeline.map(chip)),
+    h('p', { className: 'chips' }, pa.timeline.map((e) => chip(e, onEdit))),
   ]);
 }
 
-function sceneBlock(scene: Scene, replay: GameReplay): HTMLElement {
+function sceneBlock(scene: Scene, replay: GameReplay, onEdit: (event: UndoableEvent) => void): HTMLElement {
   const pas = replay.plateAppearances.filter((pa) => pa.sceneId === scene.id);
   const runs = replay.runnerEvents.filter((e) => e.sceneId === scene.id);
   const start = `시작: ${scene.outs}아웃 · ${basesLabel(scene.bases)}${scene.count.balls || scene.count.strikes ? ` · ${countLabel(scene.count)}` : ''}`;
@@ -44,7 +46,7 @@ function sceneBlock(scene: Scene, replay: GameReplay): HTMLElement {
     runs.length > 0
       ? h('p', { className: 'chips' }, runs.map((e) => h('span', { className: 'chip runner', text: `아이 ${RUNNER_EVENT_LABEL[e.kind]} (${e.inning}회)` })))
       : null,
-    ...pas.map(paCard),
+    ...pas.map((pa) => paCard(pa, onEdit)),
   ]);
 }
 
@@ -64,6 +66,9 @@ export interface ResultActions {
   saveCell: (draft: ScoreCellDraft) => void;
   resetCell: (draft: ScoreCellDraft) => void;
   openChildRecord: () => void;
+  /** 장면별 기록에서 기록 하나를 눌러 고치기 (null이면 닫기) */
+  editEvent: (event: UndoableEvent | null) => void;
+  eventEdit: EventEditActions;
 }
 
 /** 숫자 키보드 대신 0~9 단추와 −/+ 로 점수를 넣는 창 */
@@ -100,6 +105,8 @@ export interface ResultModel {
   readonly score: LineScore;
   readonly showScoreboard: boolean;
   readonly cellDraft: ScoreCellDraft | null;
+  /** 고치고 있는 기록 */
+  readonly editing: UndoableEvent | null;
 }
 
 /** 경기 결과: 스코어보드(선택) · 내 아이 기록 보기 · 장면별 기록 */
@@ -128,7 +135,9 @@ export function recordsView(model: ResultModel, actions: ResultActions): HTMLEle
     h('button', { className: 'primary child-record', text: GAME_RESULT_LABEL.childRecord, onClick: actions.openChildRecord }),
     h('h2', { className: 'inning-title', text: '장면별 기록' }),
     scenes.length === 0 ? h('p', { className: 'empty', text: '아직 기록이 없습니다. 기록 입력에서 아이가 나오는 장면을 시작하세요.' }) : null,
-    ...scenes.map((scene) => sceneBlock(scene, replay)),
+    scenes.length > 0 ? h('p', { className: 'help', text: '공이나 기록을 누르면 고치거나 지울 수 있어요.' }) : null,
+    ...scenes.map((scene) => sceneBlock(scene, replay, actions.editEvent)),
     model.cellDraft ? scoreCellPopup(model.cellDraft, names[model.cellDraft.team], actions) : null,
+    model.editing ? eventEditPopup(model.editing, actions.eventEdit) : null,
   ]);
 }

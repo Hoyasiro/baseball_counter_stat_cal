@@ -44,6 +44,9 @@ export const GAME_CARD_LABEL = {
   delete: '삭제',
 } as const;
 
+/** 지난 기록 고치기 창 */
+export const EDIT_EVENT_LABEL = { title: '기록 고치기', remove: '이 기록 지우기' } as const;
+
 /** 경기 결과 화면 */
 export const GAME_RESULT_LABEL = {
   back: '← 경기 목록',
@@ -222,7 +225,7 @@ export const HIT_TYPE_LABEL: Record<HitType, string> = {
   homeRun: '홈런',
 };
 
-const PITCH_LABEL: Record<PitchResult, string> = {
+export const PITCH_LABEL: Record<PitchResult, string> = {
   ball: '볼',
   strike: '스트라이크',
   foul: '파울',
