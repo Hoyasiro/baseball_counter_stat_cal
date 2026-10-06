@@ -39,6 +39,7 @@ export const HIT_BASES: Record<HitType, number> = { single: 1, double: 2, triple
  * 투구가 아닌 주자 상황. base는 그 주자가 있던 베이스다.
  * - stolenBase / caughtStealing: 도루 성공·실패 (base 0 = 1루 주자의 2루 도루, 2 = 3루 주자의 홈 도루)
  * - error: 수비 실책으로 주자가 움직임. 바뀐 상황은 이어서 "상황 고치기"로 맞춘다.
+ * - runnerOut: 주루사. 안타·실책·볼넷 뒤 더 가다가(홈 포함) 베이스에서 아웃됨
  * - stolenSecond / caughtStealingSecond: 예전 기록용 (1루 주자의 2루 도루)
  */
 export type PlayKind =
@@ -47,6 +48,7 @@ export type PlayKind =
   | 'stolenBase'
   | 'caughtStealing'
   | 'error'
+  | 'runnerOut'
   | 'stolenSecond'
   | 'caughtStealingSecond';
 
@@ -56,6 +58,7 @@ export const PLAY_KINDS: readonly PlayKind[] = [
   'stolenBase',
   'caughtStealing',
   'error',
+  'runnerOut',
   'stolenSecond',
   'caughtStealingSecond',
 ];
@@ -252,6 +255,11 @@ export interface BatterEvent extends EventBase {
   readonly grade?: number;
 }
 
+/** 경기 기록을 마침 (4~5회에 끝나는 경기 등). 뒤에 새 장면을 시작하면 다시 이어서 기록한다. */
+export interface GameEndEvent extends EventBase {
+  readonly kind: 'gameEnd';
+}
+
 /** 우리 아이가 교체되어 빠짐. 지금 장면의 기록을 끝낸다. */
 export interface ExitEvent extends EventBase {
   readonly kind: 'exit';
@@ -263,6 +271,18 @@ export interface ScoreEvent extends EventBase {
   readonly team: Team;
   readonly inning: number;
   readonly runs: number;
+}
+
+/** 스코어보드 합계 칸(R 점수 · H 안타 · E 실책)에 직접 넣은 값. 넣으면 기록에서 센 값보다 우선한다. */
+export type TotalField = 'runs' | 'hits' | 'errors';
+
+export const TOTAL_FIELDS: readonly TotalField[] = ['runs', 'hits', 'errors'];
+
+export interface TeamTotalEvent extends EventBase {
+  readonly kind: 'teamTotal';
+  readonly team: Team;
+  readonly field: TotalField;
+  readonly value: number;
 }
 
 export interface GameInfoEvent extends EventBase {
@@ -286,6 +306,17 @@ export interface VoidEvent extends EventBase {
   readonly targetId: string;
 }
 
+/**
+ * 지난 공의 결과를 고친 기록. 원래 공은 그대로 두고 이 기록을 덧붙인다. (CLAUDE.md 5.3)
+ * 다시 계산할 때 원래 공 대신 고친 결과를 쓴다. 같은 공을 여러 번 고치면 마지막 것을 쓴다.
+ */
+export interface EditEvent extends EventBase {
+  readonly kind: 'edit';
+  readonly targetId: string;
+  readonly result: PitchResult;
+  readonly hitType?: HitType;
+}
+
 export type LogEvent =
   | PitchEvent
   | PlayEvent
@@ -293,28 +324,51 @@ export type LogEvent =
   | AppearanceEvent
   | ExitEvent
   | BatterEvent
+  | GameEndEvent
   | ScoreEvent
+  | TeamTotalEvent
   | GameInfoEvent
-  | VoidEvent;
+  | VoidEvent
+  | EditEvent;
 
 /** 경기 진행에 영향을 주는 이벤트 */
-export type PlayLogEvent = PitchEvent | PlayEvent | AdjustEvent | AppearanceEvent | ExitEvent | BatterEvent;
+export type PlayLogEvent = PitchEvent | PlayEvent | AdjustEvent | AppearanceEvent | ExitEvent | BatterEvent | GameEndEvent;
 
 /** 취소할 수 있는 이벤트 */
-export type UndoableEvent = PlayLogEvent | ScoreEvent;
+export type UndoableEvent = PlayLogEvent | ScoreEvent | TeamTotalEvent;
 
-/** 취소되지 않은 이벤트(경기 정보 제외)만 입력 순서대로 돌려준다. */
+/** 고친 공: 결과·안타 종류를 바꾸고, 바뀐 결과와 맞지 않는 정보(병살·아웃 종류·타구)는 뺀다. */
+function applyEdit(pitch: PitchEvent, edit: EditEvent): PitchEvent {
+  const { hitType: _hit, doublePlay, outType, battedBall, ...rest } = pitch;
+  const stillOut = edit.result === 'out' && pitch.result === 'out';
+  const batted = edit.result === 'hit' || edit.result === 'out' || edit.result === 'reachedOnError';
+  return {
+    ...rest,
+    result: edit.result,
+    ...(edit.result === 'hit' ? { hitType: edit.hitType ?? 'single' } : {}),
+    ...(stillOut && doublePlay !== undefined ? { doublePlay } : {}),
+    ...(stillOut && outType !== undefined ? { outType } : {}),
+    ...(batted && battedBall !== undefined ? { battedBall } : {}),
+  };
+}
+
+/** 취소되지 않은 이벤트(경기 정보·취소·고침 제외)만 입력 순서대로 돌려준다. 고친 공은 고친 결과로 바꿔 준다. */
 export function activeEvents(events: readonly LogEvent[]): UndoableEvent[] {
   const voided = new Set(
     events.filter((e): e is VoidEvent => e.kind === 'void').map((e) => e.targetId),
   );
-  return events.filter(
-    (e): e is UndoableEvent => e.kind !== 'gameInfo' && e.kind !== 'void' && !voided.has(e.id),
-  );
+  const edits = new Map<string, EditEvent>();
+  for (const e of events) if (e.kind === 'edit' && !voided.has(e.id)) edits.set(e.targetId, e);
+  return events
+    .filter((e): e is UndoableEvent => e.kind !== 'gameInfo' && e.kind !== 'void' && e.kind !== 'edit' && !voided.has(e.id))
+    .map((e) => {
+      const edit = e.kind === 'pitch' ? edits.get(e.id) : undefined;
+      return edit && e.kind === 'pitch' ? applyEdit(e, edit) : e;
+    });
 }
 
 export function playEvents(events: readonly UndoableEvent[]): PlayLogEvent[] {
-  return events.filter((e): e is PlayLogEvent => e.kind !== 'score');
+  return events.filter((e): e is PlayLogEvent => e.kind !== 'score' && e.kind !== 'teamTotal');
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -402,6 +456,7 @@ export function isLogEvent(value: unknown): value is LogEvent {
         (value.position === undefined || POSITIONS.includes(value.position as Position))
       );
     case 'exit':
+    case 'gameEnd':
       return true;
     case 'batter':
       return (
@@ -413,6 +468,12 @@ export function isLogEvent(value: unknown): value is LogEvent {
         (value.team === 'us' || value.team === 'them') &&
         isCount(value.inning, 1, MAX_INNING) &&
         isCount(value.runs, 0, MAX_RUNS)
+      );
+    case 'teamTotal':
+      return (
+        (value.team === 'us' || value.team === 'them') &&
+        TOTAL_FIELDS.includes(value.field as TotalField) &&
+        isCount(value.value, 0, MAX_RUNS)
       );
     case 'gameInfo':
       return (
@@ -426,6 +487,12 @@ export function isLogEvent(value: unknown): value is LogEvent {
       );
     case 'void':
       return typeof value.targetId === 'string';
+    case 'edit':
+      return (
+        typeof value.targetId === 'string' &&
+        PITCH_RESULTS.includes(value.result as PitchResult) &&
+        (value.hitType === undefined || (value.result === 'hit' && HIT_TYPES.includes(value.hitType as HitType)))
+      );
     default:
       return false;
   }

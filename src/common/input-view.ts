@@ -5,7 +5,7 @@ import { BASE_NAMES, STEAL_NAMES, basesLabel, hasRunner, occupiedBases, stealabl
 import { MAX_BALLS_IN_COUNT, MAX_STRIKES_IN_COUNT, OUTS_PER_INNING } from './count';
 import { diamond } from './diamond';
 import { h } from './dom';
-import { BaseIndex, Bases, ChildPosition, HitType, MAX_INNING, MAX_RUNS, PitchResult, UndoableEvent } from './events';
+import { BaseIndex, Bases, BatterHand, ChildPosition, HitType, MAX_INNING, MAX_RUNS, PitchResult, UndoableEvent } from './events';
 import { Game, GameInfo, dateLabel, opponentLabel, ourTeamLabel } from './game';
 import { lineScoreTable } from './line-score-view';
 import { halfInningLabel } from './innings';
@@ -20,6 +20,8 @@ import {
   POSITION_LABEL,
   PitchButton,
   ROLE_LABEL,
+  OTHER_RUNNER_OUT_LABEL,
+  GAME_OVER_LABEL,
   RUNNER_BUTTONS,
   RunnerAction,
   eventLabel,
@@ -31,7 +33,8 @@ import { SceneDraft, SceneSetupActions, defaultRole, defaultSceneDraft, sceneSet
 import { PlayFieldingActions, PlayFieldingDraft, playFieldingPopup } from './fielding-view';
 import { Hand } from './settings';
 import { BatterActions, BatterDraft, batterPill, batterPopup } from './batter-info-view';
-import { FieldActions, FieldDraft, PitchSheet, PitchSheetActions, fieldPanel, pitchDetailToggle, pitchSheetView } from './pitch-detail-view';
+import { TipKey, tipPopup } from './tips';
+import { FieldActions, FieldDraft, PitchSheet, PitchSheetActions, SheetBatter, fieldPanel, pitchDetailToggle, pitchSheetView } from './pitch-detail-view';
 
 export interface SituationDraft {
   readonly inning: number;
@@ -45,7 +48,7 @@ export interface SituationDraft {
 }
 
 /** 지금 열려 있는 고르기 화면 */
-export type Chooser = 'hit' | 'doublePlay' | Exclude<RunnerAction, 'error'> | null;
+export type Chooser = 'hit' | 'doublePlay' | 'otherRunner' | Exclude<RunnerAction, 'error'> | null;
 
 export interface InputActions {
   pitch: (result: PitchResult, hitType?: HitType) => void;
@@ -66,6 +69,7 @@ export interface InputActions {
   sheet: PitchSheetActions;
   field: FieldActions;
   batter: BatterActions;
+  closeTip: () => void;
 }
 
 export interface InputModel {
@@ -89,6 +93,10 @@ export interface InputModel {
   readonly playFielding: PlayFieldingDraft | null;
   /** 상대 타자 정보를 고르는 중이면 그 값 */
   readonly batterDraft: BatterDraft | null;
+  /** 처음 한 번 보여주는 기록 요령 */
+  readonly tip: TipKey | null;
+  /** 설정: 우리 아이가 서는 타석 */
+  readonly childBatterHand: BatterHand | null;
 }
 
 function dots(filled: number, total: number, kind: string, label: string): HTMLElement {
@@ -129,7 +137,7 @@ function workloadPill(replay: GameReplay, state: ActiveState): HTMLElement | nul
   return null;
 }
 
-const END_REASON = { exit: '교체됨', next: '다음 장면으로', childDone: '아이 차례 끝', halfOver: '3아웃' } as const;
+const END_REASON = { exit: '교체 아웃', next: '다음 장면으로', childDone: '아이 차례 끝', halfOver: '3아웃', gameEnd: '경기 끝' } as const;
 
 function message(replay: GameReplay): string {
   const state = replay.state;
@@ -202,7 +210,8 @@ function board(model: InputModel, actions: InputActions): HTMLElement {
       ]),
     ]),
     h('div', { className: 'board-stats' }, [workloadPill(replay, state), scorePill]),
-    h('p', { className: 'message', text: message(replay), attrs: { 'aria-live': 'polite' } }),
+    // 장면 중에는 아래 "↶ 취소" 단추가 방금 기록을 보여 주므로, 높이가 낮은 화면에서는 CSS로 숨긴다.
+    h('p', { className: 'message live', text: message(replay), attrs: { 'aria-live': 'polite' } }),
     boardMore(model),
   ]);
 }
@@ -295,7 +304,7 @@ function baseChoiceLabel(action: RunnerAction, base: BaseIndex): string {
 
 /** 투수·타자 장면: 다른 주자들에 대한 기록 */
 function runnerPad(bases: Bases, chooser: Chooser, actions: InputActions, onEdit: () => void): HTMLElement {
-  if (chooser && chooser !== 'hit' && chooser !== 'doublePlay') {
+  if (chooser && chooser !== 'hit' && chooser !== 'doublePlay' && chooser !== 'otherRunner') {
     return h('section', { className: 'runner-section' }, [
       h('p', { className: 'section-title', text: CHOOSER_QUESTION[chooser] }),
       h('div', { className: 'choice-row' }, [
@@ -332,8 +341,25 @@ function runnerPad(bases: Bases, chooser: Chooser, actions: InputActions, onEdit
 }
 
 /** 주자 장면: 우리 아이에 대한 기록 */
-function childRunnerPad(state: ActiveState, actions: InputActions, onEdit: () => void): HTMLElement {
+/** 아이가 주자일 때 다른 주자가 아웃된 경우 (예: 아이 볼넷 뒤 앞 주자 견제 아웃) */
+function otherRunnerChooser(state: ActiveState, actions: InputActions): HTMLElement {
+  const others = occupiedBases(state.bases).filter((b) => b !== state.childBase);
+  return h('section', { className: 'runner-section' }, [
+    h('p', { className: 'section-title', text: '어느 주자가 어떻게 아웃됐나요?' }),
+    h('div', { className: 'choice-row' }, [
+      ...others.flatMap((b) => [
+        h('button', { className: 'play', text: `${BASE_NAMES[b]} 주자 견제 아웃`, onClick: () => actions.runner('pickoffOut', b) }),
+        h('button', { className: 'play', text: `${BASE_NAMES[b]} 주자 주루 아웃`, onClick: () => actions.runner('runnerOut', b) }),
+      ]),
+      h('button', { className: 'secondary', text: '취소', onClick: () => actions.choose(null) }),
+    ]),
+  ]);
+}
+
+function childRunnerPad(state: ActiveState, chooser: Chooser, actions: InputActions, onEdit: () => void): HTMLElement {
+  if (chooser === 'otherRunner') return otherRunnerChooser(state, actions);
   const base = state.childBase;
+  const hasOthers = occupiedBases(state.bases).some((b) => b !== base);
   const canSteal = base !== null && (base === 2 || !state.bases[base + 1]);
   const enabled: Record<ChildRunnerAction, boolean> = {
     stolenBase: canSteal,
@@ -353,6 +379,7 @@ function childRunnerPad(state: ActiveState, actions: InputActions, onEdit: () =>
       ...CHILD_RUNNER_BUTTONS.map((b) =>
         h('button', { className: 'play', text: b.label, disabled: !enabled[b.action], onClick: () => actions.childRunner(b.action) }),
       ),
+      h('button', { className: 'play', text: OTHER_RUNNER_OUT_LABEL, disabled: !hasOthers, onClick: () => actions.choose('otherRunner') }),
       h('button', { className: 'play edit', text: '상황 고치기', onClick: onEdit }),
     ]),
   ]);
@@ -448,6 +475,21 @@ function controls(model: InputModel, actions: InputActions): HTMLElement {
   const { replay, events, draft, chooser, sceneDraft, info } = model;
   const state = replay.state;
 
+  // "경기 끝"을 눌렀으면 끝난 화면을 보여준다. 새 장면을 시작하면 다시 이어서 기록한다.
+  if (!sceneDraft && !state && replay.gameEnded) {
+    return h('div', { className: 'controls' }, [
+      h('section', { className: 'game-over' }, [
+        h('p', { className: 'section-title', text: '이 경기 기록을 마쳤어요' }),
+        h('p', { className: 'help', text: '결과에서 스코어보드와 장면별 기록을 보고, 고칠 공이 있으면 눌러서 고칠 수 있어요.' }),
+        h('div', { className: 'confirm-buttons' }, [
+          h('button', { className: 'secondary', text: GAME_OVER_LABEL.resume, onClick: actions.openScene }),
+          h('button', { className: 'primary', text: GAME_OVER_LABEL.result, onClick: actions.openScoreboard }),
+        ]),
+      ]),
+      undoButton(events, actions),
+    ]);
+  }
+
   // 진행 중인 장면이 없으면 바로 다음 장면 설정을 보여준다.
   if (sceneDraft || !state) {
     const draftToShow = sceneDraft ?? defaultSceneDraft(replay, defaultRole(replay));
@@ -457,6 +499,7 @@ function controls(model: InputModel, actions: InputActions): HTMLElement {
       ...actions.scene,
       cancel: canClose ? actions.scene.cancel : null,
       exit: state ? actions.scene.exit : null,
+      endGame: replay.scenes.length > 0 ? actions.scene.endGame : null,
     };
     return h('div', { className: 'controls' }, [
       sceneSetupView(draftToShow, info.battingFirst, sceneActions, current),
@@ -481,7 +524,7 @@ function controls(model: InputModel, actions: InputActions): HTMLElement {
 
   if (state.role === 'runner') {
     return h('div', { className: 'controls' }, [
-      childRunnerPad(state, actions, openEditor),
+      childRunnerPad(state, chooser, actions, openEditor),
       detail,
       pitchPad(actions, chooser, '지금 타자의 공 (기록하면 아이가 자동으로 진루)', doublePlayBases(state)),
       undoButton(events, actions),
@@ -496,14 +539,22 @@ function controls(model: InputModel, actions: InputActions): HTMLElement {
   ]);
 }
 
+/** 투구 상세 창 존 그림의 타자: 상대 타자(투수·수비 장면)는 창에서 고르고, 우리 아이가 칠 때는 설정의 아이 타석을 쓴다. */
+function sheetBatter(model: InputModel): SheetBatter {
+  const state = model.replay.state;
+  if (state?.role === 'pitcher' || state?.role === 'fielder') return { hand: state.batterHand, editable: true };
+  return { hand: state?.role === 'batter' ? model.childBatterHand : null, editable: false };
+}
+
 export function inputView(model: InputModel, actions: InputActions): HTMLElement {
   return h('section', { className: 'input' }, [
     h('div', { className: 'board-sticky' }, [board(model, actions)]),
     controls(model, actions),
-    model.pitchSheet ? pitchSheetView(model.pitchSheet, model.hand, actions.sheet, model.replay.state?.batterHand ?? null) : null,
+    model.pitchSheet ? pitchSheetView(model.pitchSheet, model.hand, actions.sheet, sheetBatter(model)) : null,
     // 친 공은 야구장 그림 창에서 낙구 지점과 질을 고른 뒤 기록한다.
     model.fieldDraft ? fieldPanel(model.fieldDraft, actions.field) : null,
     model.playFielding ? playFieldingPopup(model.playFielding, actions.playFielding) : null,
     model.batterDraft ? batterPopup(model.batterDraft, actions.batter) : null,
+    model.tip ? tipPopup(model.tip, actions.closeTip) : null,
   ]);
 }

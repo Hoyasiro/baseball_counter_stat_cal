@@ -5,7 +5,7 @@
 import { batterAnalysisView } from './batter/analysis-view';
 import { AnalysisScope, AnalysisTab } from './common/analysis-ui';
 import { h, segmented } from './common/dom';
-import { BaseIndex, FieldingCredit, HitType, OutType, PitchResult, Role, TEAM_NAME_MAX_LENGTH, activeEvents, playEvents } from './common/events';
+import { BaseIndex, BatterHand, FieldingCredit, HitType, OutType, PitchResult, Role, TEAM_NAME_MAX_LENGTH, UndoableEvent, activeEvents, playEvents } from './common/events';
 import { outTypeOptions } from './common/bases';
 import { mergeGames, mergeSummary, parseBackup } from './common/backup-import';
 import { BACKUP_REMINDER_MIN_GAMES, backupBanner } from './common/backup-banner';
@@ -16,18 +16,20 @@ import { EMPTY_PITCH_DETAIL, FieldDraft, PitchDetail, PitchSheet, isBattedResult
 import {
   Hand,
   OrientationMode,
+  loadChildBatterHand,
   loadHand,
   loadOrientation,
-  loadShowScoreboard,
   loadTeamName,
+  saveChildBatterHand,
   saveHand,
   saveOrientation,
-  saveShowScoreboard,
   saveTeamName,
 } from './common/settings';
 import { applyOrientation } from './common/orientation';
 import { FIELDING_PLAYS, PlayFieldingDraft } from './common/fielding-view';
 import { BatterDraft } from './common/batter-info-view';
+import { TipKey, hasSeenTip, markTipSeen } from './common/tips';
+import { OUTS_PER_INNING } from './common/count';
 import { settingsView } from './common/settings-view';
 import {
   Game,
@@ -36,10 +38,13 @@ import {
   addAppearance,
   addBatter,
   addExit,
+  addGameEnd,
   addPitch,
   addPlay,
   addScore,
+  addTeamTotal,
   addVoid,
+  addEdit,
   createGame,
   defaultVenue,
   gameInfo,
@@ -60,7 +65,7 @@ import {
   RunnerAction,
   TAB_LABEL,
 } from './common/labels';
-import { lineScore, scoreEventIds } from './common/line-score';
+import { lineScore, scoreEventIds, totalEventIds } from './common/line-score';
 import { ScoreCellDraft, recordsView } from './common/records-view';
 import { ActiveState, GameReplay, replayGame } from './common/replay';
 import { SceneDraft, defaultRole, defaultSceneDraft } from './common/scene-setup-view';
@@ -101,6 +106,8 @@ interface State {
   sceneDraft: SceneDraft | null;
   /** 경기 결과에서 고치고 있는 스코어보드 칸 */
   cellDraft: ScoreCellDraft | null;
+  /** 경기 결과의 장면별 기록에서 고치고 있는 기록 */
+  editingEvent: UndoableEvent | null;
   form: GameForm | null;
   /** 도움말(사용 설명서)을 보고 있는지 */
   helpOpen: boolean;
@@ -118,18 +125,20 @@ interface State {
   playFielding: PlayFieldingDraft | null;
   /** 상대 타자 정보를 고르는 중 */
   batterDraft: BatterDraft | null;
+  /** 처음 한 번 보여주는 기록 요령. 닫으면 next로 하려던 기록을 이어서 한다. */
+  tip: { key: TipKey; next: () => void } | null;
   /** "경기" 탭에서 결과를 보고 있는 경기. 목록이면 null */
   resultGameId: string | null;
   /** 지울지 묻고 있는 경기 */
   deletingId: string | null;
   /** 분석 "선택한 경기"에서 보는 경기. 없으면 지금 기록 중인 경기 */
   analysisGameId: string | null;
-  /** 경기 결과에서 스코어보드를 보여줄지 (이 휴대폰에 기억) */
-  showScoreboard: boolean;
   /** 새 경기에 넣을 우리 팀 이름 (설정, 이 휴대폰에 기억) */
   teamName: string;
   /** 화면 방향 (설정, 이 휴대폰에 기억) */
   orientation: OrientationMode;
+  /** 우리 아이가 서는 타석 (설정, 이 휴대폰에 기억) */
+  childBatterHand: BatterHand | null;
   /** "분석" 탭에서 보고 있는 것 */
   analysisKind: AnalysisKind;
   /** 마지막으로 백업한 시각 (이 휴대폰에 기억) */
@@ -229,6 +238,7 @@ export function mountApp(root: HTMLElement): void {
     chooser: null,
     sceneDraft: null,
     cellDraft: null,
+    editingEvent: null,
     form: latest ? null : newGameForm(teamName),
     helpOpen: false,
     tutorialStep: hasSeenTutorial() ? null : 0,
@@ -245,12 +255,13 @@ export function mountApp(root: HTMLElement): void {
     },
     playFielding: null,
     batterDraft: null,
+    tip: null,
     resultGameId: null,
     deletingId: null,
     analysisGameId: null,
-    showScoreboard: loadShowScoreboard(),
     teamName,
     orientation: loadOrientation(),
+    childBatterHand: loadChildBatterHand(),
     analysisKind: 'pitcher',
     lastBackupAt: loadLastBackup(),
   };
@@ -279,11 +290,13 @@ export function mountApp(root: HTMLElement): void {
     state.chooser = null;
     state.sceneDraft = null;
     state.cellDraft = null;
+    state.editingEvent = null;
     state.deletingId = null;
     state.fieldDraft = null;
     state.pitchSheet = null;
     state.playFielding = null;
     state.batterDraft = null;
+    state.tip = null;
     render();
     window.scrollTo(0, 0);
   };
@@ -378,16 +391,39 @@ export function mountApp(root: HTMLElement): void {
     if (action === 'error') openErrorAdjust(ERROR_REASON);
   };
 
+  /** 공 결과 단추를 누른 뒤: 투구 상세를 켜 두었으면 그 공의 구종·존·구속을 고르는 창부터 연다. */
+  const recordPitchStart = (result: PitchResult, hitType?: HitType): void => {
+    state.chooser = null;
+    if (state.detailMode) {
+      state.pitchSheet = { result, hitType, ...EMPTY_PITCH_DETAIL };
+      render();
+      return;
+    }
+    afterPitchDetail(result, hitType, EMPTY_PITCH_DETAIL);
+  };
+
+  /** 그 상황에 처음이면 기록 요령을 먼저 보여주고, 닫으면 기록한다. */
+  const withTip = (result: PitchResult, record: () => void): void => {
+    const active = currentReplay()?.state;
+    const runners = active ? active.bases.some(Boolean) : false;
+    const key: TipKey | null =
+      runners && result === 'wildPitch' ? 'wildPitch' : runners && result === 'out' && active && active.outs < OUTS_PER_INNING - 1 ? 'fieldersChoice' : null;
+    if (key && !hasSeenTip(key)) {
+      state.tip = { key, next: record };
+      render();
+      return;
+    }
+    record();
+  };
+
   const inputActions = {
-    pitch: (result: PitchResult, hitType?: HitType) => {
-      state.chooser = null;
-      // 투구 상세를 켜 두었으면 그 공의 구종·존·구속을 고르는 창부터 연다.
-      if (state.detailMode) {
-        state.pitchSheet = { result, hitType, ...EMPTY_PITCH_DETAIL };
-        render();
-        return;
-      }
-      afterPitchDetail(result, hitType, EMPTY_PITCH_DETAIL);
+    pitch: (result: PitchResult, hitType?: HitType) => withTip(result, () => recordPitchStart(result, hitType)),
+    closeTip: () => {
+      const tip = state.tip;
+      if (!tip) return;
+      markTipSeen(tip.key);
+      state.tip = null;
+      tip.next();
     },
     doublePlay: (base: BaseIndex) => {
       state.chooser = null;
@@ -417,6 +453,12 @@ export function mountApp(root: HTMLElement): void {
       cancel: () => {
         state.pitchSheet = null;
         render();
+      },
+      // 창을 닫지 않고 타자 정보(학년은 그대로)를 저장한다. 공보다 먼저 기록되므로 이 타석에 붙는다.
+      batterHand: (sheet: PitchSheet, hand: BatterHand | null) => {
+        state.pitchSheet = sheet;
+        const grade = currentReplay()?.state?.batterGrade ?? null;
+        updateCurrent((g) => addBatter(g, hand, grade));
       },
     },
     field: {
@@ -561,6 +603,10 @@ export function mountApp(root: HTMLElement): void {
         state.sceneDraft = null;
         updateCurrent((g) => addExit(g));
       },
+      endGame: () => {
+        state.sceneDraft = null;
+        updateCurrent((g) => addGameEnd(g));
+      },
     },
   };
 
@@ -578,23 +624,44 @@ export function mountApp(root: HTMLElement): void {
       render();
       window.scrollTo(0, 0);
     },
-    toggleScoreboard: () => {
-      state.showScoreboard = !state.showScoreboard;
-      saveShowScoreboard(state.showScoreboard);
-      render();
-    },
     editCell: (draft: ScoreCellDraft | null) => {
       state.cellDraft = draft;
       render();
     },
     saveCell: (draft: ScoreCellDraft) => {
       state.cellDraft = null;
-      updateResultGame((g) => addScore(g, draft.team, draft.inning, draft.runs));
+      const { team, target, value } = draft;
+      updateResultGame((g) => (typeof target === 'number' ? addScore(g, team, target, value) : addTeamTotal(g, team, target, value)));
     },
     // 직접 넣은 점수를 지우지 않고 취소 기록을 덧붙여, 기록에서 센 점수로 돌아간다.
     resetCell: (draft: ScoreCellDraft) => {
       state.cellDraft = null;
-      updateResultGame((g) => scoreEventIds(activeEvents(g.events), draft.team, draft.inning).reduce(addVoid, g));
+      const { team, target } = draft;
+      updateResultGame((g) => {
+        const events = activeEvents(g.events);
+        const ids = typeof target === 'number' ? scoreEventIds(events, team, target) : totalEventIds(events, team, target);
+        return ids.reduce(addVoid, g);
+      });
+    },
+    editEvent: (event: UndoableEvent | null) => {
+      state.editingEvent = event;
+      render();
+    },
+    eventEdit: {
+      close: () => {
+        state.editingEvent = null;
+        render();
+      },
+      saveResult: (targetId: string, result: PitchResult, hitType?: HitType) => {
+        state.editingEvent = null;
+        state.notice = '고쳤어요. 뒤 기록의 카운트·주자·점수도 다시 계산했어요.';
+        updateResultGame((g) => addEdit(g, targetId, result, hitType));
+      },
+      remove: (targetId: string) => {
+        state.editingEvent = null;
+        state.notice = '지웠어요. 원래 기록은 이력으로 남아요.';
+        updateResultGame((g) => addVoid(g, targetId));
+      },
     },
     openChildRecord: () => {
       const game = resultGame();
@@ -737,6 +804,11 @@ export function mountApp(root: HTMLElement): void {
       saveHand(hand);
       render();
     },
+    childBatterHand: (hand: BatterHand | null) => {
+      state.childBatterHand = hand;
+      saveChildBatterHand(hand);
+      render();
+    },
     orientation: (mode: OrientationMode) => {
       state.orientation = mode;
       saveOrientation(mode);
@@ -809,7 +881,7 @@ export function mountApp(root: HTMLElement): void {
 
   const renderBody = (game: Game | undefined): HTMLElement => {
     if (state.helpOpen) return manualView(helpActions);
-    if (state.tab === 'settings') return settingsView(state.hand, state.orientation, state.teamName, state.games.length > 0, state.lastBackupAt, settingsActions);
+    if (state.tab === 'settings') return settingsView(state.hand, state.orientation, state.childBatterHand, state.teamName, state.games.length > 0, state.lastBackupAt, settingsActions);
     const shown = resultGame();
     if (state.tab === 'games' && shown && !state.form) {
       const shownReplay = replayOf(shown);
@@ -818,8 +890,8 @@ export function mountApp(root: HTMLElement): void {
           info: gameInfo(shown),
           replay: shownReplay,
           score: lineScore(shownReplay, activeEvents(shown.events)),
-          showScoreboard: state.showScoreboard,
           cellDraft: state.cellDraft,
+          editing: state.editingEvent,
         },
         resultActions,
       );
@@ -849,6 +921,8 @@ export function mountApp(root: HTMLElement): void {
             fieldDraft: state.fieldDraft,
             playFielding: state.playFielding,
             batterDraft: state.batterDraft,
+            tip: state.tip?.key ?? null,
+            childBatterHand: state.childBatterHand,
           },
           inputActions,
         );

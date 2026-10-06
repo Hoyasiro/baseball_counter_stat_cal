@@ -7,7 +7,7 @@ import { diamond } from './diamond';
 import { h } from './dom';
 import { BaseIndex, Bases, MAX_INNING, POSITIONS, Position, ROLES, Role, Team } from './events';
 import { halfForRole, halfInningLabel, nextInningFor } from './innings';
-import { POSITION_LABEL, ROLE_LABEL } from './labels';
+import { POSITION_LABEL, ROLE_LABEL, SCENE_END_BUTTON } from './labels';
 import { GameReplay } from './replay';
 
 export interface SceneDraft {
@@ -27,6 +27,8 @@ export interface SceneSetupActions {
   start: (draft: SceneDraft) => void;
   cancel: (() => void) | null;
   exit: (() => void) | null;
+  /** 경기 기록 마치기 (기록이 하나라도 있을 때) */
+  endGame: (() => void) | null;
 }
 
 const ROLE_HINT: Record<Role, string> = {
@@ -177,8 +179,11 @@ export function sceneSetupView(
       actions.cancel ? h('button', { className: 'secondary', text: '닫기', onClick: actions.cancel }) : null,
       h('button', { className: 'primary', text: '이 장면으로 시작', disabled: missingPosition, onClick: () => actions.start(draft) }),
     ]),
-    actions.exit
-      ? h('button', { className: 'secondary danger', text: '아이 교체됨 (지금 장면 기록 끝)', onClick: actions.exit })
+    actions.exit || actions.endGame
+      ? h('div', { className: 'confirm-buttons scene-end-buttons' }, [
+          actions.exit ? h('button', { className: 'secondary danger', text: SCENE_END_BUTTON.exit, onClick: actions.exit }) : null,
+          actions.endGame ? h('button', { className: 'secondary', text: SCENE_END_BUTTON.gameEnd, onClick: actions.endGame }) : null,
+        ])
       : null,
   ]);
 }

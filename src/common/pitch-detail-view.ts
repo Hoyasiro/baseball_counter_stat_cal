@@ -6,6 +6,7 @@ import {
   BATTED_BALL_TYPES,
   BattedBallStrength,
   BatterHand,
+  BATTER_HANDS,
   BaseIndex,
   BattedBallType,
   FieldingCredit,
@@ -23,6 +24,7 @@ import {
   BATTED_BALL_TYPE_HINT,
   BATTED_BALL_TYPE_LABEL,
   FIELD_BUTTON_LABEL,
+  BATTER_HAND_LABEL,
   OUT_TYPE_HINT,
   OUT_TYPE_LABEL,
   PITCH_DETAIL_LABEL,
@@ -79,6 +81,14 @@ export interface PitchSheetActions {
   save: (sheet: PitchSheet) => void;
   skip: (sheet: PitchSheet) => void;
   cancel: () => void;
+  /** 창 안에서 지금 상대 타자가 선 쪽을 고른다 (바로 저장) */
+  batterHand: (sheet: PitchSheet, hand: BatterHand | null) => void;
+}
+
+/** 존 그림에 표시할 지금 타자: 상대 타자면 창에서 고를 수 있고, 우리 아이는 설정 값을 쓴다. */
+export interface SheetBatter {
+  readonly hand: BatterHand | null;
+  readonly editable: boolean;
 }
 
 export interface FieldActions {
@@ -109,7 +119,7 @@ function sheetResultLabel(sheet: PitchSheet): string {
 }
 
 /** 결과 버튼을 누른 뒤 뜨는 투구 상세 창(팝업) */
-export function pitchSheetView(sheet: PitchSheet, hand: Hand, actions: PitchSheetActions, batterHand: BatterHand | null): HTMLElement {
+export function pitchSheetView(sheet: PitchSheet, hand: Hand, actions: PitchSheetActions, batter: SheetBatter): HTMLElement {
   // 다이얼 값은 다시 그리지 않고 담기만 하므로, 다른 값을 고르거나 기록할 때 최신 구속을 함께 넘긴다.
   let speed = sheet.speed;
   const changeSpeed = (value: number | null): void => {
@@ -143,13 +153,30 @@ export function pitchSheetView(sheet: PitchSheet, hand: Hand, actions: PitchShee
               picked: sheet.zone,
               onPick: (x, y) => set({ zone: { x, y } }),
               label: '스트라이크 존 (포수 쪽에서 본 모습). 공이 지나간 곳을 누르세요',
-              batters: { highlight: batterHand },
+              batters: { highlight: batter.hand },
             }),
           ]),
           h('p', { className: 'zone-caption' }, [
             zoneText,
             sheet.zone ? h('button', { className: 'link-button', text: '지우기', onClick: () => set({ zone: null }) }) : null,
           ]),
+          batter.editable
+            ? h(
+                'div',
+                { className: 'sheet-batter', attrs: { role: 'group', 'aria-label': '지금 타자가 서는 쪽' } },
+                [
+                  h('span', { text: '타자' }),
+                  ...BATTER_HANDS.map((bh) =>
+                    h('button', {
+                      className: batter.hand === bh ? 'active' : '',
+                      text: BATTER_HAND_LABEL[bh],
+                      attrs: { 'aria-pressed': batter.hand === bh ? 'true' : 'false' },
+                      onClick: () => actions.batterHand(latest(), batter.hand === bh ? null : bh),
+                    }),
+                  ),
+                ],
+              )
+            : null,
         ]),
         speedDial(sheet.speed, hand, changeSpeed),
       ]),

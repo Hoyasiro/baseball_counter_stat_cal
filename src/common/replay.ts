@@ -27,6 +27,7 @@ import {
   childBaseOf,
   forceAdvance,
   fromBases,
+  keepErrorMarks,
   removeRunner,
   stealAdvance,
   toBases,
@@ -104,6 +105,11 @@ export interface PlateAppearance {
   readonly runsOnResult: number;
   /** 타석이 끝난 뒤 다음 타자 전에 "상황 고치기"로 넣은 점수 (예: 안타 때 2루 주자도 홈인) */
   readonly runsAfterEnd: number;
+  /**
+   * 이 타석 동안 들어온 점수 중 비자책점. 간단한 규칙으로 센다:
+   * 실책으로 나간 주자의 득점, 실책 출루·실책 진루 때(바로 이어 고친 상황 포함) 들어온 점수.
+   */
+  readonly unearnedRuns: number;
   /** 이 타석 동안 나온 수비 실책 수 */
   readonly errors: number;
   /** 타자가 선 쪽 (고른 경우만) */
@@ -126,7 +132,7 @@ export interface RunnerEvent {
   readonly plateAppearance: number;
 }
 
-export type SceneEnd = 'exit' | 'next' | 'childDone' | 'halfOver';
+export type SceneEnd = 'exit' | 'next' | 'childDone' | 'halfOver' | 'gameEnd';
 
 export interface Scene {
   readonly id: string;
@@ -176,6 +182,8 @@ export interface GameReplay {
   /** 기록한 초·말별 점수·안타·실책. 키는 halfKey */
   readonly halves: ReadonlyMap<string, HalfTotals>;
   readonly battingFirst: Team;
+  /** "기록 종료"를 눌렀고 그 뒤에 새 장면이 없는지 */
+  readonly gameEnded: boolean;
 }
 
 export interface ReplaySettings {
@@ -238,6 +246,7 @@ interface OpenPlateAppearance {
   outsRecorded: number;
   runs: number;
   runsOnResult: number;
+  unearnedRuns: number;
   errors: number;
   batterHand: BatterHand | null;
   batterGrade: number | null;
@@ -260,6 +269,8 @@ interface OpenScene {
   childBatting: boolean;
   /** 이 장면에서 닫힌 마지막 타석 */
   lastClosed: MutablePlateAppearance | null;
+  /** 방금 실책(실책 출루·실책 진루)이 있었는지. 다음 공·주자 상황 전까지 고친 점수는 비자책점이다. */
+  errorPending: boolean;
 }
 
 type Totals = { runs: number; hits: number; errors: number };
@@ -309,6 +320,7 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
     outsRecorded: 0,
     runs: 0,
     runsOnResult: 0,
+    unearnedRuns: 0,
     errors: 0,
     batterHand: null,
     batterGrade: null,
@@ -343,6 +355,7 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
     runs: pa.runs,
     runsOnResult: pa.runsOnResult,
     runsAfterEnd: 0,
+    unearnedRuns: pa.unearnedRuns,
     errors: pa.errors,
     batterHand: pa.batterHand,
     batterGrade: pa.batterGrade,
@@ -364,13 +377,14 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
     runnerEvents.push({ kind, sceneId: s.record.id, inning: s.inning, half: s.half, base, plateAppearance: currentPaNumber(s) });
   };
 
-  /** 주자 이동 결과를 반영하고 점수를 센다. */
-  const applyAdvance = (s: OpenScene, advance: Advance, owner: { runs: number }): void => {
+  /** 주자 이동 결과를 반영하고 점수를 센다. allUnearned: 실책 플레이로 들어온 점수라 모두 비자책 */
+  const applyAdvance = (s: OpenScene, advance: Advance, owner: { runs: number; unearnedRuns: number }, allUnearned = false): void => {
     const childBefore = childBaseOf(s.runners);
     s.runners = advance.runners;
     if (advance.runs > 0) {
       totals(s).runs += advance.runs;
       owner.runs += advance.runs;
+      owner.unearnedRuns += allUnearned ? advance.runs : advance.unearnedRuns;
     }
     if (advance.childScored) childEvent(s, 'scored', childBefore);
   };
@@ -433,6 +447,7 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
       current: null,
       childBatting: event.role === 'batter',
       lastClosed: null,
+      errorPending: false,
     };
     s.current = openPa(s, count);
     scene = s;
@@ -441,6 +456,7 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
   const onPitch = (s: OpenScene, pa: OpenPlateAppearance, event: PitchEvent): void => {
     // 기록이 있는 초·말은 점수가 없어도 0점으로 스코어보드에 남긴다.
     totals(s);
+    s.errorPending = false;
     pa.timeline.push(event);
     pa.pitches.push(event);
     if (event.result === 'wildPitch') applyAdvance(s, advanceRunners(s.runners, 1), pa);
@@ -465,7 +481,8 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
         // 실책 출루는 1루타처럼 한 베이스씩 옮긴다. 더 간 경우는 사용자가 고친다.
         totals(s).errors += 1;
         pa.errors += 1;
-        applyAdvance(s, batterAdvance(s.runners, HIT_BASES.single, batterIsChild), pa);
+        applyAdvance(s, batterAdvance(s.runners, HIT_BASES.single, batterIsChild, true), pa, true);
+        s.errorPending = true;
         break;
       default:
         // 희생타·진루타는 주자가 먼저 움직이고 타자가 아웃된다.
@@ -492,6 +509,9 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
 
   const onPlay = (s: OpenScene, pa: OpenPlateAppearance, event: PlayEvent): void => {
     totals(s);
+    // 실책 진루 뒤에 이어진 주루 아웃까지는 같은 실책 플레이로 본다.
+    if (event.play === 'error') s.errorPending = true;
+    else if (event.play !== 'runnerOut') s.errorPending = false;
     pa.timeline.push(event);
     pa.plays.push(event);
     const legacySecond = event.play === 'stolenSecond' || event.play === 'caughtStealingSecond';
@@ -500,6 +520,12 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
     switch (event.play) {
       case 'pickoff':
         if (isChild) childEvent(s, 'pickoff', base);
+        break;
+      case 'runnerOut':
+        if (isChild) childEvent(s, 'out', base);
+        s.runners = removeRunner(s.runners, base).runners;
+        s.outs += 1;
+        pa.outsRecorded += 1;
         break;
       case 'pickoffOut':
       case 'caughtStealing':
@@ -553,9 +579,10 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
       totals(s).runs += runs;
       if (owner) owner.runs += runs;
       if (owner && owner === s.lastClosed) s.lastClosed.runsAfterEnd += runs;
+      if (owner && s.errorPending) owner.unearnedRuns += runs;
     }
     s.outs = event.outs;
-    s.runners = fromBases(bases, childBase);
+    s.runners = keepErrorMarks(s.runners, fromBases(bases, childBase));
     if (s.current && !started(s.current)) {
       s.current.inning = s.inning;
       s.current.outsBefore = s.outs;
@@ -572,9 +599,16 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
     s.current.batterGrade = event.grade ?? null;
   };
 
+  let gameEnded = false;
   for (const event of events) {
     if (event.kind === 'appearance') {
+      gameEnded = false;
       startScene(event);
+      continue;
+    }
+    if (event.kind === 'gameEnd') {
+      if (scene) endScene(scene, 'gameEnd');
+      gameEnded = true;
       continue;
     }
     // scene은 위의 함수들 안에서 바뀌므로 타입을 직접 밝힌다.
@@ -607,6 +641,7 @@ export function replayGame(events: readonly PlayLogEvent[], settings: ReplaySett
     state: active ? activeState(active) : null,
     halves,
     battingFirst,
+    gameEnded,
   };
 }
 

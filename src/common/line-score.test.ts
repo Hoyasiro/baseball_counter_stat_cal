@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { lineScore, scoreEventIds } from './line-score';
+import { lineScore, scoreEventIds, totalEventIds } from './line-score';
 import { replayGame } from './replay';
-import { appear, hit, pitches, score, settings } from './test-helpers';
+import { appear, hit, pitches, score, settings, total } from './test-helpers';
 
 describe('스코어보드 (후공: 상대 공격은 초, 우리 공격은 말)', () => {
   // 3회초 아이가 투수: 홈런(1점), 실책 출루, 3아웃 / 3회말 아이가 타자: 2루타
@@ -47,5 +47,19 @@ describe('점수 없이 막은 이닝', () => {
     const r = replayGame([appear('pitcher', { inning: 2 }), ...pitches('out', 'out', 'out')], settings());
     expect(lineScore(r, []).runs.them[1]).toBe(0);
     expect(lineScore(r, []).runs.them[2]).toBeNull();
+  });
+});
+
+describe('스코어보드 합계 칸 직접 넣기', () => {
+  it('R·H·E에 넣은 값이 기록에서 센 값보다 우선하고, 넣은 칸 표시가 남는다', () => {
+    const r = replayGame([appear('pitcher'), hit('homeRun')], settings());
+    const events = [total('them', 'runs', 5), total('us', 'hits', 7), total('them', 'runs', 6)];
+    const ls = lineScore(r, events);
+    expect(ls.totalRuns.them).toBe(6);
+    expect(ls.hits.us).toBe(7);
+    expect(ls.hits.them).toBe(1);
+    expect(ls.manualTotals.them.runs).toBe(true);
+    expect(ls.manualTotals.us.runs).toBe(false);
+    expect(totalEventIds(events, 'them', 'runs')).toEqual([events[0].id, events[2].id]);
   });
 });

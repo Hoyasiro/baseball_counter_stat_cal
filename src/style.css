@@ -978,7 +978,7 @@ input:focus-visible {
 
 .play-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
 }
 
@@ -1916,7 +1916,8 @@ input:focus-visible {
 
 .pickable {
   cursor: crosshair;
-  touch-action: manipulation;
+  /* 끄는 동안 화면이 같이 움직이지 않게 */
+  touch-action: none;
 }
 
 .field-foul-ground {
@@ -2366,11 +2367,14 @@ input[type='file'].visually-hidden {
 
 /* ── 백업 알림 ── */
 .backup-banner {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin: 8px 16px 0;
-  padding: 12px;
+  padding: 6px 6px 6px 12px;
   border-radius: 12px;
+  font-size: 14px;
   border: 1px solid var(--strike);
   background: var(--warn-bg);
   color: var(--warn-text);
@@ -2384,9 +2388,21 @@ input[type='file'].visually-hidden {
   font-weight: 400;
 }
 
-.backup-banner .help {
-  color: var(--warn-text);
-  font-size: 13px;
+.backup-banner p {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.backup-now.compact {
+  display: block;
+  width: auto;
+  flex: none;
+  padding: 8px 12px;
+  font-size: 14px;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .backup-now {
@@ -2447,32 +2463,9 @@ input[type='file'].visually-hidden {
   font-size: 15px;
 }
 
-.scoreboard-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
 
-.scoreboard-head .inning-title {
-  margin: 0;
-}
 
-.view-toggle {
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 600;
-}
 
-.view-toggle.on {
-  background: var(--primary-soft);
-  border-color: var(--primary);
-  color: var(--primary);
-}
 
 .line-score.editable td:not(.total) {
   padding: 0;
@@ -2554,26 +2547,54 @@ input[type='file'].visually-hidden {
 }
 
 /* 존 그림 양옆 타석 · 홈플레이트 (포수 쪽에서 본 모습) */
-.batter-box {
-  fill: none;
-  stroke: var(--board-dot);
-  stroke-width: 0.6;
-  stroke-dasharray: 2 1.5;
-}
 
-.batter-box.on {
-  fill: rgba(79, 182, 242, 0.18);
-  stroke: var(--child);
-  stroke-dasharray: none;
-}
 
 .batter-label {
   fill: var(--board-dot);
-  font-size: 4.6px;
+  font-size: 4.2px;
   font-weight: 700;
-  writing-mode: vertical-rl;
   user-select: none;
   pointer-events: none;
+}
+
+/* 타격 자세 실루엣: 존 위에 찍은 점을 가리지 않게 흐리게 그리고, 누르기를 막지 않는다 */
+.batter-figure {
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.batter-figure.on {
+  opacity: 1;
+}
+
+.batter-body {
+  fill: var(--board-dot);
+}
+
+.batter-limb,
+.batter-bat {
+  fill: none;
+  stroke: var(--board-dot);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3.6;
+}
+
+.batter-limb.thick {
+  stroke-width: 6.5;
+}
+
+.batter-bat {
+  stroke-width: 2.2;
+}
+
+.batter-figure.on .batter-body {
+  fill: var(--child);
+}
+
+.batter-figure.on .batter-limb,
+.batter-figure.on .batter-bat {
+  stroke: var(--child);
 }
 
 .batter-label.on {
@@ -2983,5 +3004,231 @@ input[type='file'].visually-hidden {
   .tabbar button {
     padding: 6px 0;
     font-size: 12px;
+  }
+}
+
+/* 경기 끝 */
+.game-over {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 2px solid var(--primary);
+}
+
+.game-over p {
+  margin: 0;
+}
+
+.scene-end-buttons .secondary {
+  padding: 12px 6px;
+}
+
+.game-card-chips {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.type-chip.ended {
+  background: var(--bar);
+  color: var(--on-color);
+}
+
+.tip-popup p {
+  margin: 0;
+}
+
+/* 지난 기록 고치기 */
+.chip.editable {
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+.edit-results {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.edit-results button {
+  min-height: 44px;
+  padding: 4px 2px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.edit-results button.active {
+  background: var(--bar);
+  border-color: var(--bar);
+  color: var(--on-color);
+  opacity: 1;
+}
+
+.edit-popup p {
+  margin: 0;
+}
+
+.score-cell-value strong.fresh {
+  color: var(--muted);
+}
+
+.hand-picker.three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.hand-picker.three button {
+  font-size: 13px;
+  padding: 4px;
+}
+
+/* 투구 상세 창: 지금 타자가 서는 쪽 */
+.sheet-batter {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sheet-batter button {
+  min-height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sheet-batter button.active {
+  background: var(--child);
+  border-color: var(--child);
+  color: #0b2233;
+}
+
+/* ── 세로 화면이 짧을 때: 기록 입력이 스크롤 없이 한 화면에 들어가게 줄인다 (CLAUDE.md 0.4) ── */
+@media (orientation: portrait) and (max-height: 900px) {
+  .board .message.live {
+    display: none;
+  }
+
+  .board-sticky {
+    padding: 6px 16px;
+  }
+
+  .detail-toggle {
+    min-height: 32px;
+    padding: 4px 12px;
+    font-size: 14px;
+  }
+
+  .detail-toggle-hint {
+    display: none;
+  }
+
+  .controls {
+    gap: 8px;
+  }
+
+  .runner-section {
+    padding: 8px 10px;
+  }
+
+  .play small {
+    display: none;
+  }
+
+  .play,
+  .child-grid .play {
+    padding: 8px 2px;
+    font-size: 13px;
+  }
+
+  .undo {
+    padding: 9px;
+  }
+
+  /* 아이 주루 단추 9개 + 상황 고치기를 두 줄에 */
+  .child-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 5px;
+  }
+
+  .child-grid .play {
+    padding: 6px 1px;
+    font-size: 12px;
+    line-height: 1.25;
+  }
+
+  .pad-title {
+    font-size: 12px;
+  }
+}
+
+@media (orientation: portrait) and (max-height: 780px) {
+  :root {
+    --topbar-h: 44px;
+  }
+
+  .topbar h1 {
+    font-size: 16px;
+  }
+
+  .content {
+    padding-top: 10px;
+  }
+
+  .board {
+    padding: 8px 10px;
+    gap: 4px;
+  }
+
+  .board .inning strong {
+    font-size: 19px;
+  }
+
+  .board .count-row {
+    font-size: 13px;
+  }
+
+  .board .dot {
+    width: 14px;
+    height: 14px;
+  }
+
+  .board .diamond {
+    width: 70px;
+  }
+
+  .pill {
+    padding: 2px 9px;
+    font-size: 14px;
+  }
+
+  .pitch {
+    min-height: 50px;
+    gap: 2px;
+  }
+
+  .pitch strong {
+    font-size: 16px;
+  }
+
+  .pitch small {
+    font-size: 10px;
+  }
+
+  .pitch.extra {
+    min-height: 42px;
+  }
+
+  .tabbar button {
+    padding: 9px 0;
   }
 }

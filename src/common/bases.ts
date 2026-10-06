@@ -13,6 +13,8 @@ export interface Runner {
   readonly base: BaseIndex;
   /** 우리 아이인지 */
   readonly child: boolean;
+  /** 실책으로 나간 주자인지. 이 주자의 득점은 비자책점이다. */
+  readonly byError?: boolean;
 }
 
 export type Runners = readonly Runner[];
@@ -21,6 +23,8 @@ export interface Advance {
   readonly runners: Runners;
   /** 홈에 들어온 주자 수 */
   readonly runs: number;
+  /** 그중 실책으로 나간 주자의 득점 (비자책점) */
+  readonly unearnedRuns: number;
   readonly childScored: boolean;
 }
 
@@ -41,6 +45,7 @@ export function childBaseOf(runners: Runners): BaseIndex | null {
 function move(runners: Runners, shouldMove: (r: Runner) => boolean, count: number): Advance {
   const next: Runner[] = [];
   let runs = 0;
+  let unearnedRuns = 0;
   let childScored = false;
   for (const r of runners) {
     if (!shouldMove(r)) {
@@ -50,20 +55,27 @@ function move(runners: Runners, shouldMove: (r: Runner) => boolean, count: numbe
     const target = r.base + count;
     if (target >= HOME) {
       runs += 1;
+      if (r.byError) unearnedRuns += 1;
       childScored ||= r.child;
     } else {
-      next.push({ base: target as BaseIndex, child: r.child });
+      next.push({ ...r, base: target as BaseIndex });
     }
   }
   next.sort((a, b) => a.base - b.base);
-  return { runners: next, runs, childScored };
+  return { runners: next, runs, unearnedRuns, childScored };
 }
 
-function addBatter(advance: Advance, base: number, batterIsChild: boolean): Advance {
+function addBatter(advance: Advance, base: number, batterIsChild: boolean, byError = false): Advance {
   if (base >= HOME) {
-    return { runners: advance.runners, runs: advance.runs + 1, childScored: advance.childScored || batterIsChild };
+    return {
+      runners: advance.runners,
+      runs: advance.runs + 1,
+      unearnedRuns: advance.unearnedRuns + (byError ? 1 : 0),
+      childScored: advance.childScored || batterIsChild,
+    };
   }
-  const runners = [...advance.runners, { base: base as BaseIndex, child: batterIsChild }].sort((a, b) => a.base - b.base);
+  const batter: Runner = byError ? { base: base as BaseIndex, child: batterIsChild, byError } : { base: base as BaseIndex, child: batterIsChild };
+  const runners = [...advance.runners, batter].sort((a, b) => a.base - b.base);
   return { ...advance, runners };
 }
 
@@ -86,9 +98,14 @@ export function advanceRunners(runners: Runners, count: number): Advance {
   return move(runners, () => true, count);
 }
 
-/** 타자가 batterBases 베이스를 가고, 주자도 같은 수만큼 간다. (안타 종류, 실책 출루) */
-export function batterAdvance(runners: Runners, batterBases: number, batterIsChild = false): Advance {
-  return addBatter(advanceRunners(runners, batterBases), batterBases - 1, batterIsChild);
+/** 타자가 batterBases 베이스를 가고, 주자도 같은 수만큼 간다. (안타 종류, 실책 출루: byError) */
+export function batterAdvance(runners: Runners, batterBases: number, batterIsChild = false, byError = false): Advance {
+  return addBatter(advanceRunners(runners, batterBases), batterBases - 1, batterIsChild, byError);
+}
+
+/** 상황 고치기로 베이스를 다시 정할 때, 같은 베이스에 남은 주자의 "실책으로 나감" 표시는 이어 준다. */
+export function keepErrorMarks(previous: Runners, next: Runners): Runners {
+  return next.map((r) => (previous.some((p) => p.base === r.base && p.byError) ? { ...r, byError: true } : r));
 }
 
 /**

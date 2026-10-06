@@ -5,7 +5,7 @@
 import { Calculation, safeDivide, tally, term } from '../common/calculation';
 import { Count, OUTS_PER_INNING, countLabel } from '../common/count';
 import { BATTER_HANDS, PITCH_TYPES, PitchResult, PitchType } from '../common/events';
-import { formatInningsFromOuts, formatPercent } from '../common/format';
+import { formatEra, formatInningsFromOuts, formatPercent } from '../common/format';
 import {
   END_COUNT_BASIS,
   GameForStats,
@@ -154,6 +154,36 @@ export function runsAllowed(games: readonly GameForStats[]): Calculation {
   return tally('실점', '던지는 동안 홈에 들어온 점수', repeatedSources(faced(games), (pa) => pa.runs));
 }
 
+/** 비자책점: 실책으로 나간 주자의 득점, 실책 출루·실책 진루 때(바로 이어 고친 상황 포함) 들어온 점수 */
+export function unearnedRuns(games: readonly GameForStats[]): Calculation {
+  return tally('비자책점', '실점 중 수비 실책 때문에 준 점수 (실책으로 나간 주자의 득점, 실책 플레이 때 들어온 점수)', repeatedSources(faced(games), (pa) => pa.unearnedRuns));
+}
+
+/** 자책점 = 실점 - 비자책점 (투수 책임인 점수) */
+export function earnedRuns(games: readonly GameForStats[]): Calculation {
+  return tally('자책점', '실점에서 비자책점을 뺀 점수 (투수 책임인 점수)', repeatedSources(faced(games), (pa) => pa.runs - pa.unearnedRuns));
+}
+
+/** 평균자책점(ERA)을 셀 때 한 경기로 보는 이닝 (공식 기록 규칙: 9이닝) */
+export const ERA_INNINGS = 9;
+
+/** 평균자책점 = 자책점 × 9 ÷ 던진 이닝 = 자책점 × 27 ÷ 잡은 아웃 (9이닝을 던졌다면 몇 점을 줬을지) */
+export function earnedRunAverage(games: readonly GameForStats[]): Calculation {
+  const pas = faced(games);
+  const earned = term('자책점', repeatedSources(pas, (pa) => pa.runs - pa.unearnedRuns));
+  const outs = term('잡은 아웃', repeatedSources(pas, (pa) => pa.outsRecorded));
+  const value = safeDivide(earned.value * ERA_INNINGS * OUTS_PER_INNING, outs.value);
+  return {
+    title: '평균자책점',
+    formula: `자책점 × ${ERA_INNINGS} ÷ 던진 이닝 (${ERA_INNINGS}이닝을 던졌다면 줬을 점수, 낮을수록 좋아요)`,
+    terms: [earned, outs],
+    expression: `${earned.value} × ${ERA_INNINGS} ÷ ${formatInningsFromOuts(outs.value)}이닝`,
+    value,
+    display: formatEra(value),
+    note: value === null ? '잡은 아웃이 없어 계산할 수 없음' : undefined,
+  };
+}
+
 export function wildPitches(games: readonly GameForStats[]): Calculation {
   return tally('와일드피치', '와일드피치로 기록한 공 수', pitchSources(faced(games), (r) => r === 'wildPitch'));
 }
@@ -299,6 +329,9 @@ export function summarize(games: readonly GameForStats[]): PitcherSummary {
           battingAverageAgainst(games),
           sluggingAgainst(games),
           runsAllowed(games),
+          earnedRuns(games),
+          unearnedRuns(games),
+          earnedRunAverage(games),
         ],
       },
       {

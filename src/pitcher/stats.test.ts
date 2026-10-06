@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { formatSources } from '../common/calculation';
 import { PlayLogEvent } from '../common/events';
 import { replayGame } from '../common/replay';
-import { appear, batter, hit, pitchWith, pitches, play, settings } from '../common/test-helpers';
+import { adjust, appear, batter, hit, pitchWith, pitches, play, settings } from '../common/test-helpers';
 import {
   GameForStats,
   averageSpeed,
   battedBallTypes,
   byBatterHand,
+  earnedRunAverage,
+  earnedRuns,
+  unearnedRuns,
   byPitchType,
   charts,
   topSpeed,
@@ -240,5 +243,51 @@ describe('좌타 · 우타별', () => {
     // 고르지 않은 네 번째 타자는 어느 쪽에도 들어가지 않는다.
     expect(games[0].replay.plateAppearances[3].batterHand).toBeNull();
     expect(games[0].replay.plateAppearances[0].batterGrade).toBe(5);
+  });
+});
+
+describe('자책점 · 비자책점 · 평균자책점', () => {
+  const asGames = (events: PlayLogEvent[]): GameForStats[] => [{ label: '10월 6일 ○○전', replay: replayGame(events, settings()) }];
+
+  it('1·2루 내야 뜬공 실책 → 2루 주자 득점, 1루 주자 홈에서 주루사: 실점 1 = 비자책 1, 아웃 1', () => {
+    const games = asGames([
+      appear('pitcher', { bases: [true, true, false] }),
+      // 실책 출루: 타자 1루, 1루 주자 2루, 2루 주자 3루 (자동)
+      ...pitches('reachedOnError'),
+      // 상황 고치기: 3루까지 간 주자 홈인(1점), 2루까지 간 주자는 홈에서 아웃 → 주자는 타자 한 명(1루), 1아웃
+      adjust(1, 1, [true, false, false], 1),
+    ]);
+    expect(runsAllowed(games).value).toBe(1);
+    expect(unearnedRuns(games).value).toBe(1);
+    expect(earnedRuns(games).value).toBe(0);
+    expect(inningsPitched(games).display).toBe('1/3');
+  });
+
+  it('주자 아웃 버튼으로 기록해도 같다 (실책 → 주자 아웃 → 상황 고치기 1점)', () => {
+    const games = asGames([
+      appear('pitcher', { bases: [true, true, false] }),
+      ...pitches('reachedOnError'),
+      play('runnerOut', 1),
+      adjust(1, 1, [true, false, false], 1),
+    ]);
+    expect(unearnedRuns(games).value).toBe(1);
+    expect(earnedRuns(games).value).toBe(0);
+  });
+
+  it('실책으로 나간 주자가 뒤 타자 홈런에 들어오면 그 1점만 비자책: 실점 2 = 자책 1 + 비자책 1', () => {
+    const games = asGames([appear('pitcher'), ...pitches('reachedOnError'), hit('homeRun')]);
+    expect(runsAllowed(games).value).toBe(2);
+    expect(unearnedRuns(games).value).toBe(1);
+    expect(earnedRuns(games).value).toBe(1);
+  });
+
+  it('평균자책점 = 자책점 × 9 ÷ 던진 이닝: 1이닝 자책 1 → 9.00, 아웃이 없으면 계산할 수 없음', () => {
+    const games = asGames([appear('pitcher'), hit('homeRun'), ...pitches('out', 'out', 'out')]);
+    const era = earnedRunAverage(games);
+    expect(era.display).toBe('9.00');
+    expect(era.expression).toBe('1 × 9 ÷ 1이닝');
+    const none = earnedRunAverage(asGames([appear('pitcher'), hit('homeRun')]));
+    expect(none.value).toBeNull();
+    expect(none.display).toBe('-');
   });
 });

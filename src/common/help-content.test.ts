@@ -37,6 +37,10 @@ import {
   ANALYSIS_SCOPE_LABEL,
   GAMES_VIEW_LABEL,
   ORIENTATION_LABEL,
+  SCENE_END_BUTTON,
+  GAME_OVER_LABEL,
+  OTHER_RUNNER_OUT_LABEL,
+  EDIT_EVENT_LABEL,
   CALENDAR_LABEL,
   ANALYSIS_KIND_LABEL,
 } from './labels';
@@ -70,6 +74,10 @@ describe('도움말이 화면과 맞는지', () => {
     expect(missing(Object.values(ANALYSIS_SCOPE_LABEL))).toEqual([]);
     expect(missing(Object.values(GAMES_VIEW_LABEL))).toEqual([]);
     expect(missing(Object.values(ORIENTATION_LABEL))).toEqual([]);
+    expect(missing(Object.values(SCENE_END_BUTTON))).toEqual([]);
+    expect(missing(Object.values(GAME_OVER_LABEL))).toEqual([]);
+    expect(missing([OTHER_RUNNER_OUT_LABEL])).toEqual([]);
+    expect(missing(Object.values(EDIT_EVENT_LABEL))).toEqual([]);
     expect(missing(Object.values(CALENDAR_LABEL))).toEqual([]);
     expect(missing(Object.values(ANALYSIS_KIND_LABEL))).toEqual([]);
   });

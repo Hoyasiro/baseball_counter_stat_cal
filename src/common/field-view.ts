@@ -23,15 +23,67 @@ function svgEl<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<strin
 const FIELD_TOP = HOME.y - FENCE_RADIUS - 12;
 const FIELD_VIEW_HEIGHT = FIELD_SIZE - FIELD_TOP;
 
-/** 그림을 누른 곳을 0~1 좌표로 바꾼다. top: 그림이 잘려 보이기 시작하는 높이 */
-function pickHandler(svg: SVGSVGElement, onPick: (x: number, y: number) => void, top = 0): void {
-  svg.addEventListener('click', (e) => {
+/** 그림에 보이는 범위 (그림 좌표). 저장하는 0~1 좌표는 언제나 0~FIELD_SIZE 범위를 기준으로 한다. */
+interface ViewArea {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+function clampUnit(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+/**
+ * 그림을 누르거나 끌면 고른 점이 손가락을 따라오고, 손을 떼면 그 자리로 정한다.
+ * 끄는 동안은 다시 그리지 않고 점만 옮긴다. (다시 그리면 손가락을 놓친다)
+ */
+function pickHandler(svg: SVGSVGElement, onPick: (x: number, y: number) => void, view: ViewArea): void {
+  const toUnit = (e: PointerEvent): { x: number; y: number } => {
     const rect = svg.getBoundingClientRect();
-    const x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    const shown = (e.clientY - rect.top) / rect.height;
-    const y = Math.min(1, Math.max(0, (top + shown * (FIELD_SIZE - top)) / FIELD_SIZE));
-    onPick(x, y);
+    const x = view.left + ((e.clientX - rect.left) / rect.width) * view.width;
+    const y = view.top + ((e.clientY - rect.top) / rect.height) * view.height;
+    return { x: clampUnit(x / FIELD_SIZE), y: clampUnit(y / FIELD_SIZE) };
+  };
+  let dragging = false;
+  const follow = (e: PointerEvent): void => {
+    const p = toUnit(e);
+    movePicked(svg, p.x, p.y);
+  };
+  svg.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    svg.setPointerCapture(e.pointerId);
+    follow(e);
   });
+  svg.addEventListener('pointermove', (e) => {
+    if (dragging) follow(e);
+  });
+  const finish = (e: PointerEvent): void => {
+    if (!dragging) return;
+    dragging = false;
+    const p = toUnit(e);
+    onPick(p.x, p.y);
+  };
+  svg.addEventListener('pointerup', finish);
+  svg.addEventListener('pointercancel', () => {
+    dragging = false;
+  });
+}
+
+/** 고른 점(고리 + 가운데 점)을 옮긴다. 아직 없으면 만든다. */
+function movePicked(svg: SVGSVGElement, x: number, y: number): void {
+  let ring = svg.querySelector<SVGCircleElement>('.picked-ring');
+  let dot = svg.querySelector<SVGCircleElement>('.picked-dot');
+  if (!ring || !dot) {
+    ring = svgEl('circle', { r: 4.5, class: 'picked-ring' });
+    dot = svgEl('circle', { r: 2, class: 'picked-dot' });
+    svg.append(ring, dot);
+  }
+  for (const el of [ring, dot]) {
+    el.setAttribute('cx', String(x * FIELD_SIZE));
+    el.setAttribute('cy', String(y * FIELD_SIZE));
+  }
 }
 
 function drawPoints(svg: SVGSVGElement, points: readonly DrawPoint[], radius: number): void {
@@ -41,11 +93,7 @@ function drawPoints(svg: SVGSVGElement, points: readonly DrawPoint[], radius: nu
 }
 
 function drawPicked(svg: SVGSVGElement, picked: { x: number; y: number } | null): void {
-  if (!picked) return;
-  const cx = picked.x * FIELD_SIZE;
-  const cy = picked.y * FIELD_SIZE;
-  svg.append(svgEl('circle', { cx, cy, r: 4.5, class: 'picked-ring' }));
-  svg.append(svgEl('circle', { cx, cy, r: 2, class: 'picked-dot' }));
+  if (picked) movePicked(svg, picked.x, picked.y);
 }
 
 function pointOnCircle(angleDegrees: number, radius: number): { x: number; y: number } {
@@ -70,21 +118,44 @@ export interface FieldOptions {
 }
 
 /**
- * 포수 쪽에서 본 모습임을 알 수 있게 양옆 타석과 아래 홈플레이트를 그린다.
+ * 존 그림 둘레에 더 보여주는 여백 (그림 좌표). 존이 그림에서 차지하는 크기를 예전보다 10% 줄이고,
+ * 양옆에 타자 그림을 그릴 자리를 만든다. 저장 좌표(0~1)와 존 범위(ZONE_MIN~ZONE_MAX)는 그대로다.
+ */
+const ZONE_VIEW_MARGIN = 5.6;
+
+/** 타격 자세를 잡은 어린이 실루엣 (우타자 기준, 포수 쪽에서 본 모습: 홈플레이트 쪽을 보고 배트는 뒤로 든다) */
+function batterFigure(hand: BatterHand, on: boolean): SVGGElement {
+  // 우타자는 왼쪽(3루 쪽), 좌타자는 오른쪽(1루 쪽)에 좌우를 뒤집어 그린다.
+  const transform = hand === 'right' ? 'translate(-4 4)' : `translate(${FIELD_SIZE + 4} 4) scale(-1 1)`;
+  const g = svgEl('g', { transform, class: `batter-figure${on ? ' on' : ''}`, 'aria-hidden': 'true' });
+  // 배트: 손에서 뒤쪽 위로
+  g.append(svgEl('line', { x1: 6, y1: 22, x2: 1, y2: 2, class: 'batter-bat' }));
+  // 헬멧 쓴 머리
+  g.append(svgEl('circle', { cx: 11, cy: 13, r: 5.2, class: 'batter-body' }));
+  g.append(svgEl('path', { d: 'M15 12.5 L19 14 L15.5 15.2 Z', class: 'batter-body' }));
+  // 몸통 (살짝 앞으로 숙임)
+  g.append(svgEl('line', { x1: 11, y1: 20, x2: 9, y2: 46, class: 'batter-limb thick' }));
+  // 팔: 어깨에서 뒤쪽 손으로
+  g.append(svgEl('polyline', { points: '12,23 9,25 6,22', class: 'batter-limb' }));
+  // 다리: 앞다리는 홈플레이트 쪽으로 벌리고, 뒷다리는 굽힌다
+  g.append(svgEl('polyline', { points: '10,46 16,64 17,86', class: 'batter-limb' }));
+  g.append(svgEl('polyline', { points: '8,46 4,65 5,86', class: 'batter-limb' }));
+  return g;
+}
+
+/**
+ * 포수 쪽에서 본 모습임을 알 수 있게 양옆 타자 실루엣과 아래 홈플레이트를 그린다.
  * 포수 쪽에서 보면 우타자는 왼쪽(3루 쪽), 좌타자는 오른쪽(1루 쪽)에 선다.
  */
-function drawBatterBoxes(svg: SVGSVGElement, highlight: BatterHand | null): void {
-  const margin = ZONE_MIN * FIELD_SIZE;
-  const top = margin + 2;
-  const height = (ZONE_MAX - ZONE_MIN) * FIELD_SIZE - 4;
-  const sides: [BatterHand, number, string][] = [
-    ['right', 3, '우타자'],
-    ['left', FIELD_SIZE - margin + 3, '좌타자'],
+function drawBatters(svg: SVGSVGElement, highlight: BatterHand | null): void {
+  const labels: [BatterHand, number, string][] = [
+    ['right', 8, '우타자'],
+    ['left', FIELD_SIZE - 8, '좌타자'],
   ];
-  for (const [hand, x, text] of sides) {
+  for (const [hand, x, text] of labels) {
     const on = highlight === hand;
-    svg.append(svgEl('rect', { x, y: top, width: margin - 6, height, rx: 2, class: `batter-box${on ? ' on' : ''}` }));
-    const label = svgEl('text', { x: x + (margin - 6) / 2, y: top + height / 2, class: `batter-label${on ? ' on' : ''}`, 'text-anchor': 'middle', 'dominant-baseline': 'middle' });
+    svg.append(batterFigure(hand, on));
+    const label = svgEl('text', { x, y: FIELD_SIZE + 2.5, class: `batter-label${on ? ' on' : ''}`, 'text-anchor': 'middle' });
     label.textContent = text;
     svg.append(label);
   }
@@ -111,13 +182,20 @@ export function fieldSvg(options: FieldOptions): SVGSVGElement {
   svg.append(svgEl('circle', { cx: HOME.x, cy: HOME.y, r: 1.8, class: 'field-base' }));
   drawPoints(svg, options.points ?? [], 2.2);
   drawPicked(svg, options.picked ?? null);
-  if (options.onPick) pickHandler(svg, options.onPick, FIELD_TOP);
+  if (options.onPick) pickHandler(svg, options.onPick, { left: 0, top: FIELD_TOP, width: FIELD_SIZE, height: FIELD_VIEW_HEIGHT });
   return svg;
 }
 
 export function zoneSvg(options: FieldOptions): SVGSVGElement {
-  const svg = svgEl('svg', { viewBox: `0 0 ${FIELD_SIZE} ${FIELD_SIZE}`, class: `zone-svg${options.onPick ? ' pickable' : ''}`, role: 'img', 'aria-label': options.label });
-  svg.append(svgEl('rect', { x: 0, y: 0, width: FIELD_SIZE, height: FIELD_SIZE, class: 'zone-bg' }));
+  const m = ZONE_VIEW_MARGIN;
+  const view: ViewArea = { left: -m, top: -m, width: FIELD_SIZE + 2 * m, height: FIELD_SIZE + 2 * m };
+  const svg = svgEl('svg', {
+    viewBox: `${view.left} ${view.top} ${view.width} ${view.height}`,
+    class: `zone-svg${options.onPick ? ' pickable' : ''}`,
+    role: 'img',
+    'aria-label': options.label,
+  });
+  svg.append(svgEl('rect', { x: view.left, y: view.top, width: view.width, height: view.height, class: 'zone-bg' }));
   const min = ZONE_MIN * FIELD_SIZE;
   const size = (ZONE_MAX - ZONE_MIN) * FIELD_SIZE;
   svg.append(svgEl('rect', { x: min, y: min, width: size, height: size, class: 'zone-box' }));
@@ -126,10 +204,10 @@ export function zoneSvg(options: FieldOptions): SVGSVGElement {
     svg.append(svgEl('line', { x1: offset, y1: min, x2: offset, y2: min + size, class: 'zone-grid' }));
     svg.append(svgEl('line', { x1: min, y1: offset, x2: min + size, y2: offset, class: 'zone-grid' }));
   }
-  if (options.batters) drawBatterBoxes(svg, options.batters.highlight);
+  if (options.batters) drawBatters(svg, options.batters.highlight);
   drawPoints(svg, options.points ?? [], 3);
   drawPicked(svg, options.picked ?? null);
-  if (options.onPick) pickHandler(svg, options.onPick);
+  if (options.onPick) pickHandler(svg, options.onPick, view);
   return svg;
 }
 

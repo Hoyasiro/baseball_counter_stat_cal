@@ -17,6 +17,7 @@ import {
   PlayEvent,
   Position,
   Role,
+  TotalField,
   UndoableEvent,
 } from './events';
 import { halfInningLabel } from './innings';
@@ -44,6 +45,12 @@ export const GAME_CARD_LABEL = {
   delete: '삭제',
 } as const;
 
+/** 스코어보드 합계 칸 */
+export const TOTAL_FIELD_LABEL: Record<TotalField, string> = { runs: '점수(R)', hits: '안타(H)', errors: '실책(E)' };
+
+/** 지난 기록 고치기 창 */
+export const EDIT_EVENT_LABEL = { title: '기록 고치기', remove: '이 기록 지우기' } as const;
+
 /** 경기 결과 화면 */
 export const GAME_RESULT_LABEL = {
   back: '← 경기 목록',
@@ -52,7 +59,7 @@ export const GAME_RESULT_LABEL = {
 } as const;
 
 /** 스코어보드 칸 고치기 창 */
-export const SCORE_CELL_LABEL = { save: '이 점수로', reset: '기록대로 되돌리기' } as const;
+export const SCORE_CELL_LABEL = { save: '이 숫자로', reset: '기록대로 되돌리기', clear: '0으로 비우기' } as const;
 
 /** 경기 탭 보기 방식 */
 export const GAMES_VIEW_LABEL = { list: '목록', calendar: '달력' } as const;
@@ -222,7 +229,7 @@ export const HIT_TYPE_LABEL: Record<HitType, string> = {
   homeRun: '홈런',
 };
 
-const PITCH_LABEL: Record<PitchResult, string> = {
+export const PITCH_LABEL: Record<PitchResult, string> = {
   ball: '볼',
   strike: '스트라이크',
   foul: '파울',
@@ -242,7 +249,7 @@ export function pitchLabel(pitch: Pick<PitchEvent, 'result' | 'hitType' | 'doubl
 }
 
 /** 주자 상황 버튼. 주자가 여럿이면 누구인지 고르는 화면이 나온다. */
-export type RunnerAction = 'pickoff' | 'pickoffOut' | 'stolenBase' | 'caughtStealing' | 'error';
+export type RunnerAction = 'pickoff' | 'pickoffOut' | 'stolenBase' | 'caughtStealing' | 'error' | 'runnerOut';
 
 export const RUNNER_BUTTONS: readonly { action: RunnerAction; label: string; hint: string }[] = [
   { action: 'pickoff', label: '견제', hint: '주자 살아남' },
@@ -250,7 +257,17 @@ export const RUNNER_BUTTONS: readonly { action: RunnerAction; label: string; hin
   { action: 'error', label: '실책 진루', hint: '수비 실수로 주자 이동' },
   { action: 'stolenBase', label: '도루', hint: '다음 베이스 성공' },
   { action: 'caughtStealing', label: '도루 실패', hint: '뛰다가 잡힘' },
+  { action: 'runnerOut', label: '주자 아웃', hint: '더 가다 아웃 (홈 포함)' },
 ];
+
+/** 아이가 주자일 때 다른 주자 아웃을 고르는 단추 */
+export const OTHER_RUNNER_OUT_LABEL = '다른 주자 아웃';
+
+/** 경기 끝 화면 단추 */
+export const GAME_OVER_LABEL = { resume: '다시 이어서 기록', result: '경기 결과 보기' } as const;
+
+/** 장면 바꾸기 화면 아래 단추: 아이가 빠짐 / 경기 기록을 마침 */
+export const SCENE_END_BUTTON = { exit: '교체 아웃/기록 종료', gameEnd: '경기 끝 (기록 마치기)' } as const;
 
 /** 주자인 우리 아이에게 바로 기록하는 버튼 */
 export type ChildRunnerAction = 'stolenBase' | 'caughtStealing' | 'pickoff' | 'pickoffOut' | 'advance' | 'scored' | 'out';
@@ -270,6 +287,7 @@ export const CHOOSER_QUESTION: Record<Exclude<RunnerAction, 'error'>, string> = 
   pickoffOut: '어느 주자를 견제로 잡았나요?',
   stolenBase: '누가 도루했나요?',
   caughtStealing: '누가 도루하다 잡혔나요?',
+  runnerOut: '어느 주자가 아웃됐나요? (지금 있는 베이스)',
 };
 
 function playLabel(play: PlayEvent): string {
@@ -289,6 +307,8 @@ function playLabel(play: PlayEvent): string {
       return `도루 실패 (${STEAL_NAMES[0]})`;
     case 'error':
       return '실책 (주자 이동)';
+    case 'runnerOut':
+      return `주자 아웃 (${BASE_NAMES[base]} 주자)`;
   }
 }
 
@@ -336,9 +356,13 @@ export function eventLabel(event: UndoableEvent): string {
     case 'appearance':
       return `${ROLE_LABEL[event.role]}로 등장 (${event.inning}회)`;
     case 'exit':
-      return '교체됨';
+      return SCENE_END_BUTTON.exit;
+    case 'gameEnd':
+      return SCENE_END_BUTTON.gameEnd;
     case 'batter':
       return `타자 정보: ${batterInfoText(event.hand ?? null, event.grade ?? null) ?? '모름'}`;
+    case 'teamTotal':
+      return `합계 넣음: ${event.team === 'us' ? '우리 팀' : '상대팀'} ${TOTAL_FIELD_LABEL[event.field]} ${event.value}`;
     case 'score':
       return `점수 넣음: ${event.team === 'us' ? '우리 팀' : '상대팀'} ${event.inning}회 ${event.runs}점`;
   }

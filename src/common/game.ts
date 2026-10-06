@@ -16,6 +16,7 @@ import {
   Role,
   ChildPosition,
   Team,
+  TotalField,
   Venue,
   BatterHand,
   isLogEvent,
@@ -205,6 +206,10 @@ export function addExit(game: Game): Game {
   return append(game, { kind: 'exit', ...base() });
 }
 
+export function addGameEnd(game: Game): Game {
+  return append(game, { kind: 'gameEnd', ...base() });
+}
+
 export function addBatter(game: Game, hand: BatterHand | null, grade: number | null): Game {
   return append(game, {
     kind: 'batter',
@@ -216,6 +221,15 @@ export function addBatter(game: Game, hand: BatterHand | null, grade: number | n
 
 export function addScore(game: Game, team: Team, inning: number, runs: number): Game {
   return append(game, { kind: 'score', ...base(), team, inning, runs });
+}
+
+/** 지난 공의 결과를 고친다. 원래 공은 남기고 고침 기록을 덧붙인다. */
+export function addEdit(game: Game, targetId: string, result: PitchResult, hitType?: HitType): Game {
+  return append(game, { kind: 'edit', ...base(), targetId, result, ...(result === 'hit' ? { hitType: hitType ?? 'single' } : {}) });
+}
+
+export function addTeamTotal(game: Game, team: Team, field: TotalField, value: number): Game {
+  return append(game, { kind: 'teamTotal', ...base(), team, field, value });
 }
 
 export function addVoid(game: Game, targetId: string): Game {

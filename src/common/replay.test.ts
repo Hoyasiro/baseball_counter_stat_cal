@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { activeEvents, LogEvent, PlayLogEvent } from './events';
+import { activeEvents, EditEvent, LogEvent, PlayLogEvent, playEvents } from './events';
 import { replayGame } from './replay';
-import { adjust, appear, exit, hit, pitchWith, pitches, play, settings } from './test-helpers';
+import { adjust, appear, exit, gameEnd, hit, pitchWith, pitches, play, settings } from './test-helpers';
 
 /** 1회 선발 투수로 등장한 뒤의 기록 */
 const asPitcher = (...events: PlayLogEvent[]) => replayGame([appear('pitcher'), ...events], settings());
@@ -247,5 +247,69 @@ describe('병살 (타자 + 주자 한 명 아웃)', () => {
     const r = replayGame([appear('runner', { childBase: 0 }), pitchWith('out', { doublePlay: 0 })], settings());
     expect(r.runnerEvents.map((e) => e.kind)).toEqual(['out']);
     expect(r.scenes[0].endedBy).toBe('childDone');
+  });
+});
+
+describe('주자 아웃 · 경기 끝', () => {
+  it('아이 볼넷 뒤 앞 주자 견제 아웃: 아이는 1루에 그대로, 1아웃', () => {
+    const r = replayGame([appear('batter', { bases: [false, true, false] }), ...pitches('ball', 'ball', 'ball', 'ball'), play('pickoffOut', 1)], settings());
+    expect(r.state?.childBase).toBe(0);
+    expect(r.state?.outs).toBe(1);
+    expect(r.state?.bases).toEqual([true, false, false]);
+  });
+
+  it('아이가 안타 뒤 더 가다 주자 아웃: 아이 장면이 끝나고 주루 아웃으로 남는다', () => {
+    const r = replayGame([appear('batter'), hit('single'), play('runnerOut', 0)], settings());
+    expect(r.state).toBeNull();
+    expect(r.runnerEvents.map((e) => e.kind)).toEqual(['out']);
+    expect(r.scenes[0].endedBy).toBe('childDone');
+  });
+
+  it('경기 끝: 진행 중 장면을 마치고, 새 장면을 시작하면 다시 이어서 기록', () => {
+    const ended = replayGame([appear('pitcher'), ...pitches('out'), gameEnd()], settings());
+    expect(ended.gameEnded).toBe(true);
+    expect(ended.state).toBeNull();
+    expect(ended.scenes[0].endedBy).toBe('gameEnd');
+    const resumed = replayGame([appear('pitcher'), gameEnd(), appear('batter', { inning: 2 })], settings());
+    expect(resumed.gameEnded).toBe(false);
+    expect(resumed.state?.role).toBe('batter');
+  });
+});
+
+describe('지난 공 고치기', () => {
+  const edit = (targetId: string, result: EditEvent['result'], hitType?: EditEvent['hitType']): EditEvent => ({
+    kind: 'edit',
+    id: `edit-${targetId}-${result}`,
+    createdAt: '2026-10-06T00:00:00.000Z',
+    author: '테스트',
+    targetId,
+    result,
+    ...(hitType ? { hitType } : {}),
+  });
+
+  it('스트라이크를 볼로 고치면 카운트가 다시 계산되고, 원래 공은 이력으로 남는다', () => {
+    const [p1, p2] = pitches('strike', 'strike');
+    const events: LogEvent[] = [appear('pitcher'), p1, p2, edit(p1.id, 'ball')];
+    const r = replayGame(playEvents(activeEvents(events)), settings());
+    expect(r.state?.count).toEqual({ balls: 1, strikes: 1 });
+    expect(events).toHaveLength(4);
+  });
+
+  it('아웃을 2루타로 고치면 안타가 되고, 아웃에만 붙던 병살·아웃 종류는 빠진다', () => {
+    const out = pitchWith('out', { outType: 'productive' });
+    const events: LogEvent[] = [appear('pitcher', { bases: [true, false, false] }), out, edit(out.id, 'hit', 'double')];
+    const [pitch] = activeEvents(events).filter((e) => e.kind === 'pitch');
+    expect(pitch).toMatchObject({ result: 'hit', hitType: 'double' });
+    expect(pitch).not.toHaveProperty('outType');
+    const r = replayGame(playEvents(activeEvents(events)), settings());
+    expect(r.plateAppearances[0].outcome).toBe('hit');
+    expect(r.state?.outs).toBe(0);
+  });
+
+  it('같은 공을 여러 번 고치면 마지막 것을 쓴다', () => {
+    const [p1] = pitches('strike');
+    const events: LogEvent[] = [appear('pitcher'), p1, edit(p1.id, 'ball'), edit(p1.id, 'foul')];
+    const [pitch] = activeEvents(events).filter((e) => e.kind === 'pitch');
+    expect(pitch).toMatchObject({ result: 'foul' });
   });
 });
