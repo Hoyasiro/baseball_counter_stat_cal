@@ -17,6 +17,7 @@ import {
   PlayEvent,
   Position,
   Role,
+  TotalField,
   UndoableEvent,
 } from './events';
 import { halfInningLabel } from './innings';
@@ -44,6 +45,9 @@ export const GAME_CARD_LABEL = {
   delete: '삭제',
 } as const;
 
+/** 스코어보드 합계 칸 */
+export const TOTAL_FIELD_LABEL: Record<TotalField, string> = { runs: '점수(R)', hits: '안타(H)', errors: '실책(E)' };
+
 /** 지난 기록 고치기 창 */
 export const EDIT_EVENT_LABEL = { title: '기록 고치기', remove: '이 기록 지우기' } as const;
 
@@ -55,7 +59,7 @@ export const GAME_RESULT_LABEL = {
 } as const;
 
 /** 스코어보드 칸 고치기 창 */
-export const SCORE_CELL_LABEL = { save: '이 점수로', reset: '기록대로 되돌리기' } as const;
+export const SCORE_CELL_LABEL = { save: '이 숫자로', reset: '기록대로 되돌리기', clear: '0으로 비우기' } as const;
 
 /** 경기 탭 보기 방식 */
 export const GAMES_VIEW_LABEL = { list: '목록', calendar: '달력' } as const;
@@ -357,6 +361,8 @@ export function eventLabel(event: UndoableEvent): string {
       return SCENE_END_BUTTON.gameEnd;
     case 'batter':
       return `타자 정보: ${batterInfoText(event.hand ?? null, event.grade ?? null) ?? '모름'}`;
+    case 'teamTotal':
+      return `합계 넣음: ${event.team === 'us' ? '우리 팀' : '상대팀'} ${TOTAL_FIELD_LABEL[event.field]} ${event.value}`;
     case 'score':
       return `점수 넣음: ${event.team === 'us' ? '우리 팀' : '상대팀'} ${event.inning}회 ${event.runs}점`;
   }

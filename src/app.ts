@@ -18,11 +18,9 @@ import {
   OrientationMode,
   loadHand,
   loadOrientation,
-  loadShowScoreboard,
   loadTeamName,
   saveHand,
   saveOrientation,
-  saveShowScoreboard,
   saveTeamName,
 } from './common/settings';
 import { applyOrientation } from './common/orientation';
@@ -42,6 +40,7 @@ import {
   addPitch,
   addPlay,
   addScore,
+  addTeamTotal,
   addVoid,
   addEdit,
   createGame,
@@ -64,7 +63,7 @@ import {
   RunnerAction,
   TAB_LABEL,
 } from './common/labels';
-import { lineScore, scoreEventIds } from './common/line-score';
+import { lineScore, scoreEventIds, totalEventIds } from './common/line-score';
 import { ScoreCellDraft, recordsView } from './common/records-view';
 import { ActiveState, GameReplay, replayGame } from './common/replay';
 import { SceneDraft, defaultRole, defaultSceneDraft } from './common/scene-setup-view';
@@ -132,8 +131,6 @@ interface State {
   deletingId: string | null;
   /** 분석 "선택한 경기"에서 보는 경기. 없으면 지금 기록 중인 경기 */
   analysisGameId: string | null;
-  /** 경기 결과에서 스코어보드를 보여줄지 (이 휴대폰에 기억) */
-  showScoreboard: boolean;
   /** 새 경기에 넣을 우리 팀 이름 (설정, 이 휴대폰에 기억) */
   teamName: string;
   /** 화면 방향 (설정, 이 휴대폰에 기억) */
@@ -258,7 +255,6 @@ export function mountApp(root: HTMLElement): void {
     resultGameId: null,
     deletingId: null,
     analysisGameId: null,
-    showScoreboard: loadShowScoreboard(),
     teamName,
     orientation: loadOrientation(),
     analysisKind: 'pitcher',
@@ -617,23 +613,24 @@ export function mountApp(root: HTMLElement): void {
       render();
       window.scrollTo(0, 0);
     },
-    toggleScoreboard: () => {
-      state.showScoreboard = !state.showScoreboard;
-      saveShowScoreboard(state.showScoreboard);
-      render();
-    },
     editCell: (draft: ScoreCellDraft | null) => {
       state.cellDraft = draft;
       render();
     },
     saveCell: (draft: ScoreCellDraft) => {
       state.cellDraft = null;
-      updateResultGame((g) => addScore(g, draft.team, draft.inning, draft.runs));
+      const { team, target, value } = draft;
+      updateResultGame((g) => (typeof target === 'number' ? addScore(g, team, target, value) : addTeamTotal(g, team, target, value)));
     },
     // 직접 넣은 점수를 지우지 않고 취소 기록을 덧붙여, 기록에서 센 점수로 돌아간다.
     resetCell: (draft: ScoreCellDraft) => {
       state.cellDraft = null;
-      updateResultGame((g) => scoreEventIds(activeEvents(g.events), draft.team, draft.inning).reduce(addVoid, g));
+      const { team, target } = draft;
+      updateResultGame((g) => {
+        const events = activeEvents(g.events);
+        const ids = typeof target === 'number' ? scoreEventIds(events, team, target) : totalEventIds(events, team, target);
+        return ids.reduce(addVoid, g);
+      });
     },
     editEvent: (event: UndoableEvent | null) => {
       state.editingEvent = event;
@@ -877,7 +874,6 @@ export function mountApp(root: HTMLElement): void {
           info: gameInfo(shown),
           replay: shownReplay,
           score: lineScore(shownReplay, activeEvents(shown.events)),
-          showScoreboard: state.showScoreboard,
           cellDraft: state.cellDraft,
           editing: state.editingEvent,
         },

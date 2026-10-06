@@ -46,25 +46,6 @@ export function saveTeamName(name: string): void {
   }
 }
 
-const SCOREBOARD_KEY = 'baseball-counter.scoreboard';
-
-/** 경기 결과에서 스코어보드를 보여줄지. 아이 기록이 먼저라 꺼 둘 수 있다. 처음에는 켜져 있다. */
-export function loadShowScoreboard(): boolean {
-  try {
-    return localStorage.getItem(SCOREBOARD_KEY) !== '0';
-  } catch {
-    return true;
-  }
-}
-
-export function saveShowScoreboard(on: boolean): void {
-  try {
-    localStorage.setItem(SCOREBOARD_KEY, on ? '1' : '0');
-  } catch {
-    // 기억하지 못해도 이번에는 그대로 쓴다.
-  }
-}
-
 /** 화면 방향: 세로로 고정 / 돌려서 쓰기(가로 화면 · 분할 화면) */
 export type OrientationMode = 'portrait' | 'any';
 

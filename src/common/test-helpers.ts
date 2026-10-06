@@ -17,6 +17,8 @@ import {
   Position,
   Role,
   ScoreEvent,
+  TeamTotalEvent,
+  TotalField,
   Team,
 } from './events';
 import { ReplaySettings } from './replay';
@@ -102,4 +104,8 @@ export function batter(hand: BatterHand | null, grade: number | null): BatterEve
 
 export function gameEnd(): GameEndEvent {
   return { kind: 'gameEnd', ...base() };
+}
+
+export function total(team: Team, field: TotalField, value: number): TeamTotalEvent {
+  return { kind: 'teamTotal', ...base(), team, field, value };
 }

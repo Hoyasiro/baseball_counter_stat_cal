@@ -2447,32 +2447,9 @@ input[type='file'].visually-hidden {
   font-size: 15px;
 }
 
-.scoreboard-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
 
-.scoreboard-head .inning-title {
-  margin: 0;
-}
 
-.view-toggle {
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 600;
-}
 
-.view-toggle.on {
-  background: var(--primary-soft);
-  border-color: var(--primary);
-  color: var(--primary);
-}
 
 .line-score.editable td:not(.total) {
   padding: 0;
@@ -3051,4 +3028,8 @@ input[type='file'].visually-hidden {
 
 .edit-popup p {
   margin: 0;
+}
+
+.score-cell-value strong.fresh {
+  color: var(--muted);
 }

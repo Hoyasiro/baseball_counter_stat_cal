@@ -273,6 +273,18 @@ export interface ScoreEvent extends EventBase {
   readonly runs: number;
 }
 
+/** 스코어보드 합계 칸(R 점수 · H 안타 · E 실책)에 직접 넣은 값. 넣으면 기록에서 센 값보다 우선한다. */
+export type TotalField = 'runs' | 'hits' | 'errors';
+
+export const TOTAL_FIELDS: readonly TotalField[] = ['runs', 'hits', 'errors'];
+
+export interface TeamTotalEvent extends EventBase {
+  readonly kind: 'teamTotal';
+  readonly team: Team;
+  readonly field: TotalField;
+  readonly value: number;
+}
+
 export interface GameInfoEvent extends EventBase {
   readonly kind: 'gameInfo';
   /** YYYY-MM-DD */
@@ -314,6 +326,7 @@ export type LogEvent =
   | BatterEvent
   | GameEndEvent
   | ScoreEvent
+  | TeamTotalEvent
   | GameInfoEvent
   | VoidEvent
   | EditEvent;
@@ -322,7 +335,7 @@ export type LogEvent =
 export type PlayLogEvent = PitchEvent | PlayEvent | AdjustEvent | AppearanceEvent | ExitEvent | BatterEvent | GameEndEvent;
 
 /** 취소할 수 있는 이벤트 */
-export type UndoableEvent = PlayLogEvent | ScoreEvent;
+export type UndoableEvent = PlayLogEvent | ScoreEvent | TeamTotalEvent;
 
 /** 고친 공: 결과·안타 종류를 바꾸고, 바뀐 결과와 맞지 않는 정보(병살·아웃 종류·타구)는 뺀다. */
 function applyEdit(pitch: PitchEvent, edit: EditEvent): PitchEvent {
@@ -355,7 +368,7 @@ export function activeEvents(events: readonly LogEvent[]): UndoableEvent[] {
 }
 
 export function playEvents(events: readonly UndoableEvent[]): PlayLogEvent[] {
-  return events.filter((e): e is PlayLogEvent => e.kind !== 'score');
+  return events.filter((e): e is PlayLogEvent => e.kind !== 'score' && e.kind !== 'teamTotal');
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -455,6 +468,12 @@ export function isLogEvent(value: unknown): value is LogEvent {
         (value.team === 'us' || value.team === 'them') &&
         isCount(value.inning, 1, MAX_INNING) &&
         isCount(value.runs, 0, MAX_RUNS)
+      );
+    case 'teamTotal':
+      return (
+        (value.team === 'us' || value.team === 'them') &&
+        TOTAL_FIELDS.includes(value.field as TotalField) &&
+        isCount(value.value, 0, MAX_RUNS)
       );
     case 'gameInfo':
       return (
