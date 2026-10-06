@@ -210,7 +210,8 @@ function board(model: InputModel, actions: InputActions): HTMLElement {
       ]),
     ]),
     h('div', { className: 'board-stats' }, [workloadPill(replay, state), scorePill]),
-    h('p', { className: 'message', text: message(replay), attrs: { 'aria-live': 'polite' } }),
+    // 장면 중에는 아래 "↶ 취소" 단추가 방금 기록을 보여 주므로, 높이가 낮은 화면에서는 CSS로 숨긴다.
+    h('p', { className: 'message live', text: message(replay), attrs: { 'aria-live': 'polite' } }),
     boardMore(model),
   ]);
 }
