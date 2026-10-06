@@ -2560,40 +2560,25 @@ input[type='file'].visually-hidden {
 /* 타격 자세 실루엣: 존 위에 찍은 점을 가리지 않게 흐리게 그리고, 누르기를 막지 않는다 */
 .batter-figure {
   pointer-events: none;
-  opacity: 0.55;
 }
 
-.batter-figure.on {
-  opacity: 1;
-}
-
+/* 겹치는 곳이 진해지지 않게 불투명한 색을 쓴다 (상황판 바탕은 밝은·어두운 화면 모두 어둡다) */
 .batter-body {
-  fill: var(--board-dot);
+  fill: #5e6862;
 }
 
-.batter-limb,
-.batter-bat {
+.batter-limb {
   fill: none;
-  stroke: var(--board-dot);
+  stroke: #5e6862;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 3.6;
-}
-
-.batter-limb.thick {
-  stroke-width: 6.5;
-}
-
-.batter-bat {
-  stroke-width: 2.2;
 }
 
 .batter-figure.on .batter-body {
   fill: var(--child);
 }
 
-.batter-figure.on .batter-limb,
-.batter-figure.on .batter-bat {
+.batter-figure.on .batter-limb {
   stroke: var(--child);
 }
 
