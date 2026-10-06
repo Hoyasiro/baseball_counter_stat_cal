@@ -18,6 +18,10 @@ import {
   pickoffsReceived,
   pitchesSeen,
   plateAppearances,
+  productiveOuts,
+  runsBattedIn,
+  sacrificeBunts,
+  sacrificeFlies,
   runsScored,
   slugging,
   stolenBases,
@@ -140,5 +144,51 @@ describe('병살타', () => {
 
   it('병살타가 없으면 0', () => {
     expect(groundedIntoDoublePlays([asGame([appear('batter'), hit('single')])]).value).toBe(0);
+  });
+});
+
+describe('희생타 · 진루타 · 타점', () => {
+  // 1회: 3루 주자 있을 때 희생플라이 (3루 주자 홈인, 1타점)
+  // 2회: 1루 주자 있을 때 희생번트 (주자 2루로)
+  // 3회: 2루 주자 있을 때 진루타 (주자 3루로, 타수에 들어감)
+  // 4회: 1·2루에서 2루타 → 2루 주자 홈인(자동) + 1루 주자도 홈인(상황 고치기 1점) = 2타점
+  // 5회: 3루 주자 있을 때 실책 출루 (주자 홈인해도 타점 아님)
+  const sacGame = asGame([
+    appear('batter', { inning: 1, bases: [false, false, true] }),
+    pitchWith('out', { outType: 'sacrificeFly' }),
+    appear('batter', { inning: 2, bases: [true, false, false] }),
+    pitchWith('out', { outType: 'sacrificeBunt' }),
+    appear('batter', { inning: 3, bases: [false, true, false] }),
+    pitchWith('out', { outType: 'productive' }),
+    appear('batter', { inning: 4, bases: [true, true, false] }),
+    hit('double'),
+    adjust(4, 0, [false, true, false], 1, 1),
+    appear('batter', { inning: 5, bases: [false, false, true] }),
+    ...pitches('reachedOnError'),
+  ]);
+
+  it('희생번트·희생플라이는 타수에서 빠진다: 타율 = 안타 1 ÷ 타수 3 (진루타·2루타·실책 출루)', () => {
+    expect(sacrificeFlies([sacGame]).value).toBe(1);
+    expect(sacrificeBunts([sacGame]).value).toBe(1);
+    expect(productiveOuts([sacGame]).value).toBe(1);
+    expect(battingAverage([sacGame]).expression).toBe('1 ÷ 3');
+  });
+
+  it('출루율 분모에는 희생플라이만 들어간다: 1 ÷ (타수 3 + 희생플라이 1) = .250', () => {
+    const obp = onBasePercentage([sacGame]);
+    expect(obp.expression).toBe('1 ÷ 4');
+    expect(obp.display).toBe('.250');
+  });
+
+  it('타점 = 희생플라이 1 + 2루타 2 = 3 (실책 출루 때 들어온 점수는 빼고)', () => {
+    const rbi = runsBattedIn([sacGame]);
+    expect(rbi.value).toBe(3);
+  });
+
+  it('희생플라이는 3루 주자를 홈에 들이고, 희생번트는 주자를 한 베이스 보낸다', () => {
+    const [sf, sh] = sacGame.replay.plateAppearances;
+    expect(sf.runsOnResult).toBe(1);
+    expect(sh.runs).toBe(0);
+    expect(sacGame.replay.scenes.length).toBe(5);
   });
 });

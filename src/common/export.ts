@@ -9,6 +9,7 @@ import { GAME_TYPE_LABEL, Game, gameInfo, opponentLabel } from './game';
 import { halfInningLabel } from './innings';
 import {
   ACTOR_LABEL,
+  BATTER_HAND_LABEL,
   BATTED_BALL_STRENGTH_LABEL,
   BATTED_BALL_TYPE_LABEL,
   FIELDING_POSITION_LABEL,
@@ -36,6 +37,8 @@ const CSV_HEADER = [
   '이닝',
   '타석 번호',
   '타자',
+  '타자 서는 쪽',
+  '타자 학년',
   '타석 안 몇 번째 공',
   '던지기 전 카운트',
   '결과',
@@ -76,6 +79,8 @@ function pitchRow(game: Game, pa: GameReplay['plateAppearances'][number], pitch:
     halfInningLabel(pa.inning, pa.half),
     String(pa.number),
     ACTOR_LABEL[pa.actor],
+    pa.batterHand ? BATTER_HAND_LABEL[pa.batterHand] : '',
+    pa.batterGrade !== null ? String(pa.batterGrade) : '',
     String(index + 1),
     countKey(before),
     pitchLabel(pitch),

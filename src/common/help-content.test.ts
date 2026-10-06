@@ -12,6 +12,9 @@ import {
   DOUBLE_PLAY_BUTTON,
   DOWNLOAD_LABEL,
   FIELD_BUTTON_LABEL,
+  BATTER_HAND_LABEL,
+  BATTER_INFO_LABEL,
+  OUT_TYPE_LABEL,
   FIELDING_CREDIT_LABEL,
   FIELDING_POSITION_LABEL,
   PLAY_FIELDING_LABEL,
@@ -28,7 +31,13 @@ import {
   ROLE_LABEL,
   RUNNER_BUTTONS,
   TAB_LABEL,
-  GAMES_PANE_LABEL,
+  GAME_CARD_LABEL,
+  GAME_RESULT_LABEL,
+  SCORE_CELL_LABEL,
+  ANALYSIS_SCOPE_LABEL,
+  GAMES_VIEW_LABEL,
+  ORIENTATION_LABEL,
+  CALENDAR_LABEL,
   ANALYSIS_KIND_LABEL,
 } from './labels';
 
@@ -55,7 +64,13 @@ describe('도움말이 화면과 맞는지', () => {
     expect(missing(Object.values(POSITION_LABEL))).toEqual([]);
     expect(missing(Object.values(GAME_TYPE_LABEL))).toEqual([]);
     expect(missing(Object.values(TAB_LABEL))).toEqual([]);
-    expect(missing(Object.values(GAMES_PANE_LABEL))).toEqual([]);
+    expect(missing(Object.values(GAME_CARD_LABEL))).toEqual([]);
+    expect(missing(Object.values(GAME_RESULT_LABEL))).toEqual([]);
+    expect(missing(Object.values(SCORE_CELL_LABEL))).toEqual([]);
+    expect(missing(Object.values(ANALYSIS_SCOPE_LABEL))).toEqual([]);
+    expect(missing(Object.values(GAMES_VIEW_LABEL))).toEqual([]);
+    expect(missing(Object.values(ORIENTATION_LABEL))).toEqual([]);
+    expect(missing(Object.values(CALENDAR_LABEL))).toEqual([]);
     expect(missing(Object.values(ANALYSIS_KIND_LABEL))).toEqual([]);
   });
 
@@ -63,6 +78,9 @@ describe('도움말이 화면과 맞는지', () => {
     expect(missing(Object.values(BATTED_BALL_TYPE_LABEL))).toEqual([]);
     expect(missing(Object.values(BATTED_BALL_STRENGTH_LABEL))).toEqual([]);
     expect(missing(Object.values(FIELD_BUTTON_LABEL))).toEqual([]);
+    expect(missing(Object.values(OUT_TYPE_LABEL))).toEqual([]);
+    expect(missing(Object.values(BATTER_HAND_LABEL))).toEqual([]);
+    expect(missing(Object.values(BATTER_INFO_LABEL))).toEqual([]);
     expect(missing(Object.values(PITCH_TYPE_LABEL))).toEqual([]);
     expect(missing([PITCH_DETAIL_LABEL])).toEqual([]);
     expect(missing(Object.values(DOWNLOAD_LABEL))).toEqual([]);

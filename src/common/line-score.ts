@@ -6,8 +6,8 @@ import { ScoreEvent, Team, UndoableEvent } from './events';
 import { offensiveHalf, defensiveHalf } from './innings';
 import { GameReplay, halfKey } from './replay';
 
-/** 경기 이닝 수를 몰라도 이 정도는 칸을 보여준다. */
-const MIN_INNINGS_SHOWN = 7;
+/** 경기 이닝 수를 몰라도 이 정도는 칸을 보여준다. (정규 9회. 연장은 기록이 있으면 늘어난다) */
+export const MIN_INNINGS_SHOWN = 9;
 
 export interface LineScore {
   readonly innings: readonly number[];
@@ -33,6 +33,11 @@ export function manualScores(events: readonly UndoableEvent[]): Map<string, numb
     if (e.kind === 'score') scores.set(scoreKey(e.team, e.inning), e.runs);
   }
   return scores;
+}
+
+/** 그 칸에 직접 넣은 점수 이벤트들. "기록대로 되돌리기"는 이것들을 취소한다. */
+export function scoreEventIds(events: readonly UndoableEvent[], team: Team, inning: number): string[] {
+  return events.filter((e): e is ScoreEvent => e.kind === 'score' && e.team === team && e.inning === inning).map((e) => e.id);
 }
 
 export function lineScore(replay: GameReplay, events: readonly UndoableEvent[]): LineScore {

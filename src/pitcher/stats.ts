@@ -4,7 +4,7 @@
 
 import { Calculation, safeDivide, tally, term } from '../common/calculation';
 import { Count, OUTS_PER_INNING, countLabel } from '../common/count';
-import { PITCH_TYPES, PitchResult, PitchType } from '../common/events';
+import { BATTER_HANDS, PITCH_TYPES, PitchResult, PitchType } from '../common/events';
 import { formatInningsFromOuts, formatPercent } from '../common/format';
 import {
   END_COUNT_BASIS,
@@ -31,7 +31,7 @@ import {
   withOutcome,
   zonePoints,
 } from '../common/stat-base';
-import { PITCH_TYPE_LABEL } from '../common/labels';
+import { BATTER_HAND_LABEL, PITCH_TYPE_LABEL } from '../common/labels';
 
 export { END_COUNT_BASIS };
 export type { GameForStats };
@@ -39,7 +39,7 @@ export type { GameForStats };
 /** 스트라이크로 세는 공. 파울·번트 파울과 친 공(안타·실책 출루·아웃)도 스트라이크로 센다. 몸에 맞는 공은 볼로 센다. */
 const STRIKE_LIKE: ReadonlySet<PitchResult> = new Set(['strike', 'foul', 'buntFoul', 'hit', 'reachedOnError', 'out']);
 
-const AT_BATS_LABEL = '상대 타수 (끝난 타석에서 볼넷·몸에 맞는 공 제외)';
+const AT_BATS_LABEL = '상대 타수 (끝난 타석에서 볼넷·몸에 맞는 공·희생번트·희생플라이 제외)';
 
 function faced(games: readonly GameForStats[]): ScopedPlateAppearance[] {
   return platesOf(games, 'opponent').filter((s) => s.pa.fieldingPosition === 'pitcher');
@@ -130,6 +130,24 @@ export function battingAverageAgainst(games: readonly GameForStats[]): Calculati
 /** 피장타율 = 루타 ÷ 상대 타수 */
 export function sluggingAgainst(games: readonly GameForStats[]): Calculation {
   return sluggingOf(faced(games), { title: '피장타율', atBats: AT_BATS_LABEL });
+}
+
+/** 좌타·우타별: 그 쪽에 선 타자의 타석 수와 피안타율. 타자 정보를 고른 타석만 센다. */
+export function byBatterHand(games: readonly GameForStats[]): Calculation[] {
+  const pas = faced(games);
+  return BATTER_HANDS.flatMap((hand) => {
+    const name = `${BATTER_HAND_LABEL[hand]}자`;
+    const here = pas.filter((s) => s.pa.batterHand === hand);
+    return [
+      tally(`${name} 타석`, `${name}로 고른 상대 타자의 끝난 타석 수`, completed(here).map(ref)),
+      averageOf(here, { title: `${name} 피안타율`, hits: `${name}에게 맞은 안타`, atBats: `${name} 타수 (볼넷·몸에 맞는 공·희생타 제외)` }),
+    ];
+  });
+}
+
+/** 타자 정보(좌타·우타)를 고른 타석이 하나라도 있는지 */
+function hasBatterHands(games: readonly GameForStats[]): boolean {
+  return faced(games).some((s) => s.pa.batterHand !== null);
 }
 
 export function runsAllowed(games: readonly GameForStats[]): Calculation {
@@ -295,6 +313,7 @@ export function summarize(games: readonly GameForStats[]): PitcherSummary {
         ],
       },
       { title: '맞은 타구', items: battedBallTypes(games) },
+      ...(hasBatterHands(games) ? [{ title: '좌타 · 우타별', items: byBatterHand(games) }] : []),
     ],
     byCount: byEndCount(games),
     byInning: games.length === 1 ? pitchesByInning(games) : [],

@@ -4,6 +4,7 @@ import { Calculation, formatSources } from './calculation';
 import { Count, countLabel } from './count';
 import { h, segmented } from './dom';
 import { DrawPoint, LegendItem, chartCard, fieldSvg, zoneSvg } from './field-view';
+import { ANALYSIS_SCOPE_LABEL } from './labels';
 
 export type AnalysisTab = 'result' | 'process';
 export type AnalysisScope = 'game' | 'all';
@@ -11,6 +12,26 @@ export type AnalysisScope = 'game' | 'all';
 export interface AnalysisActions {
   scope: (s: AnalysisScope) => void;
   tab: (t: AnalysisTab) => void;
+  /** "선택한 경기"에서 볼 경기 고르기 */
+  pickGame: (id: string) => void;
+  /** 고를 수 있는 경기 [id, 이름] (최근 경기 먼저)와 지금 고른 경기 */
+  readonly gameOptions: readonly [string, string][];
+  readonly selectedGameId: string;
+}
+
+/** 볼 경기를 고르는 목록. 휴대폰 기본 고르기 창이 떠서 키보드가 올라오지 않는다. */
+function gamePicker(actions: AnalysisActions): HTMLElement {
+  const select = h(
+    'select',
+    { attrs: { id: 'analysis-game', 'aria-label': '볼 경기 고르기' } },
+    actions.gameOptions.map(([id, label]) => {
+      const option = h('option', { text: label, attrs: { value: id } });
+      option.selected = id === actions.selectedGameId;
+      return option;
+    }),
+  );
+  select.addEventListener('change', () => actions.pickGame(select.value));
+  return h('label', { className: 'game-picker', attrs: { for: 'analysis-game' } }, ['볼 경기', select]);
 }
 
 export interface Section {
@@ -24,17 +45,18 @@ export interface CountTableRow {
   readonly rate: Calculation;
 }
 
-export function analysisHeader(totalGames: number, scope: AnalysisScope, tab: AnalysisTab, actions: AnalysisActions): HTMLElement[] {
+export function analysisHeader(totalGames: number, scope: AnalysisScope, tab: AnalysisTab, actions: AnalysisActions): (HTMLElement | null)[] {
   return [
     segmented<AnalysisScope>(
       [
-        ['game', '이 경기'],
-        ['all', `전체 ${totalGames}경기`],
+        ['game', ANALYSIS_SCOPE_LABEL.game],
+        ['all', `${ANALYSIS_SCOPE_LABEL.all} ${totalGames}경기`],
       ],
       scope,
       actions.scope,
       'scope-tabs',
     ),
+    scope === 'game' ? gamePicker(actions) : null,
     segmented<AnalysisTab>(
       [
         ['result', '결과'],
@@ -109,7 +131,7 @@ const SPRAY_LEGEND: readonly LegendItem[] = [
 /** 존 분포·타구 분포 그림 두 장 */
 export function chartCards(zone: readonly DrawPoint[], spray: readonly DrawPoint[], zoneTitle: string, sprayTitle: string): HTMLElement {
   return h('div', { className: 'chart-grid' }, [
-    chartCard(zoneTitle, zoneSvg({ points: zone, label: `${zoneTitle} ${zone.length}개` }), ZONE_LEGEND, `존을 찍은 공 ${zone.length}개 · 가운데 네모가 스트라이크 존 (포수 쪽에서 본 모습)`),
+    chartCard(zoneTitle, zoneSvg({ points: zone, label: `${zoneTitle} ${zone.length}개`, batters: { highlight: null } }), ZONE_LEGEND, `존을 찍은 공 ${zone.length}개 · 가운데 네모가 스트라이크 존 (포수 쪽에서 본 모습)`),
     chartCard(sprayTitle, fieldSvg({ points: spray, label: `${sprayTitle} ${spray.length}개` }), SPRAY_LEGEND, `낙구 지점을 찍은 타구 ${spray.length}개`),
   ]);
 }

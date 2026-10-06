@@ -7,7 +7,7 @@ import { replayGame } from './replay';
 const replayOf = (g: Game) => replayGame(playEvents(activeEvents(g.events)), { battingFirst: gameInfo(g).battingFirst });
 
 function sampleGame(): Game {
-  let g = createGame({ date: '2026-10-05', opponent: '서울 "A", 초', gameType: 'practice', battingFirst: 'them' });
+  let g = createGame({ date: '2026-10-05', opponent: '서울 "A", 초', gameType: 'practice', battingFirst: 'them', venue: 'home', ourTeam: '' });
   g = addAppearance(g, { role: 'pitcher', inning: 1, outs: 0, bases: [false, false, false], balls: 0, strikes: 0 });
   g = addPitch(g, 'ball', { pitchType: 'fastball', speed: 98, zone: { x: 0.1, y: 0.5 } });
   g = addPitch(g, 'hit', { hitType: 'double', battedBall: { x: 0.8, y: 0.55, type: 'line', strength: 'hard' } });
@@ -29,7 +29,7 @@ describe('표 파일(CSV)', () => {
   });
 
   it('첫 공: 던지기 전 0-0, 볼, 직구 98km/h, 존 밖', () => {
-    expect(lines[1]).toContain(',1회초,1,상대 타자,1,0-0,볼,직구,98,0.1,0.5,밖,');
+    expect(lines[1]).toContain(',1회초,1,상대 타자,,,1,0-0,볼,직구,98,0.1,0.5,밖,');
   });
 
   it('둘째 공: 던지기 전 1-0, 2루타, 라인드라이브 세게, 오른쪽 외야', () => {
@@ -37,7 +37,7 @@ describe('표 파일(CSV)', () => {
   });
 
   it('수비 장면: 아이 수비 자리와 받은 수비 기록을 적는다', () => {
-    let g = createGame({ date: '2026-10-05', opponent: '가팀', gameType: 'practice', battingFirst: 'them' });
+    let g = createGame({ date: '2026-10-05', opponent: '가팀', gameType: 'practice', battingFirst: 'them', venue: 'home', ourTeam: '' });
     g = addAppearance(g, { role: 'fielder', position: 'shortstop', inning: 1, outs: 0, bases: [false, false, false], balls: 0, strikes: 0 });
     g = addPitch(g, 'out', { fielding: ['putout', 'assist'] });
     const row = pitchesCsv([g], replayOf).replace('\ufeff', '').trim().split('\r\n')[1];

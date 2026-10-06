@@ -1,6 +1,8 @@
 import {
   AdjustEvent,
   AppearanceEvent,
+  BatterEvent,
+  BatterHand,
   BaseIndex,
   Bases,
   ChildPosition,
@@ -91,4 +93,8 @@ export function exit(): ExitEvent {
 
 export function score(team: Team, inning: number, runs: number): ScoreEvent {
   return { kind: 'score', ...base(), team, inning, runs };
+}
+
+export function batter(hand: BatterHand | null, grade: number | null): BatterEvent {
+  return { kind: 'batter', ...base(), ...(hand === null ? {} : { hand }), ...(grade === null ? {} : { grade }) };
 }

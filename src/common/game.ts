@@ -5,6 +5,7 @@ import {
   FieldingCredit,
   PitchType,
   ZonePoint,
+  OutType,
   GameInfoEvent,
   GameType,
   HitType,
@@ -15,6 +16,8 @@ import {
   Role,
   ChildPosition,
   Team,
+  Venue,
+  BatterHand,
   isLogEvent,
 } from './events';
 
@@ -36,6 +39,27 @@ export interface GameInfo {
   readonly gameType: GameType;
   /** 우리 팀이 먼저 공격(초)인지 */
   readonly battingFirst: Team;
+  readonly venue: Venue;
+  /** 우리 팀 이름. 비어 있으면 "우리 팀"으로 보여준다. */
+  readonly ourTeam: string;
+}
+
+/** 선공/후공만 정했을 때의 홈/원정: 보통 후공이 홈팀이다. */
+export function defaultVenue(battingFirst: Team): Venue {
+  return battingFirst === 'us' ? 'away' : 'home';
+}
+
+export const VENUE_LABEL: Record<Venue, string> = { home: '홈', away: '원정' };
+
+/** 화면용 선후공·홈원정. 예: "후공 · 홈" */
+export function orderLabel(info: GameInfo): string {
+  return `${info.battingFirst === 'us' ? '선공' : '후공'} · ${VENUE_LABEL[info.venue]}`;
+}
+
+export const DEFAULT_TEAM_NAME = '우리 팀';
+
+export function ourTeamLabel(info: Pick<GameInfo, 'ourTeam'>): string {
+  return info.ourTeam.trim() === '' ? DEFAULT_TEAM_NAME : info.ourTeam.trim();
 }
 
 export const GAME_TYPE_LABEL: Record<GameType, string> = {
@@ -113,6 +137,7 @@ export interface PitchDetails {
   readonly battedBall?: BattedBall;
   readonly fielding?: readonly FieldingCredit[];
   readonly doublePlay?: BaseIndex;
+  readonly outType?: OutType;
 }
 
 export function addPitch(game: Game, result: PitchResult, details: PitchDetails = {}): Game {
@@ -180,6 +205,15 @@ export function addExit(game: Game): Game {
   return append(game, { kind: 'exit', ...base() });
 }
 
+export function addBatter(game: Game, hand: BatterHand | null, grade: number | null): Game {
+  return append(game, {
+    kind: 'batter',
+    ...base(),
+    ...(hand === null ? {} : { hand }),
+    ...(grade === null ? {} : { grade }),
+  });
+}
+
 export function addScore(game: Game, team: Team, inning: number, runs: number): Game {
   return append(game, { kind: 'score', ...base(), team, inning, runs });
 }
@@ -193,18 +227,23 @@ const UNKNOWN_INFO: GameInfo = {
   opponent: '',
   gameType: 'other',
   battingFirst: 'them',
+  venue: 'home',
+  ourTeam: '',
 };
 
-/** 가장 최근에 입력한 경기 정보. 예전 기록에 없는 값은 기본값(후공)으로 채운다. */
+/** 가장 최근에 입력한 경기 정보. 예전 기록에 없는 값은 기본값(후공, 후공이면 홈)으로 채운다. */
 export function gameInfo(game: Game): GameInfo {
   const infos = game.events.filter((e): e is GameInfoEvent => e.kind === 'gameInfo');
   const latest = infos[infos.length - 1];
   if (!latest) return UNKNOWN_INFO;
+  const battingFirst = latest.battingFirst ?? UNKNOWN_INFO.battingFirst;
   return {
     date: latest.date,
     opponent: latest.opponent,
     gameType: latest.gameType,
-    battingFirst: latest.battingFirst ?? UNKNOWN_INFO.battingFirst,
+    battingFirst,
+    venue: latest.venue ?? defaultVenue(battingFirst),
+    ourTeam: latest.ourTeam ?? '',
   };
 }
 

@@ -2,9 +2,8 @@
 // 확실히 정해지는 이동(밀어내기, 안타 종류만큼 진루, 와일드피치 한 베이스, 도루)만 자동으로 처리하고,
 // 그 밖의 경우(주자가 더 뛴 경우, 실책 등)는 사용자가 "상황 고치기"로 맞춘다.
 
-import { BaseIndex, Bases } from './events';
-
-export const EMPTY_BASES: Bases = [false, false, false];
+import { OUTS_PER_INNING } from './count';
+import { BaseIndex, Bases, OutType } from './events';
 
 /** 3루 다음은 홈 */
 const HOME = 3;
@@ -90,6 +89,22 @@ export function advanceRunners(runners: Runners, count: number): Advance {
 /** 타자가 batterBases 베이스를 가고, 주자도 같은 수만큼 간다. (안타 종류, 실책 출루) */
 export function batterAdvance(runners: Runners, batterBases: number, batterIsChild = false): Advance {
   return addBatter(advanceRunners(runners, batterBases), batterBases - 1, batterIsChild);
+}
+
+/**
+ * 희생타·진루타로 아웃될 때 주자 이동.
+ * - 희생플라이: 3루 주자가 홈인 (희생플라이의 정의). 다른 주자는 그대로
+ * - 희생번트·진루타: 모든 주자가 한 베이스씩. 다르게 움직였으면 사용자가 "상황 고치기"로 맞춘다.
+ */
+export function outTypeAdvance(runners: Runners, outType: OutType): Advance {
+  if (outType === 'sacrificeFly') return move(runners, (r) => r.base === 2, 1);
+  return advanceRunners(runners, 1);
+}
+
+/** 고를 수 있는 아웃 종류: 2아웃이면 없음(타자 아웃으로 이닝 끝), 희생플라이는 3루 주자가 있을 때만 */
+export function outTypeOptions(bases: Bases, outs: number): OutType[] {
+  if (outs >= OUTS_PER_INNING - 1 || !hasRunner(bases)) return [];
+  return bases[2] ? ['sacrificeBunt', 'sacrificeFly', 'productive'] : ['sacrificeBunt', 'productive'];
 }
 
 /** 도루 성공: 그 주자만 한 베이스 이동. 3루 주자면 홈 도루로 득점. */

@@ -30,27 +30,6 @@ export function isValidCount(balls: number, strikes: number): boolean {
   );
 }
 
-export function createCount(balls: number, strikes: number): Count {
-  if (!isValidCount(balls, strikes)) {
-    throw new Error(
-      `존재할 수 없는 카운트입니다: 볼 ${balls}, 스트라이크 ${strikes} ` +
-        `(볼 0~${MAX_BALLS_IN_COUNT}, 스트라이크 0~${MAX_STRIKES_IN_COUNT})`,
-    );
-  }
-  return { balls, strikes };
-}
-
-/** 가능한 12개 카운트를 0-0, 0-1, ... 3-2 순서로 돌려준다. */
-export function allCounts(): Count[] {
-  const counts: Count[] = [];
-  for (let balls = 0; balls <= MAX_BALLS_IN_COUNT; balls++) {
-    for (let strikes = 0; strikes <= MAX_STRIKES_IN_COUNT; strikes++) {
-      counts.push({ balls, strikes });
-    }
-  }
-  return counts;
-}
-
 /** 볼 수, 스트라이크 수 순으로 정렬 */
 export function compareCounts(a: Count, b: Count): number {
   return a.balls - b.balls || a.strikes - b.strikes;

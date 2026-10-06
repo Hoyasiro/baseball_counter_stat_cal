@@ -18,6 +18,8 @@ import {
   completed,
   endCountsOf,
   inCount,
+  outTypeOf,
+  repeatedSources,
   pitchSources,
   platesOf,
   ref,
@@ -29,7 +31,7 @@ import {
 
 export { END_COUNT_BASIS };
 
-const AT_BATS_LABEL = '타수 (끝난 타석에서 볼넷·몸에 맞는 공 제외)';
+const AT_BATS_LABEL = '타수 (끝난 타석에서 볼넷·몸에 맞는 공·희생번트·희생플라이 제외)';
 
 function batted(games: readonly GameForStats[]): ScopedPlateAppearance[] {
   return platesOf(games, 'child');
@@ -40,7 +42,7 @@ export function plateAppearances(games: readonly GameForStats[]): Calculation {
 }
 
 export function atBatCount(games: readonly GameForStats[]): Calculation {
-  return tally('타수', '끝난 타석에서 볼넷·몸에 맞는 공을 뺀 수', atBats(batted(games)));
+  return tally('타수', '끝난 타석에서 볼넷·몸에 맞는 공·희생번트·희생플라이를 뺀 수', atBats(batted(games)));
 }
 
 export function hits(games: readonly GameForStats[]): Calculation {
@@ -74,21 +76,59 @@ export function groundedIntoDoublePlays(games: readonly GameForStats[]): Calcula
   return tally('병살타', '병살로 끝난 타석 수 (아이 + 주자 한 명 아웃)', pas.map(ref));
 }
 
+function withOutType(games: readonly GameForStats[], type: 'sacrificeBunt' | 'sacrificeFly' | 'productive'): SourceRef[] {
+  return completed(batted(games)).filter((s) => outTypeOf(s.pa) === type).map(ref);
+}
+
+export function sacrificeBunts(games: readonly GameForStats[]): Calculation {
+  return tally('희생번트', '번트로 주자를 보내고 아웃된 타석 수 (타수에서 빠짐)', withOutType(games, 'sacrificeBunt'));
+}
+
+export function sacrificeFlies(games: readonly GameForStats[]): Calculation {
+  return tally('희생플라이', '뜬공이 잡혔지만 3루 주자가 홈인한 타석 수 (타수에서 빠짐)', withOutType(games, 'sacrificeFly'));
+}
+
+/** 진루타: 공식 기록은 아니다. 아웃됐지만 주자를 보낸 타석 (희생타 제외, 타수에는 들어간다) */
+export function productiveOuts(games: readonly GameForStats[]): Calculation {
+  return tally('진루타', '아웃됐지만 주자를 다음 베이스로 보낸 타석 수 (공식 기록 아님, 희생타 제외)', withOutType(games, 'productive'));
+}
+
+/**
+ * 타점: 아이의 타석으로 홈에 들어온 점수.
+ * 안타·볼넷·몸에 맞는 공·아웃(희생타 포함)으로 들어온 점수와, 그 타석이 끝난 직후 "상황 고치기"로 넣은 점수를 센다.
+ * 공식 기록 규칙처럼 실책 출루·병살·삼진 때 들어온 점수와, 타석 도중 폭투·도루로 들어온 점수는 세지 않는다.
+ */
+export function runsBattedIn(games: readonly GameForStats[]): Calculation {
+  const credited = completed(batted(games)).filter((s) => {
+    const { outcome } = s.pa;
+    if (outcome === 'hit' || outcome === 'walk' || outcome === 'hitByPitch') return true;
+    return outcome === 'out' && s.pa.pitches[s.pa.pitches.length - 1]?.doublePlay === undefined;
+  });
+  return tally(
+    '타점',
+    '아이 타석의 결과로 들어온 점수 (실책 출루·병살·삼진·폭투·도루로 들어온 점수 제외)',
+    repeatedSources(credited, (pa) => pa.runsOnResult + pa.runsAfterEnd),
+  );
+}
+
 /** 타율 = 안타 ÷ 타수 */
 export function battingAverage(games: readonly GameForStats[]): Calculation {
   return averageOf(batted(games), { title: '타율', hits: '안타', atBats: AT_BATS_LABEL });
 }
 
-/** 출루율 = (안타 + 볼넷 + 몸에 맞는 공) ÷ (타수 + 볼넷 + 몸에 맞는 공). 데모에는 희생플라이 구분이 없다. */
+/** 출루율 = (안타 + 볼넷 + 몸에 맞는 공) ÷ (타수 + 볼넷 + 몸에 맞는 공 + 희생플라이). 희생번트는 분모에서도 빠진다. */
 export function onBasePercentage(games: readonly GameForStats[]): Calculation {
   const pas = batted(games);
   const reached = term('출루 (안타 + 볼넷 + 몸에 맞는 공)', completed(pas).filter((s) => s.pa.outcome !== null && ON_BASE.has(s.pa.outcome)).map(ref));
-  // 희생타 구분이 없으므로 타수 + 볼넷 + 몸에 맞는 공 = 끝난 타석 전체
-  const chances = term('타수 + 볼넷 + 몸에 맞는 공 (= 끝난 타석)', completed(pas).map(ref));
+  // 타수 + 볼넷 + 몸에 맞는 공 + 희생플라이 = 끝난 타석에서 희생번트만 뺀 수
+  const chances = term(
+    '타수 + 볼넷 + 몸에 맞는 공 + 희생플라이 (= 끝난 타석 - 희생번트)',
+    completed(pas).filter((s) => outTypeOf(s.pa) !== 'sacrificeBunt').map(ref),
+  );
   const value = safeDivide(reached.value, chances.value);
   return {
     title: '출루율',
-    formula: '출루 ÷ (타수 + 볼넷 + 몸에 맞는 공)',
+    formula: '출루 ÷ (타수 + 볼넷 + 몸에 맞는 공 + 희생플라이)',
     terms: [reached, chances],
     expression: `${reached.value} ÷ ${chances.value}`,
     value,
@@ -232,6 +272,10 @@ export function summarize(games: readonly GameForStats[]): BatterSummary {
           hitByPitches(games),
           strikeouts(games),
           groundedIntoDoublePlays(games),
+          runsBattedIn(games),
+          sacrificeBunts(games),
+          sacrificeFlies(games),
+          productiveOuts(games),
           pitchesSeen(games),
         ],
       },

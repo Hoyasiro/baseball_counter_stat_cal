@@ -4,11 +4,13 @@ import { GameOrder } from './game-list';
 import { Hand } from './settings';
 import { BASE_NAMES, STEAL_NAMES, basesLabel } from './bases';
 import {
+  BatterHand,
   BattedBallStrength,
   BattedBallType,
   HitType,
   FieldingCredit,
   FieldingPosition,
+  OutType,
   PitchEvent,
   PitchResult,
   PitchType,
@@ -20,7 +22,6 @@ import {
 import { halfInningLabel } from './innings';
 import { Actor, PlateAppearance, PlateAppearanceOutcome, RunnerEventKind } from './replay';
 
-/** 아래 탭 이름 */
 /** 앱 이름. 화면 제목·도움말에 쓴다. (index.html 제목, manifest 이름도 같게 맞춘다) */
 export const APP_NAME = '야구맘기록지';
 
@@ -34,10 +35,36 @@ export const TAB_LABEL: Record<AppTab, string> = {
   settings: '설정',
 };
 
-/** "경기" 탭 안: 지금 경기의 기록(스코어보드·장면) / 경기 목록 */
-export type GamesPane = 'current' | 'list';
+/** "경기" 탭 경기 카드의 단추 */
+export const GAME_CARD_LABEL = {
+  result: '결과',
+  resume: '이어서 기록',
+  record: '이 경기 기록하기',
+  edit: '정보 고치기',
+  delete: '삭제',
+} as const;
 
-export const GAMES_PANE_LABEL: Record<GamesPane, string> = { current: '이 경기 기록', list: '경기 목록' };
+/** 경기 결과 화면 */
+export const GAME_RESULT_LABEL = {
+  back: '← 경기 목록',
+  scoreboard: '스코어보드',
+  childRecord: '내 아이 기록 보기',
+} as const;
+
+/** 스코어보드 칸 고치기 창 */
+export const SCORE_CELL_LABEL = { save: '이 점수로', reset: '기록대로 되돌리기' } as const;
+
+/** 경기 탭 보기 방식 */
+export const GAMES_VIEW_LABEL = { list: '목록', calendar: '달력' } as const;
+
+/** 달력 보기 단추 */
+export const CALENDAR_LABEL = { year: '연도 보기', month: '달 보기' } as const;
+
+/** 설정: 화면 방향 */
+export const ORIENTATION_LABEL = { portrait: '세로로 고정', any: '돌려서 쓰기' } as const;
+
+/** 분석 범위 */
+export const ANALYSIS_SCOPE_LABEL = { game: '선택한 경기', all: '전체' } as const;
 
 /** "분석" 탭 안: 투수 / 타자 / 수비 (계산은 src/pitcher, src/batter, src/fielder로 나뉜다) */
 export type AnalysisKind = 'pitcher' | 'batter' | 'fielder';
@@ -150,6 +177,19 @@ export const BATTED_BALL_STRENGTH_LABEL: Record<BattedBallStrength, string> = {
   hard: '세게',
 };
 
+/** 아웃의 종류 (타구 기록 창에서 고름) */
+export const OUT_TYPE_LABEL: Record<OutType, string> = {
+  sacrificeBunt: '희생번트',
+  sacrificeFly: '희생플라이',
+  productive: '진루타',
+};
+
+export const OUT_TYPE_HINT: Record<OutType, string> = {
+  sacrificeBunt: '번트로 주자 보냄',
+  sacrificeFly: '뜬공에 3루 주자 홈인',
+  productive: '아웃, 주자는 진루',
+};
+
 /** 타구 기록 화면 버튼 */
 export const FIELD_BUTTON_LABEL = { skip: '타구 기록 건너뛰기', save: '이 타구로 기록' } as const;
 
@@ -194,9 +234,10 @@ const PITCH_LABEL: Record<PitchResult, string> = {
   hitByPitch: '몸에 맞음',
 };
 
-export function pitchLabel(pitch: Pick<PitchEvent, 'result' | 'hitType' | 'doublePlay'>): string {
+export function pitchLabel(pitch: Pick<PitchEvent, 'result' | 'hitType' | 'doublePlay' | 'outType'>): string {
   if (pitch.result === 'hit') return HIT_TYPE_LABEL[pitch.hitType ?? 'single'];
   if (pitch.result === 'out' && pitch.doublePlay !== undefined) return `병살 (${BASE_NAMES[pitch.doublePlay]} 주자도 아웃)`;
+  if (pitch.result === 'out' && pitch.outType !== undefined) return OUT_TYPE_LABEL[pitch.outType];
   return PITCH_LABEL[pitch.result];
 }
 
@@ -264,6 +305,18 @@ function fieldingSuffix(fielding: readonly FieldingCredit[] | undefined): string
   return text ? ` · 아이: ${text}` : '';
 }
 
+/** 타자가 선 쪽. 포수 쪽에서 보면 우타자는 왼쪽, 좌타자는 오른쪽에 선다. */
+export const BATTER_HAND_LABEL: Record<BatterHand, string> = { right: '우타', left: '좌타' };
+
+/** 상대 타자 정보 창 단추 */
+export const BATTER_INFO_LABEL = { open: '타자 정보', unknown: '모름', save: '이 타자로' } as const;
+
+/** 예: "우타 · 5학년". 아무것도 모르면 null */
+export function batterInfoText(hand: BatterHand | null, grade: number | null): string | null {
+  const parts = [hand ? BATTER_HAND_LABEL[hand] : null, grade ? `${grade}학년` : null].filter((p): p is string => p !== null);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
 export function eventLabel(event: UndoableEvent): string {
   switch (event.kind) {
     case 'pitch':
@@ -284,6 +337,8 @@ export function eventLabel(event: UndoableEvent): string {
       return `${ROLE_LABEL[event.role]}로 등장 (${event.inning}회)`;
     case 'exit':
       return '교체됨';
+    case 'batter':
+      return `타자 정보: ${batterInfoText(event.hand ?? null, event.grade ?? null) ?? '모름'}`;
     case 'score':
       return `점수 넣음: ${event.team === 'us' ? '우리 팀' : '상대팀'} ${event.inning}회 ${event.runs}점`;
   }
@@ -307,6 +362,7 @@ export function outcomeLabel(pa: PlateAppearance): string {
   const lastPitch = pa.pitches[pa.pitches.length - 1];
   if (pa.outcome === 'strikeout' && lastPitch?.result === 'buntFoul') return '삼진 (쓰리번트 아웃)';
   if (pa.outcome === 'out' && lastPitch?.doublePlay !== undefined) return '병살';
+  if (pa.outcome === 'out' && lastPitch?.outType !== undefined) return OUT_TYPE_LABEL[lastPitch.outType];
   return OUTCOME_LABEL[pa.outcome];
 }
 

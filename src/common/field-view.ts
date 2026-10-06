@@ -2,7 +2,7 @@
 // 같은 그림을 입력과 분석에서 함께 쓴다.
 
 import { h } from './dom';
-import { ZONE_MAX, ZONE_MIN } from './events';
+import { BatterHand, ZONE_MAX, ZONE_MIN } from './events';
 import { BASE_DISTANCE, FENCE_RADIUS, FIELD_SIZE, HOME, INFIELD_RADIUS } from './field';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -65,6 +65,33 @@ export interface FieldOptions {
   readonly picked?: { x: number; y: number } | null;
   readonly onPick?: (x: number, y: number) => void;
   readonly label: string;
+  /** 존 그림 양옆에 타석(우타자·좌타자 자리)을 그린다. highlight는 지금 타자가 선 쪽 */
+  readonly batters?: { readonly highlight: BatterHand | null };
+}
+
+/**
+ * 포수 쪽에서 본 모습임을 알 수 있게 양옆 타석과 아래 홈플레이트를 그린다.
+ * 포수 쪽에서 보면 우타자는 왼쪽(3루 쪽), 좌타자는 오른쪽(1루 쪽)에 선다.
+ */
+function drawBatterBoxes(svg: SVGSVGElement, highlight: BatterHand | null): void {
+  const margin = ZONE_MIN * FIELD_SIZE;
+  const top = margin + 2;
+  const height = (ZONE_MAX - ZONE_MIN) * FIELD_SIZE - 4;
+  const sides: [BatterHand, number, string][] = [
+    ['right', 3, '우타자'],
+    ['left', FIELD_SIZE - margin + 3, '좌타자'],
+  ];
+  for (const [hand, x, text] of sides) {
+    const on = highlight === hand;
+    svg.append(svgEl('rect', { x, y: top, width: margin - 6, height, rx: 2, class: `batter-box${on ? ' on' : ''}` }));
+    const label = svgEl('text', { x: x + (margin - 6) / 2, y: top + height / 2, class: `batter-label${on ? ' on' : ''}`, 'text-anchor': 'middle', 'dominant-baseline': 'middle' });
+    label.textContent = text;
+    svg.append(label);
+  }
+  // 홈플레이트: 뾰족한 쪽이 포수(아래)를 향한다.
+  const c = FIELD_SIZE / 2;
+  const plateTop = ZONE_MAX * FIELD_SIZE + 6;
+  svg.append(svgEl('path', { d: `M${c - 7} ${plateTop} L${c + 7} ${plateTop} L${c + 7} ${plateTop + 4} L${c} ${plateTop + 9} L${c - 7} ${plateTop + 4} Z`, class: 'zone-plate' }));
 }
 
 export function fieldSvg(options: FieldOptions): SVGSVGElement {
@@ -99,6 +126,7 @@ export function zoneSvg(options: FieldOptions): SVGSVGElement {
     svg.append(svgEl('line', { x1: offset, y1: min, x2: offset, y2: min + size, class: 'zone-grid' }));
     svg.append(svgEl('line', { x1: min, y1: offset, x2: min + size, y2: offset, class: 'zone-grid' }));
   }
+  if (options.batters) drawBatterBoxes(svg, options.batters.highlight);
   drawPoints(svg, options.points ?? [], 3);
   drawPicked(svg, options.picked ?? null);
   if (options.onPick) pickHandler(svg, options.onPick);

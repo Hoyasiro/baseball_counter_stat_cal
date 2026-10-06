@@ -99,6 +99,15 @@ export interface BattedBall {
   readonly strength: BattedBallStrength | null;
 }
 
+/**
+ * 아웃의 종류. 타자는 아웃됐지만 주자를 보낸 경우를 구분한다. (result가 'out'이고 병살이 아닐 때만)
+ * - sacrificeBunt(희생번트) · sacrificeFly(희생플라이): 공식 기록 규칙상 타수에서 빠진다.
+ * - productive(진루타): 공식 기록이 아니어서 타수는 그대로, 개수만 센다.
+ */
+export type OutType = 'sacrificeBunt' | 'sacrificeFly' | 'productive';
+
+export const OUT_TYPES: readonly OutType[] = ['sacrificeBunt', 'sacrificeFly', 'productive'];
+
 /** 0: 1루, 1: 2루, 2: 3루 */
 export type BaseIndex = 0 | 1 | 2;
 
@@ -109,6 +118,12 @@ export type GameType = 'practice' | 'tournament' | 'league' | 'other';
 export const GAME_TYPES: readonly GameType[] = ['practice', 'tournament', 'league', 'other'];
 
 export type Team = 'us' | 'them';
+
+/** 우리 팀이 홈인지 원정인지. 아마추어는 동전 던지기로 선후공을 정하기도 해서 선공/후공과 따로 둔다. */
+export type Venue = 'home' | 'away';
+
+/** 우리 팀 이름 최대 글자 수 */
+export const TEAM_NAME_MAX_LENGTH = 30;
 
 /** 초(top) / 말(bottom) */
 export type Half = 'top' | 'bottom';
@@ -181,6 +196,8 @@ export interface PitchEvent extends EventBase {
   readonly fielding?: readonly FieldingCredit[];
   /** 병살: result가 'out'일 때 타자와 함께 아웃된 주자가 있던 베이스 */
   readonly doublePlay?: BaseIndex;
+  /** 희생번트·희생플라이·진루타: result가 'out'일 때 아웃의 종류 */
+  readonly outType?: OutType;
 }
 
 export interface PlayEvent extends EventBase {
@@ -219,6 +236,22 @@ export interface AppearanceEvent extends EventBase {
   readonly position?: Position;
 }
 
+/** 타자가 서는 쪽: 오른쪽 타석(우타) / 왼쪽 타석(좌타) */
+export type BatterHand = 'right' | 'left';
+
+export const BATTER_HANDS: readonly BatterHand[] = ['right', 'left'];
+
+/** 학년으로 고를 수 있는 범위 (초등 1~6, 중·고 1~3을 함께 쓴다) */
+export const GRADE_MIN = 1;
+export const GRADE_MAX = 6;
+
+/** 지금 타석에 선 타자 정보 (상대 타자). 고른 것만 남기고, 모르면 비운다. 다음 타자에게는 이어지지 않는다. */
+export interface BatterEvent extends EventBase {
+  readonly kind: 'batter';
+  readonly hand?: BatterHand;
+  readonly grade?: number;
+}
+
 /** 우리 아이가 교체되어 빠짐. 지금 장면의 기록을 끝낸다. */
 export interface ExitEvent extends EventBase {
   readonly kind: 'exit';
@@ -242,6 +275,10 @@ export interface GameInfoEvent extends EventBase {
   readonly startInning?: number;
   /** 우리 팀이 먼저 공격(초)인지. 없으면 후공으로 본다. */
   readonly battingFirst?: Team;
+  /** 홈 / 원정. 없으면 선공은 원정, 후공은 홈으로 본다. */
+  readonly venue?: Venue;
+  /** 우리 팀 이름. 없거나 비어 있으면 "우리 팀" */
+  readonly ourTeam?: string;
 }
 
 export interface VoidEvent extends EventBase {
@@ -255,12 +292,13 @@ export type LogEvent =
   | AdjustEvent
   | AppearanceEvent
   | ExitEvent
+  | BatterEvent
   | ScoreEvent
   | GameInfoEvent
   | VoidEvent;
 
 /** 경기 진행에 영향을 주는 이벤트 */
-export type PlayLogEvent = PitchEvent | PlayEvent | AdjustEvent | AppearanceEvent | ExitEvent;
+export type PlayLogEvent = PitchEvent | PlayEvent | AdjustEvent | AppearanceEvent | ExitEvent | BatterEvent;
 
 /** 취소할 수 있는 이벤트 */
 export type UndoableEvent = PlayLogEvent | ScoreEvent;
@@ -334,7 +372,9 @@ export function isLogEvent(value: unknown): value is LogEvent {
         (value.speed === undefined || isCount(value.speed, SPEED_MIN, SPEED_MAX)) &&
         (value.battedBall === undefined || isBattedBall(value.battedBall)) &&
         (value.fielding === undefined || isFieldingCredits(value.fielding)) &&
-        (value.doublePlay === undefined || (value.result === 'out' && isCount(value.doublePlay, 0, 2)))
+        (value.doublePlay === undefined || (value.result === 'out' && isCount(value.doublePlay, 0, 2))) &&
+        (value.outType === undefined ||
+          (value.result === 'out' && value.doublePlay === undefined && OUT_TYPES.includes(value.outType as OutType)))
       );
     case 'play':
       return (
@@ -363,6 +403,11 @@ export function isLogEvent(value: unknown): value is LogEvent {
       );
     case 'exit':
       return true;
+    case 'batter':
+      return (
+        (value.hand === undefined || BATTER_HANDS.includes(value.hand as BatterHand)) &&
+        (value.grade === undefined || isCount(value.grade, GRADE_MIN, GRADE_MAX))
+      );
     case 'score':
       return (
         (value.team === 'us' || value.team === 'them') &&
@@ -375,7 +420,9 @@ export function isLogEvent(value: unknown): value is LogEvent {
         typeof value.opponent === 'string' &&
         GAME_TYPES.includes(value.gameType as GameType) &&
         (value.startInning === undefined || isCount(value.startInning, 1, MAX_INNING)) &&
-        (value.battingFirst === undefined || value.battingFirst === 'us' || value.battingFirst === 'them')
+        (value.battingFirst === undefined || value.battingFirst === 'us' || value.battingFirst === 'them') &&
+        (value.venue === undefined || value.venue === 'home' || value.venue === 'away') &&
+        (value.ourTeam === undefined || (typeof value.ourTeam === 'string' && value.ourTeam.length <= TEAM_NAME_MAX_LENGTH))
       );
     case 'void':
       return typeof value.targetId === 'string';

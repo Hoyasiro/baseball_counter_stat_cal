@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lineScore } from './line-score';
+import { lineScore, scoreEventIds } from './line-score';
 import { replayGame } from './replay';
 import { appear, hit, pitches, score, settings } from './test-helpers';
 
@@ -29,10 +29,16 @@ describe('스코어보드 (후공: 상대 공격은 초, 우리 공격은 말)',
     expect(ls.totalRuns).toEqual({ us: 3, them: 2 });
   });
 
-  it('기록도 입력도 없는 이닝은 빈칸, 최소 7회까지', () => {
+  it('기록도 입력도 없는 이닝은 값 없음(화면에는 0), 정규 9회까지는 칸을 보여준다', () => {
     const ls = lineScore(replay, []);
     expect(ls.runs.us[1]).toBeNull();
-    expect(ls.innings).toHaveLength(7);
+    expect(ls.innings).toHaveLength(9);
+  });
+
+  it('"기록대로 되돌리기"는 그 칸에 직접 넣은 점수만 취소 대상으로 고른다', () => {
+    const events = [score('us', 2, 3), score('them', 2, 1), score('us', 2, 4)];
+    expect(scoreEventIds(events, 'us', 2)).toEqual([events[0].id, events[2].id]);
+    expect(scoreEventIds(events, 'us', 3)).toEqual([]);
   });
 });
 

@@ -1,9 +1,28 @@
 // 경기 목록과 경기 정보 입력 화면 (공통)
 
 import { h } from './dom';
-import { GAME_TYPES, GameType, Team } from './events';
-import { GAME_TYPE_LABEL, Game, GameInfo, OPPONENT_MAX_LENGTH, dateLabel, gameInfo, opponentLabel, recentOpponents, shiftDate, today } from './game';
-import { GAME_ORDER_LABEL, IMPORT_LABEL } from './labels';
+import { GAME_TYPES, GameType, TEAM_NAME_MAX_LENGTH, Team, Venue } from './events';
+import {
+  GAME_TYPE_LABEL,
+  Game,
+  GameInfo,
+  OPPONENT_MAX_LENGTH,
+  VENUE_LABEL,
+  dateLabel,
+  defaultVenue,
+  gameInfo,
+  gameShortLabel,
+  opponentLabel,
+  orderLabel,
+  ourTeamLabel,
+  recentOpponents,
+  shiftDate,
+  today,
+} from './game';
+import { GAME_CARD_LABEL, GAME_ORDER_LABEL, GAMES_VIEW_LABEL, IMPORT_LABEL } from './labels';
+import { popup } from './popup';
+import { CalendarState, calendarView } from './calendar-view';
+import { segmented } from './dom';
 import { GAME_ORDERS, GameOrder, GameTypeFilter, filterGames, sortGames } from './game-list';
 import { GameReplay } from './replay';
 
@@ -16,6 +35,10 @@ export interface GameForm {
 
 export interface GamesActions {
   select: (id: string) => void;
+  openResult: (id: string) => void;
+  /** 지울지 묻는 창을 연다 (null이면 닫기) */
+  askDelete: (id: string | null) => void;
+  confirmDelete: (id: string) => void;
   openNew: () => void;
   openEdit: (game: Game) => void;
   changeForm: (form: GameForm) => void;
@@ -26,26 +49,34 @@ export interface GamesActions {
   changeList: (list: GameListView) => void;
 }
 
-/** 경기 목록을 어떻게 보여줄지 (정렬·찾기) */
+/** 경기 목록을 어떻게 보여줄지 (목록·달력, 정렬·찾기) */
 export interface GameListView {
+  readonly mode: 'list' | 'calendar';
   readonly order: GameOrder;
   readonly type: GameTypeFilter;
   readonly query: string;
+  readonly calendar: CalendarState;
 }
 
 
-/** 버튼 여러 개 중 하나를 고르는 줄. 다시 그리지 않고 선택 표시만 바꾼다. */
-function picker<T extends string>(options: readonly [T, string][], selected: T, onSelect: (v: T) => void, className: string): HTMLElement {
+/** 버튼 여러 개 중 하나를 고르는 줄. 다시 그리지 않고 선택 표시만 바꾼다. show로 밖에서 고른 값을 표시할 수 있다. */
+function picker<T extends string>(
+  options: readonly [T, string][],
+  selected: T,
+  onSelect: (v: T) => void,
+  className: string,
+): { element: HTMLElement; show: (v: T) => void } {
   const buttons = options.map(([value, label]) =>
     h('button', { className: value === selected ? 'active' : '', text: label, attrs: { type: 'button', 'data-value': value } }),
   );
+  const show = (v: T): void => buttons.forEach((x) => x.classList.toggle('active', x.dataset.value === v));
   buttons.forEach((b) =>
     b.addEventListener('click', () => {
       onSelect(b.dataset.value as T);
-      buttons.forEach((x) => x.classList.toggle('active', x === b));
+      show(b.dataset.value as T);
     }),
   );
-  return h('div', { className }, buttons);
+  return { element: h('div', { className }, buttons), show };
 }
 
 function formView(form: GameForm, hasGames: boolean, opponents: readonly string[], actions: GamesActions): HTMLElement {
@@ -71,6 +102,41 @@ function formView(form: GameForm, hasGames: boolean, opponents: readonly string[
     },
   });
   opponentInput.addEventListener('input', () => update({ opponent: opponentInput.value }));
+
+  // 우리 팀 이름은 설정에서 정한 값이 미리 들어 있어 보통은 손대지 않는다.
+  const teamInput = h('input', {
+    attrs: {
+      id: 'game-our-team',
+      type: 'text',
+      value: form.info.ourTeam,
+      placeholder: '우리 팀 (설정에서 정하면 자동으로 들어가요)',
+      autocomplete: 'off',
+      enterkeyhint: 'done',
+      maxlength: String(TEAM_NAME_MAX_LENGTH),
+    },
+  });
+  teamInput.addEventListener('input', () => update({ ourTeam: teamInput.value }));
+
+  // 홈/원정은 선공/후공을 고르면 보통 짝(후공 = 홈)으로 맞춰 주고, 다르면 따로 바꾼다.
+  const venuePicker = picker<Venue>(
+    (['home', 'away'] as const).map((v) => [v, VENUE_LABEL[v]]),
+    form.info.venue,
+    (venue) => update({ venue }),
+    'type-picker',
+  );
+  const orderPicker = picker<Team>(
+    [
+      ['us', '선공 (초에 공격)'],
+      ['them', '후공 (말에 공격)'],
+    ],
+    form.info.battingFirst,
+    (battingFirst) => {
+      const venue = defaultVenue(battingFirst);
+      update({ battingFirst, venue });
+      venuePicker.show(venue);
+    },
+    'type-picker',
+  );
 
   // 키보드를 열지 않아도 되게: 날짜는 오늘·어제를, 상대팀은 예전에 입력한 이름을 눌러 고른다.
   const todayText = today();
@@ -107,20 +173,15 @@ function formView(form: GameForm, hasGames: boolean, opponents: readonly string[
     opponentChips,
     h('div', { className: 'field' }, [
       h('span', { text: '경기 구분' }),
-      picker<GameType>(GAME_TYPES.map((t) => [t, GAME_TYPE_LABEL[t]]), form.info.gameType, (t) => update({ gameType: t }), 'type-picker'),
+      picker<GameType>(GAME_TYPES.map((t) => [t, GAME_TYPE_LABEL[t]]), form.info.gameType, (t) => update({ gameType: t }), 'type-picker').element,
     ]),
+    h('div', { className: 'field' }, [h('span', { text: '우리 팀 공격 순서' }), orderPicker.element]),
     h('div', { className: 'field' }, [
-      h('span', { text: '우리 팀 공격 순서' }),
-      picker<Team>(
-        [
-          ['us', '선공 (초에 공격)'],
-          ['them', '후공 (말에 공격)'],
-        ],
-        form.info.battingFirst,
-        (t) => update({ battingFirst: t }),
-        'type-picker',
-      ),
+      h('span', { text: '홈 / 원정' }),
+      venuePicker.element,
+      h('p', { className: 'help', text: '후공을 고르면 홈, 선공을 고르면 원정이 골라져요. 다르면 바꿔 주세요.' }),
     ]),
+    h('label', { attrs: { for: 'game-our-team' } }, ['우리 팀', teamInput]),
     form.error ? h('p', { className: 'error', text: form.error, attrs: { role: 'alert' } }) : null,
     h('div', { className: 'confirm-buttons' }, [
       hasGames ? h('button', { className: 'secondary', text: '취소', onClick: actions.cancelForm }) : null,
@@ -153,7 +214,8 @@ function quickChips(options: readonly [string, string][], selected: string, onPi
   return h('div', { className: 'quick-chips' }, buttons);
 }
 
-function gameCard(game: Game, isCurrent: boolean, replay: GameReplay, actions: GamesActions): HTMLElement {
+function gameCard(game: Game, isCurrent: boolean, replay: GameReplay, summary: readonly string[], actions: GamesActions): HTMLElement {
+  const label = GAME_CARD_LABEL;
   const info = gameInfo(game);
   const pitched = replay.plateAppearances.filter((pa) => pa.fieldingPosition === 'pitcher');
   const pitches = pitched.reduce((n, pa) => n + pa.pitches.length, 0);
@@ -163,12 +225,28 @@ function gameCard(game: Game, isCurrent: boolean, replay: GameReplay, actions: G
       h('h3', { text: dateLabel(info.date) }),
       h('span', { className: `type-chip ${info.gameType}`, text: GAME_TYPE_LABEL[info.gameType] }),
     ]),
-    h('p', { className: 'opponent', text: `상대: ${opponentLabel(info.opponent)} · ${info.battingFirst === 'us' ? '선공' : '후공'}` }),
+    h('p', { className: 'opponent', text: `${ourTeamLabel(info)} vs ${opponentLabel(info.opponent)} · ${orderLabel(info)}` }),
+    summary.length > 0 ? h('p', { className: 'game-summary' }, summary.flatMap((line, i) => (i === 0 ? [line] : [h('br'), line]))) : null,
     h('p', { className: 'sub', text: `장면 ${replay.scenes.length} · 투구 ${pitches}개 · 타석 ${batted}` }),
     game.copiedFrom ? h('p', { className: 'sub', text: '백업에서 불러온 사본 (같은 경기가 다르게 기록되어 있어 따로 만듦)' }) : null,
+    h('div', { className: 'game-card-buttons' }, [
+      h('button', { className: 'primary', text: label.result, onClick: () => actions.openResult(game.id) }),
+      h('button', { className: 'secondary', text: isCurrent ? label.resume : label.record, onClick: () => actions.select(game.id) }),
+      h('button', { className: 'secondary', text: label.edit, onClick: () => actions.openEdit(game) }),
+      h('button', { className: 'secondary danger', text: label.delete, onClick: () => actions.askDelete(game.id) }),
+    ]),
+  ]);
+}
+
+/** 경기를 지우기 전에 한 번 더 묻는 창. 지우면 되돌릴 수 없다. (CLAUDE.md 2.8) */
+function deletePopup(game: Game, actions: GamesActions): HTMLElement {
+  const close = (): void => actions.askDelete(null);
+  return popup('delete-popup', '경기 지우기', close, [
+    h('p', { className: 'section-title', text: `${gameShortLabel(game)} 경기를 지울까요?` }),
+    h('p', { className: 'help', text: '지우면 이 휴대폰에서 되돌릴 수 없어요. 전에 받아 둔 백업 파일에 있으면 "불러오기"로 되살릴 수 있어요.' }),
     h('div', { className: 'confirm-buttons' }, [
-      h('button', { className: 'secondary', text: '정보 고치기', onClick: () => actions.openEdit(game) }),
-      h('button', { className: 'primary', text: isCurrent ? '기록 중 · 이어서' : '이 경기 기록하기', onClick: () => actions.select(game.id) }),
+      h('button', { className: 'secondary', text: '취소', onClick: close }),
+      h('button', { className: 'primary danger', text: '지우기', onClick: () => actions.confirmDelete(game.id) }),
     ]),
   ]);
 }
@@ -212,22 +290,47 @@ export function gamesView(
   currentGameId: string | null,
   form: GameForm | null,
   list: GameListView,
+  deletingId: string | null,
   actions: GamesActions,
   replayOf: (g: Game) => GameReplay,
+  summaryOf: (games: readonly Game[]) => string[],
 ): HTMLElement {
+  const deleting = games.find((g) => g.id === deletingId);
+  const card = (g: Game): HTMLElement => gameCard(g, g.id === currentGameId, replayOf(g), summaryOf([g]), actions);
+  const modeTabs =
+    games.length > 0
+      ? segmented<GameListView['mode']>(
+          [
+            ['list', GAMES_VIEW_LABEL.list],
+            ['calendar', GAMES_VIEW_LABEL.calendar],
+          ],
+          list.mode,
+          (mode) => actions.changeList({ ...list, mode }),
+          'kind-tabs',
+        )
+      : null;
   if (form) return formView(form, games.length > 0, recentOpponents(games), actions);
+  if (list.mode === 'calendar' && games.length > 0) {
+    return h('section', { className: 'games' }, [
+      h('button', { className: 'primary new-game', text: '+ 새 경기', onClick: actions.openNew }),
+      modeTabs,
+      calendarView(games, list.calendar, { change: (calendar) => actions.changeList({ ...list, calendar }) }, summaryOf, card),
+      deleting ? deletePopup(deleting, actions) : null,
+    ]);
+  }
   const cards = h('div', { className: 'game-list', attrs: { 'aria-live': 'polite' } });
   const showList = (query: string): void => {
     const shown = sortGames(filterGames(games, query, list.type), list.order);
     cards.replaceChildren(
       h('p', { className: 'help list-count', text: shown.length === games.length ? `경기 ${games.length}개` : `경기 ${games.length}개 중 ${shown.length}개` }),
-      ...shown.map((g) => gameCard(g, g.id === currentGameId, replayOf(g), actions)),
+      ...shown.map(card),
     );
     if (shown.length === 0 && games.length > 0) cards.append(h('p', { className: 'empty', text: '찾는 경기가 없어요. 찾는 말이나 경기 구분을 바꿔 보세요.' }));
   };
   showList(list.query);
   return h('section', { className: 'games' }, [
     h('button', { className: 'primary new-game', text: '+ 새 경기', onClick: actions.openNew }),
+    modeTabs,
     games.length > 0
       ? listControls(
           list,
@@ -239,5 +342,6 @@ export function gamesView(
         )
       : null,
     cards,
+    deleting ? deletePopup(deleting, actions) : null,
   ]);
 }

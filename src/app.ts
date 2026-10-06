@@ -1,31 +1,47 @@
-// 앱 화면: 기록 입력 / 경기(이 경기 기록·경기 목록) / 분석(투수·타자·수비) / 설정
+// 앱 화면: 기록 입력 / 경기(경기 목록 · 경기 결과) / 분석(투수·타자·수비) / 설정
 // 입력은 상황 기준 하나, 분석은 투수·타자로 나눈다. (CLAUDE.md 0.5)
 // 여기서는 상태를 들고 화면을 다시 그리는 일만 한다. 각 화면은 *-view.ts에 있다.
 
 import { batterAnalysisView } from './batter/analysis-view';
 import { AnalysisScope, AnalysisTab } from './common/analysis-ui';
 import { h, segmented } from './common/dom';
-import { BaseIndex, FieldingCredit, HitType, PitchResult, Role, activeEvents, playEvents } from './common/events';
+import { BaseIndex, FieldingCredit, HitType, OutType, PitchResult, Role, TEAM_NAME_MAX_LENGTH, activeEvents, playEvents } from './common/events';
+import { outTypeOptions } from './common/bases';
 import { mergeGames, mergeSummary, parseBackup } from './common/backup-import';
 import { BACKUP_REMINDER_MIN_GAMES, backupBanner } from './common/backup-banner';
 import { gamesChangedSince, loadLastBackup, saveLastBackup } from './common/backup-reminder';
 import { downloadFile, shareFile } from './common/download';
 import { backupJson, exportFileName, pitchesCsv } from './common/export';
 import { EMPTY_PITCH_DETAIL, FieldDraft, PitchDetail, PitchSheet, isBattedResult } from './common/pitch-detail-view';
-import { Hand, loadHand, saveHand } from './common/settings';
+import {
+  Hand,
+  OrientationMode,
+  loadHand,
+  loadOrientation,
+  loadShowScoreboard,
+  loadTeamName,
+  saveHand,
+  saveOrientation,
+  saveShowScoreboard,
+  saveTeamName,
+} from './common/settings';
+import { applyOrientation } from './common/orientation';
 import { FIELDING_PLAYS, PlayFieldingDraft } from './common/fielding-view';
+import { BatterDraft } from './common/batter-info-view';
 import { settingsView } from './common/settings-view';
 import {
   Game,
   GameInfo,
   addAdjust,
   addAppearance,
+  addBatter,
   addExit,
   addPitch,
   addPlay,
   addScore,
   addVoid,
   createGame,
+  defaultVenue,
   gameInfo,
   gameShortLabel,
   setGameInfo,
@@ -33,6 +49,7 @@ import {
   OPPONENT_MAX_LENGTH,
 } from './common/game';
 import { GameForm, GameListView, gamesView } from './common/games-view';
+import { sortGames } from './common/game-list';
 import { Chooser, SituationDraft, inputView } from './common/input-view';
 import {
   ANALYSIS_KIND_LABEL,
@@ -40,13 +57,11 @@ import {
   AnalysisKind,
   AppTab,
   ChildRunnerAction,
-  GAMES_PANE_LABEL,
-  GamesPane,
   RunnerAction,
   TAB_LABEL,
 } from './common/labels';
-import { lineScore } from './common/line-score';
-import { ScoreDraft, recordsView } from './common/records-view';
+import { lineScore, scoreEventIds } from './common/line-score';
+import { ScoreCellDraft, recordsView } from './common/records-view';
 import { ActiveState, GameReplay, replayGame } from './common/replay';
 import { SceneDraft, defaultRole, defaultSceneDraft } from './common/scene-setup-view';
 import { GameForStats } from './common/stat-base';
@@ -54,6 +69,10 @@ import { hasSeenTutorial, loadGames, markTutorialSeen, saveGames } from './commo
 import { manualView, tutorialView } from './common/help-view';
 import { pitcherAnalysisView } from './pitcher/analysis-view';
 import { fielderAnalysisView } from './fielder/analysis-view';
+import { batterLine } from './batter/summary';
+import { pitcherLine } from './pitcher/summary';
+import { fielderLine } from './fielder/summary';
+import { monthOf } from './common/calendar';
 
 const STORAGE_KEY = 'baseball-counter.games.v3';
 const LEGACY_STORAGE_KEYS = ['baseball-counter.pitcher.games.v2', 'baseball-counter.pitcher.games.v1'];
@@ -61,8 +80,6 @@ const LEGACY_STORAGE_KEYS = ['baseball-counter.pitcher.games.v2', 'baseball-coun
 type Tab = AppTab;
 
 const TABS: readonly Tab[] = ['input', 'games', 'analysis', 'settings'];
-
-const GAMES_PANES: readonly GamesPane[] = ['current', 'list'];
 
 const ANALYSIS_KINDS: readonly AnalysisKind[] = ['pitcher', 'batter', 'fielder'];
 
@@ -82,7 +99,8 @@ interface State {
   situationDraft: SituationDraft | null;
   chooser: Chooser;
   sceneDraft: SceneDraft | null;
-  scoreDraft: ScoreDraft | null;
+  /** 경기 결과에서 고치고 있는 스코어보드 칸 */
+  cellDraft: ScoreCellDraft | null;
   form: GameForm | null;
   /** 도움말(사용 설명서)을 보고 있는지 */
   helpOpen: boolean;
@@ -98,8 +116,20 @@ interface State {
   gameList: GameListView;
   /** 수비 중 주자 상황에서 아이의 수비 기록을 고르는 중 */
   playFielding: PlayFieldingDraft | null;
-  /** "경기" 탭에서 보고 있는 것 */
-  gamesPane: GamesPane;
+  /** 상대 타자 정보를 고르는 중 */
+  batterDraft: BatterDraft | null;
+  /** "경기" 탭에서 결과를 보고 있는 경기. 목록이면 null */
+  resultGameId: string | null;
+  /** 지울지 묻고 있는 경기 */
+  deletingId: string | null;
+  /** 분석 "선택한 경기"에서 보는 경기. 없으면 지금 기록 중인 경기 */
+  analysisGameId: string | null;
+  /** 경기 결과에서 스코어보드를 보여줄지 (이 휴대폰에 기억) */
+  showScoreboard: boolean;
+  /** 새 경기에 넣을 우리 팀 이름 (설정, 이 휴대폰에 기억) */
+  teamName: string;
+  /** 화면 방향 (설정, 이 휴대폰에 기억) */
+  orientation: OrientationMode;
   /** "분석" 탭에서 보고 있는 것 */
   analysisKind: AnalysisKind;
   /** 마지막으로 백업한 시각 (이 휴대폰에 기억) */
@@ -125,18 +155,38 @@ function saveDetailMode(on: boolean): void {
   }
 }
 
+/** 아이가 이 경기에서 주로 한 역할의 분석 (투수로 던졌으면 투수, 타석이 있으면 타자, 수비만 했으면 수비) */
+function childMainRole(replay: GameReplay): AnalysisKind | null {
+  const pas = replay.plateAppearances;
+  if (pas.some((pa) => pa.fieldingPosition === 'pitcher')) return 'pitcher';
+  if (pas.some((pa) => pa.actor === 'child')) return 'batter';
+  return pas.some((pa) => pa.fieldingPosition !== null) ? 'fielder' : null;
+}
+
+/** 경기 묶음에서 아이가 한 것을 한 줄씩 (투수 · 타자 · 수비 계산은 각 폴더에 있다) */
+function childSummary(games: readonly Game[]): string[] {
+  const forStats = games.map((g) => ({ label: gameShortLabel(g), replay: replayOf(g) }));
+  const lines: [string, string | null][] = [
+    ['투수', pitcherLine(forStats)],
+    ['타자', batterLine(forStats)],
+    ['', fielderLine(forStats)],
+  ];
+  return lines.filter(([, line]) => line !== null).map(([role, line]) => (role ? `${role}: ${line}` : (line as string)));
+}
+
 export function replayOf(game: Game): GameReplay {
   const info = gameInfo(game);
   return replayGame(playEvents(activeEvents(game.events)), { battingFirst: info.battingFirst });
 }
 
 const ERROR_REASON = '실책으로 바뀐 주자·아웃·점수를 맞춰 주세요. 바뀐 게 없으면 취소를 누르세요.';
+const ROE_REASON = '실책으로 더 간 주자나, 그 뒤 아웃된 주자(타자 포함)가 있으면 맞춰 주세요. 그대로면 취소를 누르세요.';
 const BLOCKED_ADVANCE_REASON = '다음 베이스에 주자가 있어요. 주자들이 어떻게 움직였는지 맞춰 주세요.';
 
-function newGameForm(): GameForm {
+function newGameForm(teamName: string): GameForm {
   return {
     gameId: null,
-    info: { date: today(), opponent: '', gameType: 'practice', battingFirst: 'them' },
+    info: { date: today(), opponent: '', gameType: 'practice', battingFirst: 'them', venue: defaultVenue('them'), ourTeam: teamName },
     error: null,
   };
 }
@@ -146,6 +196,7 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 export function validateInfo(info: GameInfo): string | null {
   if (!DATE_PATTERN.test(info.date)) return '경기 날짜를 골라 주세요.';
   if (info.opponent.trim().length > OPPONENT_MAX_LENGTH) return `상대팀 이름은 ${OPPONENT_MAX_LENGTH}자까지 넣을 수 있어요.`;
+  if (info.ourTeam.trim().length > TEAM_NAME_MAX_LENGTH) return `우리 팀 이름은 ${TEAM_NAME_MAX_LENGTH}자까지 넣을 수 있어요.`;
   return null;
 }
 
@@ -166,6 +217,7 @@ function childRunnerAdjust(state: ActiveState, action: 'advance' | 'scored' | 'o
 export function mountApp(root: HTMLElement): void {
   const loaded = loadGames(STORAGE_KEY, LEGACY_STORAGE_KEYS);
   const latest = loaded.games[loaded.games.length - 1];
+  const teamName = loadTeamName();
   const state: State = {
     games: loaded.games,
     currentGameId: latest?.id ?? null,
@@ -176,17 +228,29 @@ export function mountApp(root: HTMLElement): void {
     situationDraft: null,
     chooser: null,
     sceneDraft: null,
-    scoreDraft: null,
-    form: latest ? null : newGameForm(),
+    cellDraft: null,
+    form: latest ? null : newGameForm(teamName),
     helpOpen: false,
     tutorialStep: hasSeenTutorial() ? null : 0,
     detailMode: loadDetailMode(),
     pitchSheet: null,
     fieldDraft: null,
     hand: loadHand(),
-    gameList: { order: 'newest', type: 'all', query: '' },
+    gameList: {
+      mode: 'list',
+      order: 'newest',
+      type: 'all',
+      query: '',
+      calendar: { month: monthOf(latest ? gameInfo(latest).date : today()), zoom: 'month', day: null },
+    },
     playFielding: null,
-    gamesPane: latest ? 'current' : 'list',
+    batterDraft: null,
+    resultGameId: null,
+    deletingId: null,
+    analysisGameId: null,
+    showScoreboard: loadShowScoreboard(),
+    teamName,
+    orientation: loadOrientation(),
     analysisKind: 'pitcher',
     lastBackupAt: loadLastBackup(),
   };
@@ -214,10 +278,12 @@ export function mountApp(root: HTMLElement): void {
     state.situationDraft = null;
     state.chooser = null;
     state.sceneDraft = null;
-    state.scoreDraft = null;
+    state.cellDraft = null;
+    state.deletingId = null;
     state.fieldDraft = null;
     state.pitchSheet = null;
     state.playFielding = null;
+    state.batterDraft = null;
     render();
     window.scrollTo(0, 0);
   };
@@ -225,7 +291,14 @@ export function mountApp(root: HTMLElement): void {
   /** 공 하나를 기록한다. 투구 상세 창에서 고른 구종·존·구속이 있으면 함께 남긴다. */
   const recordPitch = (
     result: PitchResult,
-    extra: { hitType?: HitType; doublePlay?: BaseIndex; pitch: PitchDetail; battedBall?: FieldDraft | null; fielding?: readonly FieldingCredit[] | null },
+    extra: {
+      hitType?: HitType;
+      doublePlay?: BaseIndex;
+      outType?: OutType | null;
+      pitch: PitchDetail;
+      battedBall?: FieldDraft | null;
+      fielding?: readonly FieldingCredit[] | null;
+    },
   ): void => {
     const detail = extra.pitch;
     const ball = extra.battedBall;
@@ -236,6 +309,7 @@ export function mountApp(root: HTMLElement): void {
       addPitch(g, result, {
         hitType: extra.hitType,
         doublePlay: extra.doublePlay,
+        outType: extra.outType ?? undefined,
         pitchType: detail.pitchType ?? undefined,
         zone: detail.zone ?? undefined,
         speed: detail.speed ?? undefined,
@@ -243,11 +317,28 @@ export function mountApp(root: HTMLElement): void {
         fielding: extra.fielding ?? undefined,
       }),
     );
+    // 실책 출루 뒤에는 더 간 주자나 아웃된 주자(3아웃 포함)를 바로 맞추게 한다.
+    if (result === 'reachedOnError') openErrorAdjust(ROE_REASON);
   };
 
   const currentReplay = (): GameReplay | null => {
     const game = currentGame();
     return game ? replayOf(game) : null;
+  };
+
+  /** 실책 뒤 상황 고치기를 연다. 바뀐 게 없으면 사용자가 취소한다. */
+  const openErrorAdjust = (reason: string): void => {
+    const active = currentReplay()?.state;
+    if (!active) return;
+    state.situationDraft = {
+      inning: active.inning,
+      outs: active.outs,
+      bases: active.bases,
+      runs: 0,
+      child: active.role === 'runner' ? active.childBase : null,
+      reason,
+    };
+    render();
   };
 
   /** 아이가 수비 중인지 (투수 또는 수비수 장면) */
@@ -260,7 +351,21 @@ export function mountApp(root: HTMLElement): void {
   const afterPitchDetail = (result: PitchResult, hitType: HitType | undefined, pitch: PitchDetail, doublePlay?: BaseIndex): void => {
     if (isBattedResult(result)) {
       state.pitchSheet = null;
-      state.fieldDraft = { result, hitType, doublePlay, x: null, y: null, type: null, strength: null, pitch, fielding: childIsFielding() ? [] : null };
+      const active = currentReplay()?.state;
+      const outTypes = result === 'out' && doublePlay === undefined && active ? outTypeOptions(active.bases, active.outs) : [];
+      state.fieldDraft = {
+        result,
+        hitType,
+        doublePlay,
+        x: null,
+        y: null,
+        type: null,
+        strength: null,
+        pitch,
+        fielding: childIsFielding() ? [] : null,
+        outType: null,
+        outTypeOptions: outTypes,
+      };
       render();
       return;
     }
@@ -270,20 +375,7 @@ export function mountApp(root: HTMLElement): void {
   /** 주자 상황 기록. 실책 뒤에는 바로 상황 고치기를 열어 바뀐 주자·점수를 맞추게 한다. */
   const recordRunnerPlay = (action: RunnerAction, base: BaseIndex | undefined, fielding: readonly FieldingCredit[]): void => {
     updateCurrent((g) => addPlay(g, action, base, fielding));
-    if (action === 'error') {
-      // 실책 뒤에는 바로 상황 고치기를 열어 바뀐 주자·점수를 맞추게 한다.
-      const active = currentReplay()?.state;
-      if (!active) return;
-      state.situationDraft = {
-        inning: active.inning,
-        outs: active.outs,
-        bases: active.bases,
-        runs: 0,
-        child: active.role === 'runner' ? active.childBase : null,
-        reason: ERROR_REASON,
-      };
-      render();
-    }
+    if (action === 'error') openErrorAdjust(ERROR_REASON);
   };
 
   const inputActions = {
@@ -332,10 +424,9 @@ export function mountApp(root: HTMLElement): void {
         state.fieldDraft = draft;
         render();
       },
-      save: (draft: FieldDraft) =>
-        recordPitch(draft.result, { hitType: draft.hitType, doublePlay: draft.doublePlay, pitch: draft.pitch, battedBall: draft, fielding: draft.fielding }),
-      // 낙구 지점·질만 건너뛴다. 고른 수비 기록은 남긴다.
-      skip: (draft: FieldDraft) => recordPitch(draft.result, { hitType: draft.hitType, doublePlay: draft.doublePlay, pitch: draft.pitch, fielding: draft.fielding }),
+      save: (draft: FieldDraft) => recordPitch(draft.result, { ...draft, battedBall: draft }),
+      // 낙구 지점·질만 건너뛴다. 고른 수비 기록·아웃 종류는 남긴다.
+      skip: (draft: FieldDraft) => recordPitch(draft.result, { ...draft, battedBall: null }),
       cancel: () => {
         state.fieldDraft = null;
         render();
@@ -362,6 +453,25 @@ export function mountApp(root: HTMLElement): void {
       },
       cancel: () => {
         state.playFielding = null;
+        render();
+      },
+    },
+    batter: {
+      open: () => {
+        const active = currentReplay()?.state;
+        state.batterDraft = { hand: active?.batterHand ?? null, grade: active?.batterGrade ?? null };
+        render();
+      },
+      change: (draft: BatterDraft) => {
+        state.batterDraft = draft;
+        render();
+      },
+      save: (draft: BatterDraft) => {
+        state.batterDraft = null;
+        updateCurrent((g) => addBatter(g, draft.hand, draft.grade));
+      },
+      cancel: () => {
+        state.batterDraft = null;
         render();
       },
     },
@@ -410,11 +520,11 @@ export function mountApp(root: HTMLElement): void {
       render();
     },
     openGames: () => {
-      state.gamesPane = 'list';
+      state.resultGameId = null;
       go('games');
     },
     openScoreboard: () => {
-      state.gamesPane = 'current';
+      state.resultGameId = state.currentGameId;
       go('games');
     },
     scene: {
@@ -454,25 +564,74 @@ export function mountApp(root: HTMLElement): void {
     },
   };
 
-  const scoreActions = {
-    edit: (draft: ScoreDraft | null) => {
-      state.scoreDraft = draft;
+  const resultGame = (): Game | undefined => state.games.find((g) => g.id === state.resultGameId);
+
+  const updateResultGame = (change: (g: Game) => Game): void => {
+    const game = resultGame();
+    if (game) replaceGame(change(game));
+  };
+
+  const resultActions = {
+    back: () => {
+      state.resultGameId = null;
+      state.cellDraft = null;
+      render();
+      window.scrollTo(0, 0);
+    },
+    toggleScoreboard: () => {
+      state.showScoreboard = !state.showScoreboard;
+      saveShowScoreboard(state.showScoreboard);
       render();
     },
-    save: (draft: ScoreDraft) => {
-      state.scoreDraft = null;
-      updateCurrent((g) => addScore(g, draft.team, draft.inning, draft.runs));
+    editCell: (draft: ScoreCellDraft | null) => {
+      state.cellDraft = draft;
+      render();
+    },
+    saveCell: (draft: ScoreCellDraft) => {
+      state.cellDraft = null;
+      updateResultGame((g) => addScore(g, draft.team, draft.inning, draft.runs));
+    },
+    // 직접 넣은 점수를 지우지 않고 취소 기록을 덧붙여, 기록에서 센 점수로 돌아간다.
+    resetCell: (draft: ScoreCellDraft) => {
+      state.cellDraft = null;
+      updateResultGame((g) => scoreEventIds(activeEvents(g.events), draft.team, draft.inning).reduce(addVoid, g));
+    },
+    openChildRecord: () => {
+      const game = resultGame();
+      if (!game) return;
+      state.analysisGameId = game.id;
+      state.analysisScope = 'game';
+      state.analysisKind = childMainRole(replayOf(game)) ?? state.analysisKind;
+      go('analysis');
     },
   };
 
   const gamesActions = {
     select: (id: string) => {
       state.currentGameId = id;
-      state.gamesPane = 'current';
       go('input');
     },
+    openResult: (id: string) => {
+      state.resultGameId = id;
+      render();
+      window.scrollTo(0, 0);
+    },
+    askDelete: (id: string | null) => {
+      state.deletingId = id;
+      render();
+    },
+    confirmDelete: (id: string) => {
+      state.deletingId = null;
+      state.games = state.games.filter((g) => g.id !== id);
+      if (state.currentGameId === id) state.currentGameId = state.games[state.games.length - 1]?.id ?? null;
+      if (state.analysisGameId === id) state.analysisGameId = null;
+      if (state.games.length === 0) state.form = newGameForm(state.teamName);
+      state.notice = '경기를 지웠어요.';
+      persist();
+      render();
+    },
     openNew: () => {
-      state.form = newGameForm();
+      state.form = newGameForm(state.teamName);
       render();
     },
     openEdit: (game: Game) => {
@@ -498,7 +657,6 @@ export function mountApp(root: HTMLElement): void {
         const game = createGame(form.info);
         state.games = [...state.games, game];
         state.currentGameId = game.id;
-        state.gamesPane = 'current';
         persist();
         go('input');
         return;
@@ -511,8 +669,8 @@ export function mountApp(root: HTMLElement): void {
       go('settings');
     },
     changeList: (list: GameListView) => {
-      // 찾는 말은 목록만 바꿔 그리므로 여기서는 담기만 하고, 정렬·구분이 바뀌면 다시 그린다.
-      const redraw = list.order !== state.gameList.order || list.type !== state.gameList.type;
+      // 찾는 말은 목록만 바꿔 그리므로 여기서는 담기만 하고, 그 밖의 것(정렬·구분·달력)이 바뀌면 다시 그린다.
+      const redraw = list.query === state.gameList.query;
       state.gameList = list;
       if (redraw) render();
     },
@@ -527,11 +685,18 @@ export function mountApp(root: HTMLElement): void {
       state.analysisTab = t;
       render();
     },
+    pickGame: (id: string) => {
+      state.analysisGameId = id;
+      render();
+    },
   };
 
-  const scopedGames = (game: Game, replay: GameReplay): GameForStats[] =>
+  /** 분석 "선택한 경기": 고른 경기가 없으면 지금 기록 중인 경기 */
+  const analysisGame = (fallback: Game): Game => state.games.find((g) => g.id === state.analysisGameId) ?? fallback;
+
+  const scopedGames = (game: Game): GameForStats[] =>
     state.analysisScope === 'game'
-      ? [{ label: gameShortLabel(game), replay }]
+      ? [{ label: gameShortLabel(game), replay: replayOf(game) }]
       : state.games.map((g) => ({ label: gameShortLabel(g), replay: replayOf(g) }));
 
   const helpActions = {
@@ -571,6 +736,17 @@ export function mountApp(root: HTMLElement): void {
       state.hand = hand;
       saveHand(hand);
       render();
+    },
+    orientation: (mode: OrientationMode) => {
+      state.orientation = mode;
+      saveOrientation(mode);
+      applyOrientation(mode);
+      render();
+    },
+    // 칠 때마다 다시 그리면 키보드가 닫히므로 기억만 한다.
+    teamName: (name: string) => {
+      state.teamName = name;
+      saveTeamName(name);
     },
     download: (kind: 'backup' | 'pitches') => {
       const file =
@@ -633,9 +809,23 @@ export function mountApp(root: HTMLElement): void {
 
   const renderBody = (game: Game | undefined): HTMLElement => {
     if (state.helpOpen) return manualView(helpActions);
-    if (state.tab === 'settings') return settingsView(state.hand, state.games.length > 0, state.lastBackupAt, settingsActions);
-    if (!game || state.form || (state.tab === 'games' && state.gamesPane === 'list')) {
-      return withPanes(game, gamesView(state.games, state.currentGameId, state.form, state.gameList, gamesActions, replayOf));
+    if (state.tab === 'settings') return settingsView(state.hand, state.orientation, state.teamName, state.games.length > 0, state.lastBackupAt, settingsActions);
+    const shown = resultGame();
+    if (state.tab === 'games' && shown && !state.form) {
+      const shownReplay = replayOf(shown);
+      return recordsView(
+        {
+          info: gameInfo(shown),
+          replay: shownReplay,
+          score: lineScore(shownReplay, activeEvents(shown.events)),
+          showScoreboard: state.showScoreboard,
+          cellDraft: state.cellDraft,
+        },
+        resultActions,
+      );
+    }
+    if (!game || state.form || state.tab === 'games') {
+      return gamesView(state.games, state.currentGameId, state.form, state.gameList, state.deletingId, gamesActions, replayOf, childSummary);
     }
     const info = gameInfo(game);
     const replay = replayOf(game);
@@ -658,12 +848,12 @@ export function mountApp(root: HTMLElement): void {
             hand: state.hand,
             fieldDraft: state.fieldDraft,
             playFielding: state.playFielding,
+            batterDraft: state.batterDraft,
           },
           inputActions,
         );
-      case 'games':
-        return withPanes(game, recordsView(info, replay, score, state.scoreDraft, scoreActions));
-      case 'analysis':
+      case 'analysis': {
+        const chosen = analysisGame(game);
         return h('div', { className: 'analysis-page' }, [
           segmented<AnalysisKind>(
             ANALYSIS_KINDS.map((k) => [k, ANALYSIS_KIND_LABEL[k]]),
@@ -674,27 +864,14 @@ export function mountApp(root: HTMLElement): void {
             },
             'kind-tabs',
           ),
-          analysisView(state.analysisKind)(scopedGames(game, replay), state.games.length, state.analysisScope, state.analysisTab, analysisActions),
+          analysisView(state.analysisKind)(scopedGames(chosen), state.games.length, state.analysisScope, state.analysisTab, {
+            ...analysisActions,
+            gameOptions: sortGames(state.games, 'newest').map((g) => [g.id, gameShortLabel(g)]),
+            selectedGameId: chosen.id,
+          }),
         ]);
+      }
     }
-  };
-
-  /** "경기" 탭 위쪽의 작은 탭: 이 경기 기록 / 경기 목록 (경기가 있고 정보 입력 중이 아닐 때) */
-  const withPanes = (game: Game | undefined, body: HTMLElement): HTMLElement => {
-    if (!game || state.form) return body;
-    return h('div', { className: 'games-page' }, [
-      segmented<GamesPane>(
-        GAMES_PANES.map((p) => [p, GAMES_PANE_LABEL[p]]),
-        state.gamesPane,
-        (p) => {
-          state.gamesPane = p;
-          state.scoreDraft = null;
-          render();
-        },
-        'kind-tabs',
-      ),
-      body,
-    ]);
   };
 
   const render = (): void => {
@@ -725,7 +902,11 @@ export function mountApp(root: HTMLElement): void {
             {
               className: state.tab === tab && !state.helpOpen ? 'active' : '',
               disabled: (tab === 'input' || tab === 'analysis') && !game,
-              onClick: () => go(tab),
+              onClick: () => {
+                // 아래 "경기" 탭은 언제나 경기 목록부터 보여준다.
+                if (tab === 'games') state.resultGameId = null;
+                go(tab);
+              },
             },
             [
               TAB_LABEL[tab],
@@ -751,5 +932,6 @@ export function mountApp(root: HTMLElement): void {
     root.replaceChildren(...children.filter((c): c is Node => c !== null));
   };
 
+  applyOrientation(state.orientation);
   render();
 }
