@@ -978,7 +978,7 @@ input:focus-visible {
 
 .play-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
 }
 
@@ -2984,4 +2984,36 @@ input[type='file'].visually-hidden {
     padding: 6px 0;
     font-size: 12px;
   }
+}
+
+/* 경기 끝 */
+.game-over {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 2px solid var(--primary);
+}
+
+.game-over p {
+  margin: 0;
+}
+
+.scene-end-buttons .secondary {
+  padding: 12px 6px;
+}
+
+.game-card-chips {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.type-chip.ended {
+  background: var(--bar);
+  color: var(--on-color);
+}
+
+.tip-popup p {
+  margin: 0;
 }

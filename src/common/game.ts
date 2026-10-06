@@ -205,6 +205,10 @@ export function addExit(game: Game): Game {
   return append(game, { kind: 'exit', ...base() });
 }
 
+export function addGameEnd(game: Game): Game {
+  return append(game, { kind: 'gameEnd', ...base() });
+}
+
 export function addBatter(game: Game, hand: BatterHand | null, grade: number | null): Game {
   return append(game, {
     kind: 'batter',

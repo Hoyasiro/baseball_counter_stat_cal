@@ -20,6 +20,13 @@ export function formatPercent(value: number | null): string {
   return `${(value * 100).toFixed(PERCENT_DECIMALS)}%`;
 }
 
+const ERA_DECIMALS = 2;
+
+/** 평균자책점 표시. 예: 3 → "3.00" */
+export function formatEra(value: number | null): string {
+  return value === null ? NO_VALUE_DISPLAY : value.toFixed(ERA_DECIMALS);
+}
+
 /** 던진 이닝 표시. 잡은 아웃 수로 받는다. 예: 7 → "2 1/3", 6 → "2", 1 → "1/3" */
 export function formatInningsFromOuts(outs: number): string {
   const whole = Math.floor(outs / OUTS_PER_INNING);

@@ -223,7 +223,10 @@ function gameCard(game: Game, isCurrent: boolean, replay: GameReplay, summary: r
   return h('article', { className: `game-card${isCurrent ? ' current' : ''}` }, [
     h('div', { className: 'game-card-head' }, [
       h('h3', { text: dateLabel(info.date) }),
-      h('span', { className: `type-chip ${info.gameType}`, text: GAME_TYPE_LABEL[info.gameType] }),
+      h('span', { className: 'game-card-chips' }, [
+        replay.gameEnded ? h('span', { className: 'type-chip ended', text: '경기 끝' }) : null,
+        h('span', { className: `type-chip ${info.gameType}`, text: GAME_TYPE_LABEL[info.gameType] }),
+      ]),
     ]),
     h('p', { className: 'opponent', text: `${ourTeamLabel(info)} vs ${opponentLabel(info.opponent)} · ${orderLabel(info)}` }),
     summary.length > 0 ? h('p', { className: 'game-summary' }, summary.flatMap((line, i) => (i === 0 ? [line] : [h('br'), line]))) : null,

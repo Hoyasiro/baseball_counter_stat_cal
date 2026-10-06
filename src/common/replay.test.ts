@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { activeEvents, LogEvent, PlayLogEvent } from './events';
 import { replayGame } from './replay';
-import { adjust, appear, exit, hit, pitchWith, pitches, play, settings } from './test-helpers';
+import { adjust, appear, exit, gameEnd, hit, pitchWith, pitches, play, settings } from './test-helpers';
 
 /** 1회 선발 투수로 등장한 뒤의 기록 */
 const asPitcher = (...events: PlayLogEvent[]) => replayGame([appear('pitcher'), ...events], settings());
@@ -247,5 +247,31 @@ describe('병살 (타자 + 주자 한 명 아웃)', () => {
     const r = replayGame([appear('runner', { childBase: 0 }), pitchWith('out', { doublePlay: 0 })], settings());
     expect(r.runnerEvents.map((e) => e.kind)).toEqual(['out']);
     expect(r.scenes[0].endedBy).toBe('childDone');
+  });
+});
+
+describe('주자 아웃 · 경기 끝', () => {
+  it('아이 볼넷 뒤 앞 주자 견제 아웃: 아이는 1루에 그대로, 1아웃', () => {
+    const r = replayGame([appear('batter', { bases: [false, true, false] }), ...pitches('ball', 'ball', 'ball', 'ball'), play('pickoffOut', 1)], settings());
+    expect(r.state?.childBase).toBe(0);
+    expect(r.state?.outs).toBe(1);
+    expect(r.state?.bases).toEqual([true, false, false]);
+  });
+
+  it('아이가 안타 뒤 더 가다 주자 아웃: 아이 장면이 끝나고 주루 아웃으로 남는다', () => {
+    const r = replayGame([appear('batter'), hit('single'), play('runnerOut', 0)], settings());
+    expect(r.state).toBeNull();
+    expect(r.runnerEvents.map((e) => e.kind)).toEqual(['out']);
+    expect(r.scenes[0].endedBy).toBe('childDone');
+  });
+
+  it('경기 끝: 진행 중 장면을 마치고, 새 장면을 시작하면 다시 이어서 기록', () => {
+    const ended = replayGame([appear('pitcher'), ...pitches('out'), gameEnd()], settings());
+    expect(ended.gameEnded).toBe(true);
+    expect(ended.state).toBeNull();
+    expect(ended.scenes[0].endedBy).toBe('gameEnd');
+    const resumed = replayGame([appear('pitcher'), gameEnd(), appear('batter', { inning: 2 })], settings());
+    expect(resumed.gameEnded).toBe(false);
+    expect(resumed.state?.role).toBe('batter');
   });
 });

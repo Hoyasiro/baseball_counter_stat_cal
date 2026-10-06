@@ -12,7 +12,8 @@ import { lineScoreTable } from './line-score-view';
 import { GameReplay, PlateAppearance, Scene, SceneEnd } from './replay';
 
 const END_LABEL: Record<SceneEnd, string> = {
-  exit: '교체됨',
+  exit: '교체 아웃',
+  gameEnd: '경기 끝',
   next: '다음 장면으로',
   childDone: '아이 차례 끝',
   halfOver: '3아웃',

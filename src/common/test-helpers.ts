@@ -7,6 +7,7 @@ import {
   Bases,
   ChildPosition,
   ExitEvent,
+  GameEndEvent,
   HitType,
   PitchEvent,
   PitchResult,
@@ -97,4 +98,8 @@ export function score(team: Team, inning: number, runs: number): ScoreEvent {
 
 export function batter(hand: BatterHand | null, grade: number | null): BatterEvent {
   return { kind: 'batter', ...base(), ...(hand === null ? {} : { hand }), ...(grade === null ? {} : { grade }) };
+}
+
+export function gameEnd(): GameEndEvent {
+  return { kind: 'gameEnd', ...base() };
 }

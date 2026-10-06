@@ -39,6 +39,7 @@ export const HIT_BASES: Record<HitType, number> = { single: 1, double: 2, triple
  * 투구가 아닌 주자 상황. base는 그 주자가 있던 베이스다.
  * - stolenBase / caughtStealing: 도루 성공·실패 (base 0 = 1루 주자의 2루 도루, 2 = 3루 주자의 홈 도루)
  * - error: 수비 실책으로 주자가 움직임. 바뀐 상황은 이어서 "상황 고치기"로 맞춘다.
+ * - runnerOut: 주루사. 안타·실책·볼넷 뒤 더 가다가(홈 포함) 베이스에서 아웃됨
  * - stolenSecond / caughtStealingSecond: 예전 기록용 (1루 주자의 2루 도루)
  */
 export type PlayKind =
@@ -47,6 +48,7 @@ export type PlayKind =
   | 'stolenBase'
   | 'caughtStealing'
   | 'error'
+  | 'runnerOut'
   | 'stolenSecond'
   | 'caughtStealingSecond';
 
@@ -56,6 +58,7 @@ export const PLAY_KINDS: readonly PlayKind[] = [
   'stolenBase',
   'caughtStealing',
   'error',
+  'runnerOut',
   'stolenSecond',
   'caughtStealingSecond',
 ];
@@ -252,6 +255,11 @@ export interface BatterEvent extends EventBase {
   readonly grade?: number;
 }
 
+/** 경기 기록을 마침 (4~5회에 끝나는 경기 등). 뒤에 새 장면을 시작하면 다시 이어서 기록한다. */
+export interface GameEndEvent extends EventBase {
+  readonly kind: 'gameEnd';
+}
+
 /** 우리 아이가 교체되어 빠짐. 지금 장면의 기록을 끝낸다. */
 export interface ExitEvent extends EventBase {
   readonly kind: 'exit';
@@ -293,12 +301,13 @@ export type LogEvent =
   | AppearanceEvent
   | ExitEvent
   | BatterEvent
+  | GameEndEvent
   | ScoreEvent
   | GameInfoEvent
   | VoidEvent;
 
 /** 경기 진행에 영향을 주는 이벤트 */
-export type PlayLogEvent = PitchEvent | PlayEvent | AdjustEvent | AppearanceEvent | ExitEvent | BatterEvent;
+export type PlayLogEvent = PitchEvent | PlayEvent | AdjustEvent | AppearanceEvent | ExitEvent | BatterEvent | GameEndEvent;
 
 /** 취소할 수 있는 이벤트 */
 export type UndoableEvent = PlayLogEvent | ScoreEvent;
@@ -402,6 +411,7 @@ export function isLogEvent(value: unknown): value is LogEvent {
         (value.position === undefined || POSITIONS.includes(value.position as Position))
       );
     case 'exit':
+    case 'gameEnd':
       return true;
     case 'batter':
       return (

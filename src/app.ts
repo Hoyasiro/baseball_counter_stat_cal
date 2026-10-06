@@ -28,6 +28,8 @@ import {
 import { applyOrientation } from './common/orientation';
 import { FIELDING_PLAYS, PlayFieldingDraft } from './common/fielding-view';
 import { BatterDraft } from './common/batter-info-view';
+import { TipKey, hasSeenTip, markTipSeen } from './common/tips';
+import { OUTS_PER_INNING } from './common/count';
 import { settingsView } from './common/settings-view';
 import {
   Game,
@@ -36,6 +38,7 @@ import {
   addAppearance,
   addBatter,
   addExit,
+  addGameEnd,
   addPitch,
   addPlay,
   addScore,
@@ -118,6 +121,8 @@ interface State {
   playFielding: PlayFieldingDraft | null;
   /** 상대 타자 정보를 고르는 중 */
   batterDraft: BatterDraft | null;
+  /** 처음 한 번 보여주는 기록 요령. 닫으면 next로 하려던 기록을 이어서 한다. */
+  tip: { key: TipKey; next: () => void } | null;
   /** "경기" 탭에서 결과를 보고 있는 경기. 목록이면 null */
   resultGameId: string | null;
   /** 지울지 묻고 있는 경기 */
@@ -245,6 +250,7 @@ export function mountApp(root: HTMLElement): void {
     },
     playFielding: null,
     batterDraft: null,
+    tip: null,
     resultGameId: null,
     deletingId: null,
     analysisGameId: null,
@@ -284,6 +290,7 @@ export function mountApp(root: HTMLElement): void {
     state.pitchSheet = null;
     state.playFielding = null;
     state.batterDraft = null;
+    state.tip = null;
     render();
     window.scrollTo(0, 0);
   };
@@ -378,16 +385,39 @@ export function mountApp(root: HTMLElement): void {
     if (action === 'error') openErrorAdjust(ERROR_REASON);
   };
 
+  /** 공 결과 단추를 누른 뒤: 투구 상세를 켜 두었으면 그 공의 구종·존·구속을 고르는 창부터 연다. */
+  const recordPitchStart = (result: PitchResult, hitType?: HitType): void => {
+    state.chooser = null;
+    if (state.detailMode) {
+      state.pitchSheet = { result, hitType, ...EMPTY_PITCH_DETAIL };
+      render();
+      return;
+    }
+    afterPitchDetail(result, hitType, EMPTY_PITCH_DETAIL);
+  };
+
+  /** 그 상황에 처음이면 기록 요령을 먼저 보여주고, 닫으면 기록한다. */
+  const withTip = (result: PitchResult, record: () => void): void => {
+    const active = currentReplay()?.state;
+    const runners = active ? active.bases.some(Boolean) : false;
+    const key: TipKey | null =
+      runners && result === 'wildPitch' ? 'wildPitch' : runners && result === 'out' && active && active.outs < OUTS_PER_INNING - 1 ? 'fieldersChoice' : null;
+    if (key && !hasSeenTip(key)) {
+      state.tip = { key, next: record };
+      render();
+      return;
+    }
+    record();
+  };
+
   const inputActions = {
-    pitch: (result: PitchResult, hitType?: HitType) => {
-      state.chooser = null;
-      // 투구 상세를 켜 두었으면 그 공의 구종·존·구속을 고르는 창부터 연다.
-      if (state.detailMode) {
-        state.pitchSheet = { result, hitType, ...EMPTY_PITCH_DETAIL };
-        render();
-        return;
-      }
-      afterPitchDetail(result, hitType, EMPTY_PITCH_DETAIL);
+    pitch: (result: PitchResult, hitType?: HitType) => withTip(result, () => recordPitchStart(result, hitType)),
+    closeTip: () => {
+      const tip = state.tip;
+      if (!tip) return;
+      markTipSeen(tip.key);
+      state.tip = null;
+      tip.next();
     },
     doublePlay: (base: BaseIndex) => {
       state.chooser = null;
@@ -560,6 +590,10 @@ export function mountApp(root: HTMLElement): void {
       exit: () => {
         state.sceneDraft = null;
         updateCurrent((g) => addExit(g));
+      },
+      endGame: () => {
+        state.sceneDraft = null;
+        updateCurrent((g) => addGameEnd(g));
       },
     },
   };
@@ -849,6 +883,7 @@ export function mountApp(root: HTMLElement): void {
             fieldDraft: state.fieldDraft,
             playFielding: state.playFielding,
             batterDraft: state.batterDraft,
+            tip: state.tip?.key ?? null,
           },
           inputActions,
         );
