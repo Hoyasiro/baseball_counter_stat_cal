@@ -5,7 +5,7 @@
 import { batterAnalysisView } from './batter/analysis-view';
 import { AnalysisScope, AnalysisTab } from './common/analysis-ui';
 import { h, segmented } from './common/dom';
-import { BaseIndex, FieldingCredit, HitType, OutType, PitchResult, Role, TEAM_NAME_MAX_LENGTH, UndoableEvent, activeEvents, playEvents } from './common/events';
+import { BaseIndex, BatterHand, FieldingCredit, HitType, OutType, PitchResult, Role, TEAM_NAME_MAX_LENGTH, UndoableEvent, activeEvents, playEvents } from './common/events';
 import { outTypeOptions } from './common/bases';
 import { mergeGames, mergeSummary, parseBackup } from './common/backup-import';
 import { BACKUP_REMINDER_MIN_GAMES, backupBanner } from './common/backup-banner';
@@ -16,9 +16,11 @@ import { EMPTY_PITCH_DETAIL, FieldDraft, PitchDetail, PitchSheet, isBattedResult
 import {
   Hand,
   OrientationMode,
+  loadChildBatterHand,
   loadHand,
   loadOrientation,
   loadTeamName,
+  saveChildBatterHand,
   saveHand,
   saveOrientation,
   saveTeamName,
@@ -135,6 +137,8 @@ interface State {
   teamName: string;
   /** 화면 방향 (설정, 이 휴대폰에 기억) */
   orientation: OrientationMode;
+  /** 우리 아이가 서는 타석 (설정, 이 휴대폰에 기억) */
+  childBatterHand: BatterHand | null;
   /** "분석" 탭에서 보고 있는 것 */
   analysisKind: AnalysisKind;
   /** 마지막으로 백업한 시각 (이 휴대폰에 기억) */
@@ -257,6 +261,7 @@ export function mountApp(root: HTMLElement): void {
     analysisGameId: null,
     teamName,
     orientation: loadOrientation(),
+    childBatterHand: loadChildBatterHand(),
     analysisKind: 'pitcher',
     lastBackupAt: loadLastBackup(),
   };
@@ -448,6 +453,12 @@ export function mountApp(root: HTMLElement): void {
       cancel: () => {
         state.pitchSheet = null;
         render();
+      },
+      // 창을 닫지 않고 타자 정보(학년은 그대로)를 저장한다. 공보다 먼저 기록되므로 이 타석에 붙는다.
+      batterHand: (sheet: PitchSheet, hand: BatterHand | null) => {
+        state.pitchSheet = sheet;
+        const grade = currentReplay()?.state?.batterGrade ?? null;
+        updateCurrent((g) => addBatter(g, hand, grade));
       },
     },
     field: {
@@ -793,6 +804,11 @@ export function mountApp(root: HTMLElement): void {
       saveHand(hand);
       render();
     },
+    childBatterHand: (hand: BatterHand | null) => {
+      state.childBatterHand = hand;
+      saveChildBatterHand(hand);
+      render();
+    },
     orientation: (mode: OrientationMode) => {
       state.orientation = mode;
       saveOrientation(mode);
@@ -865,7 +881,7 @@ export function mountApp(root: HTMLElement): void {
 
   const renderBody = (game: Game | undefined): HTMLElement => {
     if (state.helpOpen) return manualView(helpActions);
-    if (state.tab === 'settings') return settingsView(state.hand, state.orientation, state.teamName, state.games.length > 0, state.lastBackupAt, settingsActions);
+    if (state.tab === 'settings') return settingsView(state.hand, state.orientation, state.childBatterHand, state.teamName, state.games.length > 0, state.lastBackupAt, settingsActions);
     const shown = resultGame();
     if (state.tab === 'games' && shown && !state.form) {
       const shownReplay = replayOf(shown);
@@ -906,6 +922,7 @@ export function mountApp(root: HTMLElement): void {
             playFielding: state.playFielding,
             batterDraft: state.batterDraft,
             tip: state.tip?.key ?? null,
+            childBatterHand: state.childBatterHand,
           },
           inputActions,
         );

@@ -1,5 +1,7 @@
 // 이 휴대폰에만 기억하는 편의 설정. 기록 데이터와는 따로 둔다.
 
+import { BatterHand } from './events';
+
 export type Hand = 'right' | 'left';
 
 export const DEFAULT_HAND: Hand = 'right';
@@ -68,5 +70,26 @@ export function saveOrientation(mode: OrientationMode): void {
     localStorage.setItem(ORIENTATION_KEY, mode);
   } catch {
     // 기억하지 못해도 이번에는 고른 방향으로 쓴다.
+  }
+}
+
+const CHILD_BATTER_HAND_KEY = 'baseball-counter.child-batter-hand';
+
+/** 우리 아이가 서는 타석(우타·좌타). 아이가 칠 때 존 그림에 표시해 매번 고르지 않게 한다. 정하지 않았으면 null */
+export function loadChildBatterHand(): BatterHand | null {
+  try {
+    const raw = localStorage.getItem(CHILD_BATTER_HAND_KEY);
+    return raw === 'right' || raw === 'left' ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveChildBatterHand(hand: BatterHand | null): void {
+  try {
+    if (hand) localStorage.setItem(CHILD_BATTER_HAND_KEY, hand);
+    else localStorage.removeItem(CHILD_BATTER_HAND_KEY);
+  } catch {
+    // 기억하지 못해도 이번에는 고른 값으로 쓴다.
   }
 }

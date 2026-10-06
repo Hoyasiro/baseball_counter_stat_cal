@@ -5,7 +5,7 @@ import { BASE_NAMES, STEAL_NAMES, basesLabel, hasRunner, occupiedBases, stealabl
 import { MAX_BALLS_IN_COUNT, MAX_STRIKES_IN_COUNT, OUTS_PER_INNING } from './count';
 import { diamond } from './diamond';
 import { h } from './dom';
-import { BaseIndex, Bases, ChildPosition, HitType, MAX_INNING, MAX_RUNS, PitchResult, UndoableEvent } from './events';
+import { BaseIndex, Bases, BatterHand, ChildPosition, HitType, MAX_INNING, MAX_RUNS, PitchResult, UndoableEvent } from './events';
 import { Game, GameInfo, dateLabel, opponentLabel, ourTeamLabel } from './game';
 import { lineScoreTable } from './line-score-view';
 import { halfInningLabel } from './innings';
@@ -34,7 +34,7 @@ import { PlayFieldingActions, PlayFieldingDraft, playFieldingPopup } from './fie
 import { Hand } from './settings';
 import { BatterActions, BatterDraft, batterPill, batterPopup } from './batter-info-view';
 import { TipKey, tipPopup } from './tips';
-import { FieldActions, FieldDraft, PitchSheet, PitchSheetActions, fieldPanel, pitchDetailToggle, pitchSheetView } from './pitch-detail-view';
+import { FieldActions, FieldDraft, PitchSheet, PitchSheetActions, SheetBatter, fieldPanel, pitchDetailToggle, pitchSheetView } from './pitch-detail-view';
 
 export interface SituationDraft {
   readonly inning: number;
@@ -95,6 +95,8 @@ export interface InputModel {
   readonly batterDraft: BatterDraft | null;
   /** 처음 한 번 보여주는 기록 요령 */
   readonly tip: TipKey | null;
+  /** 설정: 우리 아이가 서는 타석 */
+  readonly childBatterHand: BatterHand | null;
 }
 
 function dots(filled: number, total: number, kind: string, label: string): HTMLElement {
@@ -536,11 +538,18 @@ function controls(model: InputModel, actions: InputActions): HTMLElement {
   ]);
 }
 
+/** 투구 상세 창 존 그림의 타자: 상대 타자(투수·수비 장면)는 창에서 고르고, 우리 아이가 칠 때는 설정의 아이 타석을 쓴다. */
+function sheetBatter(model: InputModel): SheetBatter {
+  const state = model.replay.state;
+  if (state?.role === 'pitcher' || state?.role === 'fielder') return { hand: state.batterHand, editable: true };
+  return { hand: state?.role === 'batter' ? model.childBatterHand : null, editable: false };
+}
+
 export function inputView(model: InputModel, actions: InputActions): HTMLElement {
   return h('section', { className: 'input' }, [
     h('div', { className: 'board-sticky' }, [board(model, actions)]),
     controls(model, actions),
-    model.pitchSheet ? pitchSheetView(model.pitchSheet, model.hand, actions.sheet, model.replay.state?.batterHand ?? null) : null,
+    model.pitchSheet ? pitchSheetView(model.pitchSheet, model.hand, actions.sheet, sheetBatter(model)) : null,
     // 친 공은 야구장 그림 창에서 낙구 지점과 질을 고른 뒤 기록한다.
     model.fieldDraft ? fieldPanel(model.fieldDraft, actions.field) : null,
     model.playFielding ? playFieldingPopup(model.playFielding, actions.playFielding) : null,
