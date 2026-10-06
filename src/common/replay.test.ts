@@ -312,4 +312,13 @@ describe('지난 공 고치기', () => {
     const [pitch] = activeEvents(events).filter((e) => e.kind === 'pitch');
     expect(pitch).toMatchObject({ result: 'foul' });
   });
+
+  it('투구 상세만 고치면 결과는 그대로, null은 지운다. 결과 고침과 겹쳐 쓴다', () => {
+    const p1 = pitchWith('strike', { pitchType: 'fastball', speed: 100 });
+    const detail: EditEvent = { kind: 'edit', id: 'd1', createdAt: '2026-10-06T00:00:00.000Z', author: '테스트', targetId: p1.id, pitchType: 'curveball', zone: { x: 0.5, y: 0.5 }, speed: null };
+    const events: LogEvent[] = [appear('pitcher'), p1, detail, edit(p1.id, 'ball')];
+    const [pitch] = activeEvents(events).filter((e) => e.kind === 'pitch');
+    expect(pitch).toMatchObject({ result: 'ball', pitchType: 'curveball', zone: { x: 0.5, y: 0.5 } });
+    expect(pitch).not.toHaveProperty('speed');
+  });
 });

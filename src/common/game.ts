@@ -228,6 +228,11 @@ export function addEdit(game: Game, targetId: string, result: PitchResult, hitTy
   return append(game, { kind: 'edit', ...base(), targetId, result, ...(result === 'hit' ? { hitType: hitType ?? 'single' } : {}) });
 }
 
+/** 지난 공의 투구 상세(구종·존·구속)를 고친다. null은 지운다. */
+export function addDetailEdit(game: Game, targetId: string, detail: { pitchType: PitchType | null; zone: ZonePoint | null; speed: number | null }): Game {
+  return append(game, { kind: 'edit', ...base(), targetId, ...detail });
+}
+
 export function addTeamTotal(game: Game, team: Team, field: TotalField, value: number): Game {
   return append(game, { kind: 'teamTotal', ...base(), team, field, value });
 }

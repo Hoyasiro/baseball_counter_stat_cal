@@ -49,7 +49,7 @@ export const GAME_CARD_LABEL = {
 export const TOTAL_FIELD_LABEL: Record<TotalField, string> = { runs: '점수(R)', hits: '안타(H)', errors: '실책(E)' };
 
 /** 지난 기록 고치기 창 */
-export const EDIT_EVENT_LABEL = { title: '기록 고치기', remove: '이 기록 지우기' } as const;
+export const EDIT_EVENT_LABEL = { title: '기록 고치기', remove: '이 기록 지우기', saveDetail: '투구 상세 저장' } as const;
 
 /** 경기 결과 화면 */
 export const GAME_RESULT_LABEL = {

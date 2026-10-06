@@ -3259,3 +3259,9 @@ input[type='file'].visually-hidden {
   font-size: 11px;
   color: var(--muted);
 }
+
+/* 기록 고치기 창의 투구 상세 */
+.edit-detail {
+  display: grid;
+  gap: 8px;
+}

@@ -45,6 +45,7 @@ import {
   addTeamTotal,
   addVoid,
   addEdit,
+  addDetailEdit,
   createGame,
   defaultVenue,
   gameInfo,
@@ -108,6 +109,8 @@ interface State {
   cellDraft: ScoreCellDraft | null;
   /** 경기 결과의 장면별 기록에서 고치고 있는 기록 */
   editingEvent: UndoableEvent | null;
+  /** 고치고 있는 공의 투구 상세 */
+  editDetail: PitchDetail;
   form: GameForm | null;
   /** 도움말(사용 설명서)을 보고 있는지 */
   helpOpen: boolean;
@@ -239,6 +242,7 @@ export function mountApp(root: HTMLElement): void {
     sceneDraft: null,
     cellDraft: null,
     editingEvent: null,
+    editDetail: EMPTY_PITCH_DETAIL,
     form: latest ? null : newGameForm(teamName),
     helpOpen: false,
     tutorialStep: hasSeenTutorial() ? null : 0,
@@ -645,6 +649,9 @@ export function mountApp(root: HTMLElement): void {
     },
     editEvent: (event: UndoableEvent | null) => {
       state.editingEvent = event;
+      // 공이면 원래 투구 상세로 채워 두고 고친다.
+      state.editDetail =
+        event?.kind === 'pitch' ? { pitchType: event.pitchType ?? null, zone: event.zone ?? null, speed: event.speed ?? null } : EMPTY_PITCH_DETAIL;
       render();
     },
     eventEdit: {
@@ -661,6 +668,19 @@ export function mountApp(root: HTMLElement): void {
         state.editingEvent = null;
         state.notice = '지웠어요. 원래 기록은 이력으로 남아요.';
         updateResultGame((g) => addVoid(g, targetId));
+      },
+      toggleDetail: () => inputActions.toggleDetail(),
+      changeDetail: (detail: PitchDetail) => {
+        state.editDetail = detail;
+        render();
+      },
+      changeSpeed: (speed: number | null) => {
+        state.editDetail = { ...state.editDetail, speed };
+      },
+      saveDetail: (targetId: string, detail: PitchDetail) => {
+        state.editingEvent = null;
+        state.notice = '투구 상세를 고쳤어요.';
+        updateResultGame((g) => addDetailEdit(g, targetId, detail));
       },
     },
     openChildRecord: () => {
@@ -892,6 +912,7 @@ export function mountApp(root: HTMLElement): void {
           score: lineScore(shownReplay, activeEvents(shown.events)),
           cellDraft: state.cellDraft,
           editing: state.editingEvent,
+          editDetail: { detailMode: state.detailMode, hand: state.hand, detail: state.editDetail },
         },
         resultActions,
       );

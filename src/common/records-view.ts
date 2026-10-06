@@ -7,7 +7,7 @@ import { MAX_RUNS, Team, UndoableEvent } from './events';
 import { GAME_TYPE_LABEL, GameInfo, dateLabel, opponentLabel, orderLabel, ourTeamLabel } from './game';
 import { ACTOR_LABEL, GAME_RESULT_LABEL, RUNNER_EVENT_LABEL, SCORE_CELL_LABEL, TOTAL_FIELD_LABEL, eventLabel, outcomeLabel, sceneTitle } from './labels';
 import { popup } from './popup';
-import { EventEditActions, eventEditPopup } from './event-edit-view';
+import { EditDetailOptions, EventEditActions, eventEditPopup } from './event-edit-view';
 import { LineScore } from './line-score';
 import { ScoreCellTarget, lineScoreTable } from './line-score-view';
 import { GameReplay, PlateAppearance, Scene, SceneEnd } from './replay';
@@ -122,6 +122,8 @@ export interface ResultModel {
   readonly cellDraft: ScoreCellDraft | null;
   /** 고치고 있는 기록 */
   readonly editing: UndoableEvent | null;
+  /** 고치기 창의 투구 상세 (기록 입력과 같은 켜짐/꺼짐 설정) */
+  readonly editDetail: EditDetailOptions;
 }
 
 /** 경기 결과: 스코어보드 · 내 아이 기록 보기 · 장면별 기록 */
@@ -148,6 +150,6 @@ export function recordsView(model: ResultModel, actions: ResultActions): HTMLEle
     scenes.length > 0 ? h('p', { className: 'help', text: '공이나 기록을 누르면 고치거나 지울 수 있어요.' }) : null,
     ...scenes.map((scene) => sceneBlock(scene, replay, actions.editEvent)),
     model.cellDraft ? scoreCellPopup(model.cellDraft, names[model.cellDraft.team], actions) : null,
-    model.editing ? eventEditPopup(model.editing, actions.eventEdit) : null,
+    model.editing ? eventEditPopup(model.editing, model.editDetail, actions.eventEdit) : null,
   ]);
 }
