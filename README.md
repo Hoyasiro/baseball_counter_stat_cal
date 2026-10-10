@@ -15,7 +15,7 @@
 
 ## 설치 (휴대폰)
 
-1. https://hoyasiro.github.io/baseball_counter_stat_cal/ 을 휴대폰 브라우저로 엽니다.
+1. https://yagumam.github.io/baseball_counter_stat_cal/ 을 휴대폰 브라우저로 엽니다.
 2. 아이폰은 Safari 공유 단추 → "홈 화면에 추가", 안드로이드는 Chrome 메뉴 → "홈 화면에 추가"(또는 "앱 설치").
 3. 한 번 열어 두면 인터넷이 없어도 열립니다. (서비스 워커 `public/sw.js`)
 
