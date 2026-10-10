@@ -145,7 +145,7 @@
 ### 5.4 기술 스택
 - **형태**: 웹앱(PWA). 휴대폰 브라우저에서 바로 실행하고, 홈 화면에 추가해 앱처럼 쓸 수 있게 한다.
 - **저장**: 데모 단계는 휴대폰 안(브라우저 로컬 저장소)에 저장한다. 서버·동기화는 공증 기능 단계에서 도입한다.
-- **배포**: `main`에 합쳐지면 GitHub Actions가 테스트·빌드 후 GitHub Pages(`https://hoyasiro.github.io/baseball_counter_stat_cal/`)에 올린다. 빌드는 상대 경로(`base: './'`)로 한다. 서비스 워커(`public/sw.js`)로 한 번 연 앱은 오프라인에서도 열린다. 빌드 결과물이 바뀌는 구조를 고치면 `sw.js`의 캐시 이름(`CACHE`)을 올린다. 홈 화면 아이콘은 `public/icons/`에 있다. manifest의 `id`는 상대 경로로 쓰면 사이트 맨 앞(`https://hoyasiro.github.io/`)으로 풀려 같은 주소의 다른 앱(요리 앱 등)과 헷갈리므로, `/baseball_counter_stat_cal/yagumam`처럼 앱 주소를 포함한 값으로 둔다.
+- **배포**: `main`에 합쳐지면 GitHub Actions가 테스트·빌드 후 GitHub Pages(`https://yagumam.github.io/baseball_counter_stat_cal/`)에 올린다. 빌드는 상대 경로(`base: './'`)로 한다. 서비스 워커(`public/sw.js`)로 한 번 연 앱은 오프라인에서도 열린다. 빌드 결과물이 바뀌는 구조를 고치면 `sw.js`의 캐시 이름(`CACHE`)을 올린다. 홈 화면 아이콘은 `public/icons/`에 있다. manifest의 `id`는 상대 경로로 쓰면 사이트 맨 앞으로 풀리므로 `/baseball_counter_stat_cal/yagumam`처럼 앱 주소를 포함한 값으로 둔다. 안드로이드 크롬은 한 사이트 주소(`xxx.github.io`)에 설치형 앱을 하나만 받아 주므로, 이 앱은 전용 GitHub 조직 `yagumam`에 두고 다른 PWA와 같은 주소를 나눠 쓰지 않는다.
 - **언어·도구**: TypeScript, Vite(개발 서버·빌드), Vitest(테스트). 화면 프레임워크 없이 DOM을 직접 다룬다. (단순하게 시작, 필요해지면 도입)
 - **명령어**: `npm run dev`(개발 서버), `npm test`(테스트), `npm run typecheck`(타입 검사), `npm run build`(빌드)
 - **폴더**: `src/common`(공통: 상황 기록·다시 계산하는 엔진·입력/기록 보기/경기 목록(정렬·찾기)/설정(우리 팀 이름·화면 방향·손 방향·데이터 관리) 화면·스코어보드·공통 공식·도움말), `src/pitcher`(투수 통계·분석 화면), `src/batter`(타자·주루 통계·분석 화면), `src/fielder`(수비 통계·분석 화면), `src/app.ts`(화면 전환: 아래 탭은 기록 입력 · 경기(경기 목록 → 경기마다 결과 · 이어서 기록 · 정보 고치기 · 삭제) · 분석(투수 · 타자 · 수비) · 설정 4개)

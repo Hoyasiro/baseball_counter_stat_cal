@@ -134,7 +134,7 @@ export const MANUAL_SECTIONS: readonly ManualSection[] = [
       {
         title: '휴대폰에 앱으로 설치하기',
         text: [
-          '앱 주소(https://hoyasiro.github.io/baseball_counter_stat_cal/)를 휴대폰 브라우저로 엽니다.',
+          '앱 주소(https://yagumam.github.io/baseball_counter_stat_cal/)를 휴대폰 브라우저로 엽니다.',
           '아이폰: Safari 아래쪽 공유 단추 → "홈 화면에 추가". 안드로이드: Chrome 오른쪽 위 메뉴(⋮) → "홈 화면에 추가" 또는 "앱 설치".',
           '홈 화면의 야구맘기록지 아이콘으로 열면 주소창 없이 앱처럼 열립니다.',
           '한 번 열어 두면 야구장처럼 인터넷이 약하거나 끊긴 곳에서도 앱이 열리고 기록할 수 있습니다.',
