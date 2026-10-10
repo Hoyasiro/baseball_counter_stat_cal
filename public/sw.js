@@ -3,7 +3,7 @@
 // - 그림·코드 파일: 저장해 둔 것을 먼저 쓴다. 빌드할 때 파일 이름이 바뀌므로 오래된 파일이 남지 않는다.
 // 기록 데이터는 여기서 다루지 않는다. (브라우저 로컬 저장소에 따로 있다)
 
-const CACHE = 'yagumam-v2';
+const CACHE = 'yagumam-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
 /** index.html이 쓰는 빌드 파일(assets/...)도 처음 설치할 때 함께 저장한다. */

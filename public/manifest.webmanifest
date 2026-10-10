@@ -3,7 +3,7 @@
   "short_name": "야구맘기록지",
   "description": "경기를 보면서 우리 아이 야구 기록을 간단히 남기고 돌아보는 앱",
   "lang": "ko",
-  "id": "./",
+  "id": "/baseball_counter_stat_cal/yagumam",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
